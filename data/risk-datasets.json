@@ -1,0 +1,27 @@
+{
+  "version": "1.1",
+  "province": "กำแพงเพชร",
+  "latestYearBe": 2569,
+  "datasets": [
+    {
+      "yearBe": 2566,
+      "url": "risk/data/hotspot/hotspot_2566.geojson",
+      "label": "Agri-Risk HS 2566"
+    },
+    {
+      "yearBe": 2567,
+      "url": "risk/data/hotspot/hotspot_2567.geojson",
+      "label": "Agri-Risk HS 2567"
+    },
+    {
+      "yearBe": 2568,
+      "url": "risk/data/hotspot/hotspot_2568.geojson",
+      "label": "Agri-Risk HS 2568"
+    },
+    {
+      "yearBe": 2569,
+      "url": "risk/data/hotspot/hotspot_2569.geojson",
+      "label": "Agri-Risk HS 2569"
+    }
+  ]
+}

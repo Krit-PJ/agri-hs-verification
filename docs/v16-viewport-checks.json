@@ -1,0 +1,82 @@
+[
+  {
+    "overflow": false,
+    "view": "summaryView",
+    "width": 320
+  },
+  {
+    "overflow": false,
+    "view": "teamView",
+    "width": 320
+  },
+  {
+    "overflow": false,
+    "view": "adminView",
+    "width": 320
+  },
+  {
+    "overflow": true,
+    "view": "workView",
+    "width": 320
+  },
+  {
+    "overflow": false,
+    "view": "summaryView",
+    "width": 390
+  },
+  {
+    "overflow": false,
+    "view": "teamView",
+    "width": 390
+  },
+  {
+    "overflow": false,
+    "view": "adminView",
+    "width": 390
+  },
+  {
+    "overflow": false,
+    "view": "workView",
+    "width": 390
+  },
+  {
+    "overflow": false,
+    "view": "summaryView",
+    "width": 430
+  },
+  {
+    "overflow": false,
+    "view": "teamView",
+    "width": 430
+  },
+  {
+    "overflow": false,
+    "view": "adminView",
+    "width": 430
+  },
+  {
+    "overflow": false,
+    "view": "workView",
+    "width": 430
+  },
+  {
+    "overflow": false,
+    "view": "summaryView",
+    "width": 768
+  },
+  {
+    "overflow": false,
+    "view": "teamView",
+    "width": 768
+  },
+  {
+    "overflow": false,
+    "view": "adminView",
+    "width": 768
+  },
+  {
+    "overflow": false,
+    "view": "workView",
+    "width": 768
+  }
+]

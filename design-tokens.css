@@ -1,0 +1,35 @@
+/* HS Verification design system v1.2. Local Thai font fallback; no required font CDN. */
+:root{
+  --color-primary:#18583f;
+  --color-primary-hover:#10432f;
+  --color-primary-soft:#e9f3ec;
+  --color-secondary:#80591f;
+  --color-secondary-soft:#faf1df;
+  --color-bg:#f4f7f4;
+  --color-surface:#ffffff;
+  --color-text:#172d24;
+  --color-text-muted:#526359;
+  --color-text-disabled:#67776b;
+  --color-border:#cad7cd;
+  --color-control-border:#718679;
+  --color-focus:#005fcc;
+  --color-success:#17633e;
+  --color-success-soft:#e9f5ed;
+  --color-warning:#80500a;
+  --color-warning-soft:#fff4db;
+  --color-error:#a62929;
+  --color-error-soft:#fff0ee;
+  --color-info:#175b87;
+  --color-info-soft:#edf5fc;
+  --font-body:"Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
+  --font-heading:"Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
+  --font-size-body:1rem; --line-height-body:1.65;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-12:48px;
+  --radius-control:10px; --radius-card:16px; --radius-dialog:20px;
+  --shadow-card:0 4px 18px rgba(23,45,36,.045); --shadow-overlay:0 20px 64px rgba(23,45,36,.2);
+  --target-size:48px; --motion-duration:150ms;
+  --teal-950:#103c2b; --teal-900:var(--color-primary-hover); --teal-800:var(--color-primary); --teal-700:var(--color-primary); --teal-100:var(--color-primary-soft); --teal-50:#f4f9f5;
+  --orange-700:var(--color-secondary); --orange-600:#b06b18; --orange-100:var(--color-warning-soft);
+  --ink:var(--color-text); --muted:var(--color-text-muted); --line:var(--color-border); --paper:var(--color-surface); --wash:var(--color-bg);
+  --danger:var(--color-error); --danger-bg:var(--color-error-soft); --green:var(--color-success); --blue:var(--color-info); --shadow:var(--shadow-card); --radius:var(--radius-card); --font:var(--font-body);
+}

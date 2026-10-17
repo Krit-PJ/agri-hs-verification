@@ -1,0 +1,696 @@
+{
+  "50": {
+    "code": "50",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Chiang_Mai.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Seal_Chiang_Mai.svg/120px-Seal_Chiang_Mai.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/50.png"
+  },
+  "57": {
+    "code": "57",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Chaing_Rai_Province_(color_version,_Thai_Fine_Art_Department).png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Seal_of_Chaing_Rai_Province_%28color_version%2C_Thai_Fine_Art_Department%29.png/120px-Seal_of_Chaing_Rai_Province_%28color_version%2C_Thai_Fine_Art_Department%29.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "https://virtualarchives.nat.go.th/download/files/%E0%B8%AA%E0%B8%88%E0%B8%8A.pdf",
+    "path": "assets/provinces/57.png"
+  },
+  "52": {
+    "code": "52",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Lampang_-_coloured.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Seal_Lampang_-_coloured.png/120px-Seal_Lampang_-_coloured.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department",
+    "path": "assets/provinces/52.png"
+  },
+  "51": {
+    "code": "51",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Lamphun_province_(colored_version,_provincial_administration).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/38/Seal_of_Lamphun_province_%28colored_version%2C_provincial_administration%29.svg/120px-Seal_of_Lamphun_province_%28colored_version%2C_provincial_administration%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Lamphun Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/51.png"
+  },
+  "58": {
+    "code": "58",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Mae_Hong_Son_province_(colored_version,_provincial_administration).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/50/Seal_of_Mae_Hong_Son_province_%28colored_version%2C_provincial_administration%29.svg/120px-Seal_of_Mae_Hong_Son_province_%28colored_version%2C_provincial_administration%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Mae Hong Son Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/58.png"
+  },
+  "55": {
+    "code": "55",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nan_province_(colored_version,_provincial_administration).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/Seal_of_Nan_province_%28colored_version%2C_provincial_administration%29.svg/120px-Seal_of_Nan_province_%28colored_version%2C_provincial_administration%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Nan Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/55.png"
+  },
+  "56": {
+    "code": "56",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Phayao.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Seal_Phayao.png/120px-Seal_Phayao.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/56.png"
+  },
+  "54": {
+    "code": "54",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phrae_Province_(colour_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Seal_of_Phrae_Province_%28colour_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Phrae_Province_%28colour_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original design by Fine Arts Department of the Kingdom of Thailand, tracing into SVG format by User:Xiengyod~commonswiki",
+    "path": "assets/provinces/54.png"
+  },
+  "53": {
+    "code": "53",
+    "source": "https://commons.wikimedia.org/wiki/File:Uttaradit_Seal.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Uttaradit_Seal.png/120px-Uttaradit_Seal.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand, original artist: Phra Phrompichit (Ou Laphanon).",
+    "path": "assets/provinces/53.png"
+  },
+  "37": {
+    "code": "37",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Amnat_Charoen_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/Seal_of_Amnat_Charoen_province.svg/120px-Seal_of_Amnat_Charoen_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Amnat Charoen Provincial Office Vector:  Amnat Charoen Provincial Office",
+    "path": "assets/provinces/37.png"
+  },
+  "38": {
+    "code": "38",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Bueng_Kan_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/Seal_of_Bueng_Kan_Province.svg/120px-Seal_of_Bueng_Kan_Province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Unknown Vector:  Designism",
+    "path": "assets/provinces/38.png"
+  },
+  "31": {
+    "code": "31",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Buriram.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Seal_Buriram.png/120px-Seal_Buriram.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/31.png"
+  },
+  "36": {
+    "code": "36",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Chaiyaphum_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Seal_of_Chaiyaphum_province.svg/120px-Seal_of_Chaiyaphum_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Chaiyaphum Provincial Office Vector:  Chaiyaphum Provincial Office",
+    "path": "assets/provinces/36.png"
+  },
+  "46": {
+    "code": "46",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Kalasin.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Seal_of_Kalasin.svg/120px-Seal_of_Kalasin.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/46.png"
+  },
+  "40": {
+    "code": "40",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Khon_Kaen.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Seal_Khon_Kaen.png/120px-Seal_Khon_Kaen.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/40.png"
+  },
+  "42": {
+    "code": "42",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Loei_province_(colored).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/db/Seal_of_Loei_province_%28colored%29.svg/120px-Seal_of_Loei_province_%28colored%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/42.png"
+  },
+  "44": {
+    "code": "44",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Maha_Sarakham_province_(colour).png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/Seal_of_Maha_Sarakham_province_%28colour%29.png/120px-Seal_of_Maha_Sarakham_province_%28colour%29.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original line art by RWN38, colourize by Bbritteethewise",
+    "path": "assets/provinces/44.png"
+  },
+  "49": {
+    "code": "49",
+    "source": "https://commons.wikimedia.org/wiki/File:%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%AA%E0%B8%B1%E0%B8%8D%E0%B8%A5%E0%B8%B1%E0%B8%81%E0%B8%A9%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%B8%E0%B8%81%E0%B8%94%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%AA%E0%B8%B1%E0%B8%8D%E0%B8%A5%E0%B8%B1%E0%B8%81%E0%B8%A9%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%B8%E0%B8%81%E0%B8%94%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3.svg/120px-%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%AA%E0%B8%B1%E0%B8%8D%E0%B8%A5%E0%B8%B1%E0%B8%81%E0%B8%A9%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%B8%E0%B8%81%E0%B8%94%E0%B8%B2%E0%B8%AB%E0%B8%B2%E0%B8%A3.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "จังหวัดมุกดาหาร (Mukdahan Province)",
+    "path": "assets/provinces/49.png"
+  },
+  "48": {
+    "code": "48",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nakhon_Phanom_Province_(color_version).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/Seal_of_Nakhon_Phanom_Province_%28color_version%29.svg/120px-Seal_of_Nakhon_Phanom_Province_%28color_version%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original design by Fine Arts Department of the Kingdom of Thailand, tracing into SVG format by User:Xiengyod~commonswiki",
+    "path": "assets/provinces/48.png"
+  },
+  "30": {
+    "code": "30",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Nakhon_Ratchasima.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/Seal_Nakhon_Ratchasima.svg/120px-Seal_Nakhon_Ratchasima.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Chainwit.",
+    "path": "assets/provinces/30.png"
+  },
+  "39": {
+    "code": "39",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nong_Bua_Lamphu_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Seal_of_Nong_Bua_Lamphu_province.svg/120px-Seal_of_Nong_Bua_Lamphu_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Nong Bua Lamphu Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/39.png"
+  },
+  "43": {
+    "code": "43",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nong_Khai_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Seal_of_Nong_Khai_province.svg/120px-Seal_of_Nong_Khai_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Nong Khai Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/43.png"
+  },
+  "45": {
+    "code": "45",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Roi_Et_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Seal_of_Roi_Et_province.svg/120px-Seal_of_Roi_Et_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Roi Et Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/45.png"
+  },
+  "47": {
+    "code": "47",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Sakon_Nakhon.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Seal_Sakon_Nakhon.png/120px-Seal_Sakon_Nakhon.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/47.png"
+  },
+  "33": {
+    "code": "33",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Sisaket.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/36/Seal_of_Sisaket.svg/120px-Seal_of_Sisaket.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/33.png"
+  },
+  "32": {
+    "code": "32",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Surin_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Seal_of_Surin_province.svg/120px-Seal_of_Surin_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Surin Provincial Office Vector:  Surin Provincial Office",
+    "path": "assets/provinces/32.png"
+  },
+  "34": {
+    "code": "34",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Ubon_Ratchathani.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Seal_Ubon_Ratchathani.png/120px-Seal_Ubon_Ratchathani.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/34.png"
+  },
+  "41": {
+    "code": "41",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Udon_Thani_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Seal_of_Udon_Thani_province.svg/120px-Seal_of_Udon_Thani_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Udon Thani Provincial Office Vector:  RWN38",
+    "path": "assets/provinces/41.png"
+  },
+  "35": {
+    "code": "35",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Yasothon_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fd/Seal_of_Yasothon_province.svg/120px-Seal_of_Yasothon_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Yasothon Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/35.png"
+  },
+  "71": {
+    "code": "71",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Kanchanaburi_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Seal_of_Kanchanaburi_Province.svg/120px-Seal_of_Kanchanaburi_Province.svg.png",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "author": "RWN38",
+    "path": "assets/provinces/71.png"
+  },
+  "76": {
+    "code": "76",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phetchaburi_province.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Seal_of_Phetchaburi_province.png/120px-Seal_of_Phetchaburi_province.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Bbritteethewise, elements by RWN38",
+    "path": "assets/provinces/76.png"
+  },
+  "77": {
+    "code": "77",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Prachuap_Khiri_Khan_province_(colored_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Seal_of_Prachuap_Khiri_Khan_province_%28colored_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Prachuap_Khiri_Khan_province_%28colored_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department\n",
+    "path": "assets/provinces/77.png"
+  },
+  "70": {
+    "code": "70",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Ratchaburi_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Seal_of_Ratchaburi_province.svg/120px-Seal_of_Ratchaburi_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: RWN38Seal extracted by: HaeKN",
+    "path": "assets/provinces/70.png"
+  },
+  "63": {
+    "code": "63",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Tak_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Seal_of_Tak_province.svg/120px-Seal_of_Tak_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: RWN38Seal extracted by: HaeKN",
+    "path": "assets/provinces/63.png"
+  },
+  "15": {
+    "code": "15",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Ang_Thong_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Seal_of_Ang_Thong_Province.svg/120px-Seal_of_Ang_Thong_Province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "RWN38",
+    "path": "assets/provinces/15.png"
+  },
+  "10": {
+    "code": "10",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Bangkok_Metropolitan_Admin_(green).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/Seal_Bangkok_Metropolitan_Admin_%28green%29.svg/120px-Seal_Bangkok_Metropolitan_Admin_%28green%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Bangkok Metropolitan Administration",
+    "path": "assets/provinces/10.png"
+  },
+  "18": {
+    "code": "18",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Chai_Nat_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/Seal_of_Chai_Nat_province.svg/120px-Seal_of_Chai_Nat_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/18.png"
+  },
+  "62": {
+    "code": "62",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Kamphaeng_Phet_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Seal_of_Kamphaeng_Phet_province.svg/120px-Seal_of_Kamphaeng_Phet_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/logo-kpp.png",
+    "note": "User-supplied KPP asset retained"
+  },
+  "16": {
+    "code": "16",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Lopburi_province.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Seal_of_Lopburi_province.png/120px-Seal_of_Lopburi_province.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/16.png"
+  },
+  "26": {
+    "code": "26",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nakhon_Nayok_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Seal_of_Nakhon_Nayok_province.svg/120px-Seal_of_Nakhon_Nayok_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/26.png"
+  },
+  "73": {
+    "code": "73",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nakhon_Pathom_province_(colour_version).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Seal_of_Nakhon_Pathom_province_%28colour_version%29.svg/120px-Seal_of_Nakhon_Pathom_province_%28colour_version%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/73.png"
+  },
+  "60": {
+    "code": "60",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Nakhon_Sawan_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Seal_of_Nakhon_Sawan_province.svg/120px-Seal_of_Nakhon_Sawan_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: Th FlagSeal extracted by: HaeKN",
+    "path": "assets/provinces/60.png"
+  },
+  "12": {
+    "code": "12",
+    "source": "https://commons.wikimedia.org/wiki/File:Nonthaburi_Province_Seal.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Nonthaburi_Province_Seal.svg/120px-Nonthaburi_Province_Seal.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "PuritWiki",
+    "path": "assets/provinces/12.png"
+  },
+  "13": {
+    "code": "13",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Pathum_Thani.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Seal_of_Pathum_Thani.svg/120px-Seal_of_Pathum_Thani.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/13.png"
+  },
+  "67": {
+    "code": "67",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phetchabun_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Seal_of_Phetchabun_province.svg/120px-Seal_of_Phetchabun_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/67.png"
+  },
+  "66": {
+    "code": "66",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phichit_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/00/Seal_of_Phichit_province.svg/120px-Seal_of_Phichit_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: Th FlagSeal extracted by: HaeKN",
+    "path": "assets/provinces/66.png"
+  },
+  "65": {
+    "code": "65",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phitsanulok_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/Seal_of_Phitsanulok_Province.svg/120px-Seal_of_Phitsanulok_Province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "user:SietsL, user:Me.tammalak.nU",
+    "path": "assets/provinces/65.png"
+  },
+  "14": {
+    "code": "14",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phra_Nakhon_Si_Ayutthaya_Province_(color_version,_Thai_Fine_Art_Department).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Seal_of_Phra_Nakhon_Si_Ayutthaya_Province_%28color_version%2C_Thai_Fine_Art_Department%29.svg/120px-Seal_of_Phra_Nakhon_Si_Ayutthaya_Province_%28color_version%2C_Thai_Fine_Art_Department%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original design by Fine Arts Department of the Kingdom of Thailand, tracing into SVG format by User:Xiengyod~commonswiki",
+    "path": "assets/provinces/14.png"
+  },
+  "11": {
+    "code": "11",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Samut_Prakan_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Seal_of_Samut_Prakan_province.svg/120px-Seal_of_Samut_Prakan_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: RWN38Seal extracted by: HaeKN",
+    "path": "assets/provinces/11.png"
+  },
+  "74": {
+    "code": "74",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Samut_Sakhon_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/Seal_of_Samut_Sakhon_province.svg/120px-Seal_of_Samut_Sakhon_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: RWN38Seal extracted by: HaeKN",
+    "path": "assets/provinces/74.png"
+  },
+  "75": {
+    "code": "75",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Samut_Songkhram.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6a/Seal_Samut_Songkhram.png/120px-Seal_Samut_Songkhram.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/75.png"
+  },
+  "19": {
+    "code": "19",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Saraburi_(2564).png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Seal_Saraburi_%282564%29.png/120px-Seal_Saraburi_%282564%29.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Government of Thailand",
+    "path": "assets/provinces/19.png"
+  },
+  "17": {
+    "code": "17",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Sing_Buri_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b8/Seal_of_Sing_Buri_province.svg/120px-Seal_of_Sing_Buri_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: RWN38Seal extracted by: HaeKN",
+    "path": "assets/provinces/17.png"
+  },
+  "64": {
+    "code": "64",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Sukhothai_Province_(color_version).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Seal_of_Sukhothai_Province_%28color_version%29.svg/120px-Seal_of_Sukhothai_Province_%28color_version%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original design by Fine Arts Department of the Kingdom of Thailand, tracing into SVG format by User:Xiengyod~commonswiki",
+    "path": "assets/provinces/64.png"
+  },
+  "72": {
+    "code": "72",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Suphanburi.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/17/Seal_Suphanburi.png/120px-Seal_Suphanburi.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/72.png"
+  },
+  "61": {
+    "code": "61",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Uthai_Thani_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Seal_of_Uthai_Thani_Province.svg/120px-Seal_of_Uthai_Thani_Province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "RWN38",
+    "path": "assets/provinces/61.png"
+  },
+  "24": {
+    "code": "24",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Chachoengsao.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Seal_Chachoengsao.png/120px-Seal_Chachoengsao.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Government of Thailand.",
+    "path": "assets/provinces/24.png"
+  },
+  "22": {
+    "code": "22",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Chanthaburi_(1).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Seal_Chanthaburi_%281%29.svg/120px-Seal_Chanthaburi_%281%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand",
+    "path": "assets/provinces/22.png"
+  },
+  "20": {
+    "code": "20",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Chonburi.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Seal_of_Chonburi.svg/120px-Seal_of_Chonburi.svg.png",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Jinitak",
+    "path": "assets/provinces/20.png"
+  },
+  "25": {
+    "code": "25",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Prachin_Buri_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_Prachin_Buri_province.svg/120px-Seal_of_Prachin_Buri_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original file by: Th FlagSeal extracted by: HaeKN",
+    "path": "assets/provinces/25.png"
+  },
+  "21": {
+    "code": "21",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Rayong.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/Seal_of_Rayong.svg/120px-Seal_of_Rayong.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/21.png"
+  },
+  "27": {
+    "code": "27",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Sa_Kaeo_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/Seal_of_Sa_Kaeo_province.svg/120px-Seal_of_Sa_Kaeo_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/27.png"
+  },
+  "23": {
+    "code": "23",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Trat_Province.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Seal_of_Trat_Province.png/120px-Seal_of_Trat_Province.png",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Bbritteethewise",
+    "path": "assets/provinces/23.png"
+  },
+  "86": {
+    "code": "86",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Chomphon_Province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Seal_of_Chomphon_Province.svg/120px-Seal_of_Chomphon_Province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Government of Thailand.",
+    "path": "assets/provinces/86.png"
+  },
+  "81": {
+    "code": "81",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Krabi_(alternative_color).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b8/Seal_of_Krabi_%28alternative_color%29.svg/120px-Seal_of_Krabi_%28alternative_color%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/81.png"
+  },
+  "80": {
+    "code": "80",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_Nakhon_Si_Thammarat_-_colour.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Seal_Nakhon_Si_Thammarat_-_colour.svg/120px-Seal_Nakhon_Si_Thammarat_-_colour.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department\n",
+    "path": "assets/provinces/80.png"
+  },
+  "96": {
+    "code": "96",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Narathiwat_province_(colored_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/Seal_of_Narathiwat_province_%28colored_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Narathiwat_province_%28colored_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Narathiwat Provincial Office Vector:  HaeKN",
+    "path": "assets/provinces/96.png"
+  },
+  "94": {
+    "code": "94",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Pattani_(colour_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Seal_of_Pattani_%28colour_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Pattani_%28colour_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "author": "มองโกเลีย๔๔",
+    "path": "assets/provinces/94.png"
+  },
+  "82": {
+    "code": "82",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Phang_Nga_(colour_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/Seal_of_Phang_Nga_%28colour_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Phang_Nga_%28colour_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Government of Thailand.",
+    "path": "assets/provinces/82.png"
+  },
+  "93": {
+    "code": "93",
+    "source": "https://commons.wikimedia.org/wiki/File:Provincial_Seal_of_Phatthalung.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b8/Provincial_Seal_of_Phatthalung.svg/120px-Provincial_Seal_of_Phatthalung.svg.png",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Zsoy",
+    "path": "assets/provinces/93.png"
+  },
+  "83": {
+    "code": "83",
+    "source": "https://commons.wikimedia.org/wiki/File:%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%88%E0%B8%B3%E0%B8%88%E0%B8%B1%E0%B8%87%E0%B8%AB%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%A0%E0%B8%B9%E0%B9%80%E0%B8%81%E0%B9%87%E0%B8%95_(%E0%B8%AA%E0%B8%B5%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B9%80%E0%B8%87%E0%B8%B4%E0%B8%99).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%88%E0%B8%B3%E0%B8%88%E0%B8%B1%E0%B8%87%E0%B8%AB%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%A0%E0%B8%B9%E0%B9%80%E0%B8%81%E0%B9%87%E0%B8%95_%28%E0%B8%AA%E0%B8%B5%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B9%80%E0%B8%87%E0%B8%B4%E0%B8%99%29.svg/120px-%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%88%E0%B8%B3%E0%B8%88%E0%B8%B1%E0%B8%87%E0%B8%AB%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%A0%E0%B8%B9%E0%B9%80%E0%B8%81%E0%B9%87%E0%B8%95_%28%E0%B8%AA%E0%B8%B5%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B9%80%E0%B8%87%E0%B8%B4%E0%B8%99%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Fine Arts Department (กรมศิลปากร) of Thailand.",
+    "path": "assets/provinces/83.png"
+  },
+  "85": {
+    "code": "85",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Ranong_Province.png",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/Seal_of_Ranong_Province.png/120px-Seal_of_Ranong_Province.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "RWN38",
+    "path": "assets/provinces/85.png"
+  },
+  "91": {
+    "code": "91",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Satun_Province_(colour_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Seal_of_Satun_Province_%28colour_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Satun_Province_%28colour_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "มองโกเลีย๔๔",
+    "path": "assets/provinces/91.png"
+  },
+  "90": {
+    "code": "90",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Songkhla_(colour_version,_as_the_provincial_administration_used).svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Seal_of_Songkhla_%28colour_version%2C_as_the_provincial_administration_used%29.svg/120px-Seal_of_Songkhla_%28colour_version%2C_as_the_provincial_administration_used%29.svg.png",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "author": "มองโกเลีย๔๔",
+    "path": "assets/provinces/90.png"
+  },
+  "84": {
+    "code": "84",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Surat_Thani_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Seal_of_Surat_Thani_province.svg/120px-Seal_of_Surat_Thani_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Surat Thani Provincial Office Vector:  Th Flag",
+    "path": "assets/provinces/84.png"
+  },
+  "92": {
+    "code": "92",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Trang.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Seal_of_Trang.svg/120px-Seal_of_Trang.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "HaeKN",
+    "path": "assets/provinces/92.png"
+  },
+  "95": {
+    "code": "95",
+    "source": "https://commons.wikimedia.org/wiki/File:Seal_of_Yala_province.svg",
+    "remoteUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Seal_of_Yala_province.svg/120px-Seal_of_Yala_province.svg.png",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "author": "Original: Yala Provincial Office Vector:  RWN38",
+    "path": "assets/provinces/95.png"
+  }
+}

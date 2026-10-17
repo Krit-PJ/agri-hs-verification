@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agri-Risk Map Burning | จังหวัดกำแพงเพชร</title>
+<!-- Leaflet -->
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Chart.js -->
+<script onerror="this.onerror=null;this.src='https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js'" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Leaflet MarkerCluster -->
+<link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="css/style.css" rel="stylesheet"/>
+<style>
+    :root { --ui-font-size: 15px; --header-green:#14532d; --header-gold:#d4a72c; }
+    .brand-logos { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+    .brand-logo { width:58px; height:58px; object-fit:contain; background:#fff; border-radius:50%; padding:3px; box-shadow:0 2px 8px rgba(0,0,0,.22); }
+    .brand-title h1 { line-height:1.15; }
+    .download-guide { display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:7px 10px; border-radius:6px; background:#0f766e; color:#fff; text-decoration:none; font-weight:700; }
+    .download-guide:hover { filter:brightness(1.08); }
+    .crop-filter-wrap { margin-top:7px; padding-left:22px; }
+    .crop-filter-wrap select { width:100%; }
+    .scope-caption { margin:4px 0 8px; font-size:.86rem; opacity:.8; }
+    .chart-box.chart-crop-full { margin-top:10px; }
+    .chart-box.chart-crop-full canvas { max-height:190px; }
+    :root { --ui-font-size: 15px; }
+    body, button, select, input { font-size: var(--ui-font-size); }
+    .panel-section h3 { font-size: 1.08rem; }
+    .field-help, .model-note { font-size: .84rem; line-height: 1.45; opacity: .86; }
+    .locked-field { opacity: .92; cursor: not-allowed; }
+    .filter-actions, .data-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .btn-primary, .btn-secondary, .btn-print {
+      border:0; border-radius:6px; padding:8px 12px; cursor:pointer; font-weight:700;
+    }
+    .btn-primary, .btn-print { background:#1976d2; color:#fff; }
+    .btn-secondary { background:#334155; color:#fff; }
+    .risk-formula { margin:10px 0; padding:10px; border-radius:7px; background:#091829; line-height:1.55; }
+    .risk-factor-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0; }
+    .risk-factor { padding:7px; border:1px solid rgba(148,163,184,.25); border-radius:6px; }
+    .risk-factor strong { display:block; font-size:.94rem; }
+    .risk-levels { display:grid; gap:5px; margin-top:9px; }
+    .risk-level { display:grid; grid-template-columns:12px 1fr; gap:7px; align-items:start; }
+    .risk-swatch { width:12px; height:12px; border-radius:50%; margin-top:4px; }
+    #import-status { margin-top:7px; min-height:1.2em; }
+    .print-only { display:none; }
+
+    @page { size: A4 landscape; margin: 8mm; }
+    @media print {
+      html, body { width:297mm; height:210mm; overflow:hidden !important; background:#fff !important; }
+      body { color:#111 !important; font-size:9pt !important; }
+      #app-header { height:16mm !important; padding:3mm 5mm !important; }
+      #app-header h1 { font-size:15pt !important; margin:0 !important; }
+      #app-header p { font-size:8pt !important; margin:1mm 0 0 !important; }
+      #app-body { height:178mm !important; display:grid !important; grid-template-columns:48mm 1fr 70mm !important; gap:3mm !important; }
+      #left-panel, #right-panel { overflow:hidden !important; height:178mm !important; }
+      #left-panel .panel-section { padding:2mm !important; margin-bottom:2mm !important; }
+      #left-panel .panel-section:nth-of-type(1),
+      #left-panel .panel-section:nth-of-type(5) { display:none !important; }
+      #map-container, #map { height:178mm !important; min-height:178mm !important; }
+      #right-panel { display:grid !important; grid-template-rows:auto 42mm 48mm 1fr !important; gap:2mm !important; }
+      #right-panel .chart-box { padding:2mm !important; margin:0 !important; overflow:hidden !important; }
+      #right-panel .half-charts, #right-panel .chart-box:last-child { display:none !important; }
+      #summary-cards { gap:2mm !important; }
+      .card { min-height:18mm !important; padding:2mm !important; }
+      canvas { max-height:42mm !important; }
+      .no-print, button, input[type=file] { display:none !important; }
+      .print-only { display:block !important; }
+      select { appearance:none; border:0 !important; background:transparent !important; color:#111 !important; }
+      .risk-formula, .risk-factor, .panel-section { color:#111 !important; background:#fff !important; border-color:#bbb !important; }
+      .leaflet-control-container { display:none !important; }
+    }
+  
+    /* Header readability and centered print map */
+    .brand-title h1{font-size:24px!important;margin:0 0 2px!important;}
+    .brand-title .system-subtitle{font-size:15px!important;line-height:1.25;margin:0!important;color:#d7ecfa!important;}
+    .brand-title .developer-credit{font-size:14px!important;line-height:1.25;margin:2px 0 0!important;color:#fde68a!important;font-weight:700;}
+    .header-right{gap:8px!important;}
+    @media print{
+      #map-container{display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;}
+      #map{width:100%!important;height:100%!important;margin:auto!important;}
+      .brand-title .developer-credit{color:#333!important;font-size:8pt!important;}
+    }
+
+    /* Professional refinement: hierarchy, hotspot master switch and A4 report */
+    .brand-title h1{font-size:24px!important;}
+    .brand-title .system-subtitle{font-size:14px!important;line-height:1.25!important;}
+    .brand-title .developer-credit{font-size:12px!important;line-height:1.2!important;}
+    .hotspot-master-row{margin-bottom:6px;background:rgba(14,116,144,.18);border:1px solid rgba(103,232,249,.25);font-weight:800;}
+
+    @media print{
+      @page{size:A4 landscape;margin:7mm;}
+      html,body{width:297mm!important;height:210mm!important;overflow:hidden!important;background:#fff!important;}
+      body{font-size:8pt!important;color:#111!important;}
+      #app-header{height:18mm!important;min-height:18mm!important;padding:2mm 4mm!important;position:fixed!important;}
+      #app-header h1{font-size:14pt!important;}
+      .brand-title .system-subtitle{font-size:8pt!important;color:#222!important;}
+      .brand-title .developer-credit{font-size:7pt!important;color:#333!important;}
+      .brand-logo{width:12mm!important;height:12mm!important;}
+      #app-body{margin-top:18mm!important;height:178mm!important;display:grid!important;grid-template-columns:minmax(0,1fr) 78mm!important;gap:3mm!important;}
+      #left-panel{display:none!important;}
+      #map-container{height:178mm!important;min-height:178mm!important;display:block!important;position:relative!important;overflow:hidden!important;border:1px solid #888!important;}
+      #map{width:100%!important;height:100%!important;min-height:178mm!important;margin:0!important;}
+      #right-panel{height:178mm!important;overflow:hidden!important;padding:0!important;background:#fff!important;color:#111!important;display:grid!important;grid-template-rows:20mm 36mm 48mm 1fr!important;gap:2mm!important;}
+      #summary-cards{display:grid!important;grid-template-columns:1fr 1fr!important;gap:2mm!important;margin:0!important;}
+      .card{min-height:20mm!important;padding:2mm!important;background:#fff!important;color:#111!important;border:1px solid #777!important;}
+      .card-value,.card-label{color:#111!important;}
+      #right-panel .chart-box{display:block!important;margin:0!important;padding:2mm!important;overflow:hidden!important;background:#fff!important;color:#111!important;border:1px solid #999!important;}
+      #right-panel .chart-box:nth-of-type(2){display:none!important;} /* ซ่อน Top 5 เพื่อคงตาราง Top 10 */
+      #right-panel .chart-box:last-child{display:block!important;}
+      #right-panel .chart-box h4,.scope-caption{color:#111!important;font-size:7.5pt!important;margin-bottom:1mm!important;}
+      #chart-trend{max-height:27mm!important;}
+      #chart-risk{max-height:34mm!important;}
+      .risk-chart-layout{grid-template-columns:32mm 1fr!important;gap:2mm!important;min-height:0!important;}
+      .risk-legend-list{padding:1.5mm!important;gap:1mm!important;background:#fff!important;}
+      .risk-legend-item{font-size:7pt!important;grid-template-columns:4mm 1fr auto!important;gap:1mm!important;}
+      #tbl-top-district{font-size:6.8pt!important;}
+      #tbl-top-district th,#tbl-top-district td{padding:1.1mm 1mm!important;color:#111!important;background:#fff!important;border-color:#bbb!important;}
+      #tbl-top-district th{font-weight:800!important;}
+      .risk-badge{font-size:6.4pt!important;padding:.5mm 1mm!important;}
+      #map-legend{font-size:7pt!important;padding:1.5mm 2mm!important;bottom:4mm!important;right:4mm!important;}
+      .leaflet-control-container,.no-print,button,input[type=file]{display:none!important;}
+    }
+
+</style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script></head>
+<body>
+<nav aria-label="ระบบตรวจสอบ HS" style="padding:12px;background:#075e52;color:white"><a href="../index.html" style="color:white;font-weight:bold">← HS Verification • ตรวจสอบภาคสนาม</a></nav>
+
+<!-- HEADER -->
+<header id="app-header">
+<div class="header-left">
+<button id="sidebar-toggle" class="sidebar-toggle-btn no-print" type="button" aria-controls="left-panel" aria-expanded="true" title="ซ่อน/แสดงเมนูด้านซ้าย">☰ เมนู</button>
+<div aria-label="ตราหน่วยงาน" class="brand-logos">
+<img alt="ตรากรมส่งเสริมการเกษตร" class="brand-logo" src="assets/logo-doae.png"/>
+<img alt="ตราจังหวัดกำแพงเพชร" class="brand-logo" src="assets/logo-kpp.jpg"/>
+</div>
+<div class="brand-title">
+<h1>Agri-Risk Map Burning</h1>
+<p class="system-subtitle">ระบบประเมินและเฝ้าระวังความเสี่ยงการเผาในพื้นที่เกษตร จังหวัดกำแพงเพชร</p>
+<p class="developer-credit">พัฒนาโดย ดร. กิตติ&nbsp;&nbsp;โพธิ์จวง กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร</p>
+</div>
+</div>
+<div class="header-right"><span id="last-updated" class="header-action-badge update-badge">ข้อมูลล่าสุด: กำลังโหลด…</span>
+<button class="btn-print no-print header-action-badge" id="btn-print" title="พิมพ์รายงาน 1 หน้า A4" type="button"><span aria-hidden="true">🖨️</span><span>พิมพ์รายงาน</span></button>
+<button class="btn-admin no-print" id="btn-admin-login" type="button" aria-haspopup="dialog">🔐 Login</button>
+<button class="btn-admin-logout no-print hidden" id="btn-admin-logout" type="button">ออกจากระบบ</button>
+</div>
+</header>
+<div id="mobile-toolbar" class="no-print" aria-label="เมนูสำหรับโทรศัพท์มือถือ">
+  <button id="mobile-toggle-layers" type="button" aria-controls="left-panel" aria-expanded="false">☰ ชั้นข้อมูล</button>
+  <button id="mobile-toggle-dashboard" type="button" aria-controls="right-panel" aria-expanded="false">📊 สรุปผล</button>
+</div>
+<div id="mobile-overlay" class="no-print" hidden></div>
+
+<section id="print-report-header" class="print-only" aria-label="หัวรายงานสำหรับพิมพ์">
+  <div class="print-front-logos" aria-label="ตราหน่วยงาน">
+    <img alt="ตรากรมส่งเสริมการเกษตร" src="assets/logo-doae.png"/>
+    <img alt="ตราจังหวัดกำแพงเพชร" src="assets/logo-kpp.jpg"/>
+  </div>
+  <div class="print-title-block">
+    <h1>Agri-Risk Map Burning</h1>
+    <p>ระบบประเมินและเฝ้าระวังความเสี่ยงการเผาในพื้นที่เกษตร จังหวัดกำแพงเพชร</p>
+  </div>
+</section>
+<section id="print-report-meta" class="print-only" aria-label="ข้อมูลประกอบรายงาน">
+  <div id="print-data-updated">ข้อมูลล่าสุด: -</div>
+  <div id="print-date">วันที่พิมพ์รายงาน: -</div>
+  <div id="print-scope">ขอบเขต: จังหวัดกำแพงเพชร</div>
+</section>
+<div id="print-filter-summary" class="print-only">ชุดข้อมูลปี 2569 · จุดความร้อนสะสมรายเดือน: สะสมทุกเดือน</div>
+
+<section id="hotspot-timeline" class="no-print" aria-label="ช่วงข้อมูล Hotspot">
+  <div class="period-range-card">
+    <div class="period-range-title">ช่วงข้อมูลจุดความร้อนสะสม</div>
+    <div class="period-range-controls" aria-label="เลือกช่วงเดือนปีของข้อมูล Hotspot">
+      <label>ตั้งแต่
+        <span class="period-select-row">
+          <select id="range-start-month" class="period-month-select" aria-label="เดือนเริ่มต้น"></select>
+          <select id="range-start-year" class="period-year-select" aria-label="ปีเริ่มต้น"></select>
+        </span>
+      </label>
+      <label>ถึง
+        <span class="period-select-row">
+          <select id="range-end-month" class="period-month-select" aria-label="เดือนสิ้นสุด"></select>
+          <select id="range-end-year" class="period-year-select" aria-label="ปีสิ้นสุด"></select>
+        </span>
+      </label>
+      <button type="button" id="btn-latest-period" class="period-latest-btn">แสดงข้อมูล</button>
+    </div>
+    <div class="timeline-status" id="timeline-status">จุดความร้อนสะสม: กำลังโหลดช่วงข้อมูล…</div>
+  </div>
+  <select id="timeline-year" class="timeline-year-select timeline-year-hidden" aria-label="ชุดข้อมูลปีภายในระบบ" data-years="2566,2567,2568,2569" hidden>
+    <option value="2566">2566</option>
+    <option value="2567">2567</option>
+    <option value="2568">2568</option>
+    <option value="2569" selected>2569</option>
+  </select>
+</section>
+
+<!-- MAIN LAYOUT -->
+<div id="app-body">
+<!-- LEFT PANEL: Controls -->
+<aside id="left-panel">
+<section class="panel-section">
+<h3>🗺️ ชั้นข้อมูล</h3>
+<div class="layer-group">
+<label class="section-label">ขอบเขตข้อมูล</label>
+<label class="toggle-row">
+<input checked="" id="lyr-province" type="checkbox"/> จังหวัด
+          </label>
+<label class="toggle-row">
+<input checked="" id="lyr-district" type="checkbox"/> อำเภอ
+          </label>
+<label class="toggle-row">
+<input id="lyr-subdistrict" type="checkbox"/> ตำบล
+          </label>
+</div>
+<div class="layer-group boundary-filter-group">
+<label class="section-label">เลือกพื้นที่วิเคราะห์</label>
+<label>อำเภอ
+          <select id="filter-district">
+<option value="">-- ทั้งหมด --</option>
+<option value="เมืองกำแพงเพชร">เมืองกำแพงเพชร</option>
+<option value="ไทรงาม">ไทรงาม</option>
+<option value="คลองลาน">คลองลาน</option>
+<option value="ขาณุวรลักษบุรี">ขาณุวรลักษบุรี</option>
+<option value="คลองขลุง">คลองขลุง</option>
+<option value="พรานกระต่าย">พรานกระต่าย</option>
+<option value="ลานกระบือ">ลานกระบือ</option>
+<option value="ทรายทองวัฒนา">ทรายทองวัฒนา</option>
+<option value="ปางศิลาทอง">ปางศิลาทอง</option>
+<option value="บึงสามัคคี">บึงสามัคคี</option>
+<option value="โกสัมพีนคร">โกสัมพีนคร</option>
+</select>
+</label>
+<label>ตำบล
+          <select disabled="" id="filter-subdistrict">
+<option value="">-- เลือกอำเภอก่อน --</option>
+</select>
+<span class="field-help">รายชื่อตำบลโหลดจากชั้นข้อมูลขอบเขตโดยอัตโนมัติ</span>
+</label>
+<div class="filter-actions">
+<button class="btn-primary" id="btn-apply-filter" type="button">ใช้ตัวกรอง</button>
+<button class="btn-secondary" id="btn-reset-filter" type="button">รีเซ็ตตัวกรอง</button>
+</div>
+</div>
+<div class="layer-group hs-year-internal" aria-hidden="true">
+<label class="section-label">Hotspot รายปี</label>
+<label class="toggle-row hs-2566"><input class="hs-layer" data-year="2566" type="checkbox"/> ปี 2566 (2023)</label>
+<label class="toggle-row hs-2567"><input class="hs-layer" data-year="2567" type="checkbox"/> ปี 2567 (2024)</label>
+<label class="toggle-row hs-2568"><input class="hs-layer" data-year="2568" type="checkbox"/> ปี 2568 (2025)</label>
+<label class="toggle-row hs-2569"><input checked="" class="hs-layer" data-year="2569" type="checkbox"/> ปี 2569 (2026)</label>
+</div>
+<div class="layer-group">
+<label class="section-label">แผนที่ความเสี่ยงและชนิดพืช</label>
+<label class="toggle-row hotspot-master-row">
+<input checked="" id="lyr-hotspot" type="checkbox"/> ข้อมูล Hotspot ตามปีที่เลือก
+</label>
+<label class="toggle-row">
+<input checked="" id="lyr-risk" type="checkbox"/> แผนที่ความเสี่ยง (ตำบล)
+          </label>
+<label class="toggle-row">
+<input id="lyr-burnscar" type="checkbox"/> Burn Scar
+          </label>
+<label class="toggle-row">
+<input id="lyr-crop" type="checkbox"/> พื้นที่เพาะปลูก
+          </label>
+<div class="crop-filter-wrap">
+<label for="filter-crop">ชนิดพืช</label>
+<select disabled="" id="filter-crop">
+<option value="">-- ทุกชนิดพืช --</option>
+<option value="นาข้าว">นาข้าว</option>
+<option value="อ้อย">อ้อย</option>
+<option value="เกษตรอื่น ๆ">เกษตรอื่น ๆ</option>
+<option value="อื่น ๆ">อื่น ๆ</option>
+</select>
+</div>
+</div>
+</section>
+
+<section class="panel-section">
+<h3>🗃️ Basemap</h3>
+<div class="radio-group">
+<label><input name="basemap" type="radio" value="osm"/> OpenStreetMap</label>
+<label><input checked="" name="basemap" type="radio" value="satellite"/> Satellite</label>
+<label><input name="basemap" type="radio" value="topo"/> Topo</label>
+</div>
+</section>
+<section class="panel-section no-print admin-only hidden" id="excel-import-section" aria-hidden="true"><h3>📥 นำเข้า Hotspot จาก Excel</h3><p class="field-help">รองรับไฟล์ .xlsx/.xls ที่มี hsPlant2026 สำหรับตรวจยอด และตารางรายละเอียด hsID, Date/ YYYY-MM-DD, Province, LandType, PlantType และ Maps/X/Y</p><label>ปีข้อมูล (พ.ศ.)<input id="import-year" inputmode="numeric" max="2600" min="2566" type="number" value="2569"/></label><label>ไฟล์ Excel<input accept=".xlsx,.xls" id="import-excel" type="file"/></label><div class="data-actions"><button class="btn-primary" id="btn-import-excel" type="button">ตรวจสอบและนำเข้า</button><button class="btn-secondary" disabled="" id="btn-download-import" type="button">ดาวน์โหลด GeoJSON</button></div><div aria-live="polite" class="import-status" id="import-status" role="status">ยังไม่ได้เลือกไฟล์</div></section><section class="panel-section no-print admin-only hidden" id="guide-visibility-section" aria-hidden="true">
+<h3>📘 คู่มือการประเมินความเสี่ยง</h3>
+<label class="toggle-row guide-toggle-row">
+<input id="toggle-risk-guide" type="checkbox"/> เปิดให้ผู้ใช้เห็นปุ่มคู่มือ
+</label>
+<p class="field-help">เมื่อเปิด ระบบจะแสดงปุ่มคู่มือในแถบซ้าย และเปิดไปที่ Google Drive ไม่เปิดไฟล์ PDF โดยตรง</p>
+</section><section class="panel-section" id="risk-methodology">
+<h3>📊 หลักเกณฑ์การประเมินระดับความเสี่ยง</h3>
+<div aria-label="ระดับความเสี่ยง" class="risk-levels">
+<div class="risk-level"><span class="risk-swatch" style="background:#e74c3c"></span><span><strong>สูงมาก:</strong> 75-100 คะแนน</span></div>
+<div class="risk-level"><span class="risk-swatch" style="background:#e67e22"></span><span><strong>สูง:</strong> 50-74.9 คะแนน</span></div>
+<div class="risk-level"><span class="risk-swatch" style="background:#f1c40f"></span><span><strong>ปานกลาง:</strong> 25-49.9 คะแนน</span></div>
+<div class="risk-level"><span class="risk-swatch" style="background:#2ecc71"></span><span><strong>ต่ำ:</strong> 0-24.9 คะแนน</span></div>
+</div>
+<a class="btn-guide-download hidden" id="risk-guide-drive-link" href="https://drive.google.com/drive/folders/1KAWXj3XS3tW6b-HqznqV-IZT_LwAzhVy?usp=sharing" target="_blank" rel="noopener noreferrer">คู่มือระบบประเมินความเสี่ยง</a>
+<div class="visitor-sidebar-card no-print" title="ตัวนับผู้เข้าชม">
+  <div class="visitor-sidebar-title"><span aria-hidden="true">👁</span><strong>ผู้เข้าชม</strong></div>
+  <div class="visitor-sidebar-count" id="visitor-display">
+    <span class="external-counter-box" id="external-counter-box">
+      <script type="text/javascript" src="https://www.free-counters.org/count/jwoy"></script><br class="counter-break" aria-hidden="true"/>
+      <a href="https://www.acadoo.de/leistungen/ghostwriter-doktorarbeit/" rel="nofollow" aria-hidden="true" tabindex="-1">Dissertation Unterstützung</a>
+      <script type="text/javascript" src="https://www.whomania.com/ctr?id=f86714acfcb722f8ab86c0abf994a86cbc6adf00"></script>
+    </span>
+    <span id="visitor-counter-fallback" class="counter-fallback" aria-live="polite">กำลังนับ…</span>
+  </div>
+</div>
+
+</section>
+</aside>
+<!-- CENTER: Map -->
+<main id="map-container">
+<div class="print-north-arrow print-only" aria-label="ทิศเหนือ"><span class="north-arrow-symbol">↑</span><span class="north-arrow-label">N</span></div>
+<div id="map"></div>
+<div id="map-legend">
+<strong>ระดับความเสี่ยง</strong>
+<div><span class="dot low"></span> ต่ำ</div>
+<div><span class="dot medium"></span> ปานกลาง</div>
+<div><span class="dot high"></span> สูง</div>
+<div><span class="dot very-high"></span> สูงมาก</div>
+</div>
+</main>
+<!-- RIGHT PANEL: Dashboard -->
+<aside id="right-panel">
+<!-- Hotspot comparison table -->
+<div class="chart-box comparison-box" id="hotspot-comparison-box">
+  <div class="comparison-heading">
+    <h4 id="title-comparison">เปรียบเทียบ Hotspot รายพื้นที่</h4>
+    <span id="comparison-period">-</span>
+  </div>
+  <div class="comparison-table-wrap">
+    <table id="tbl-hotspot-comparison">
+      <thead><tr>
+        <th id="comparison-area-header">อำเภอ</th>
+        <th id="comparison-previous-header">ปีก่อน</th>
+        <th id="comparison-current-header">ปีที่เลือก</th>
+        <th>เพิ่ม/ลด</th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><th>รวม</th><th id="comparison-previous-total">0</th><th id="comparison-current-total">0</th><th id="comparison-change-total">0%</th></tr></tfoot>
+    </table>
+  </div>
+</div>
+<!-- Charts -->
+<div class="chart-box" id="top5-box">
+<h4 id="title-top5">Top 5 อำเภอ</h4>
+<canvas height="180" id="chart-top-district"></canvas>
+</div>
+<div class="chart-box" id="risk-box">
+<h4 id="title-risk">ระดับความเสี่ยงตามปีที่เลือก</h4>
+<div class="risk-chart-layout">
+  <div class="risk-canvas-wrap"><canvas height="150" id="chart-risk"></canvas></div>
+  <div id="risk-legend-list" class="risk-legend-list" aria-label="คำอธิบายระดับความเสี่ยง"></div>
+</div>
+</div>
+<div class="chart-box print-only" id="print-risk-level-card" aria-label="เกณฑ์ระดับความเสี่ยง 4 ระดับ">
+  <h4>เกณฑ์ระดับความเสี่ยง</h4>
+  <div class="print-risk-level-grid">
+    <div class="print-risk-level-item very-high"><span></span><strong>สูงมาก</strong><em>75–100</em></div>
+    <div class="print-risk-level-item high"><span></span><strong>สูง</strong><em>50–74.9</em></div>
+    <div class="print-risk-level-item medium"><span></span><strong>ปานกลาง</strong><em>25–49.9</em></div>
+    <div class="print-risk-level-item low"><span></span><strong>ต่ำ</strong><em>0–24.9</em></div>
+  </div>
+</div>
+<!-- Top Districts Table -->
+<div class="chart-box" id="top10-box">
+<h4 id="title-top10">ทุกอำเภอ (Hotspot สูงสุด)</h4>
+<table id="tbl-top-district">
+<thead>
+<tr><th id="rank-area-header">อำเภอ</th><th>Hotspot</th><th>ความเสี่ยง</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</aside>
+</div>
+<!-- POPUP Detail Panel -->
+<div class="hidden" id="detail-panel">
+<button id="detail-close">✕</button>
+<h3 id="detail-title">รายละเอียด</h3>
+<div id="detail-content"></div>
+</div>
+<div class="admin-modal hidden" id="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+  <div class="admin-modal-card">
+    <button class="admin-modal-close" id="admin-modal-close" type="button" aria-label="ปิด">×</button>
+    <h2 id="admin-modal-title">เข้าสู่ระบบผู้ดูแล</h2>
+    <p>เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถนำเข้าข้อมูล Hotspot จาก Excel</p>
+    <form id="admin-login-form" autocomplete="off">
+      <label for="admin-username">ชื่อผู้ใช้</label>
+      <input id="admin-username" name="username" type="text" autocomplete="username" required />
+      <label for="admin-password">รหัสผ่าน</label>
+      <input id="admin-password" name="password" type="password" autocomplete="current-password" required />
+      <div class="admin-login-actions">
+        <button class="btn-primary" type="submit">เข้าสู่ระบบ</button>
+        <button class="btn-secondary" id="admin-cancel" type="button">ยกเลิก</button>
+      </div>
+      <div class="admin-login-status" id="admin-login-status" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+</div>
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+<p id="sharedDataStatus" style="margin:0;padding:10px 16px;background:#e0f4ed;color:#124e43">HS ใช้ฐานข้อมูลร่วมกับ Verification</p>
+<script src="../data-source.js"></script>
+<script src="../risk-data-bridge.js"></script>
+<script src="js/config.js"></script>
+<script src="js/map.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/risk.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

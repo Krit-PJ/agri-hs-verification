@@ -1,0 +1,530 @@
+/* =============================================
+   Agri-Risk Map Burning Dashboard — style.css
+   ============================================= */
+
+/* ---- Reset & Base ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; background: #0f1923; color: #dce8f0; }
+
+/* ---- Header ---- */
+#app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, #0d2137 0%, #1a3a5c 100%);
+  padding: 8px 16px; height: 56px;
+  border-bottom: 2px solid #2a6496;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+#logo { height: 36px; }
+#app-header h1 { font-size: 18px; font-weight: 700; color: #5bc0de; }
+#app-header p  { font-size: 13px; color: #8aaccc; }
+#last-updated  { font-size: 13px; color: #6a8faa; }
+
+/* ---- App Body ---- */
+#app-body {
+  display: grid;
+  grid-template-columns: 220px 1fr 300px;
+  grid-template-rows: 1fr;
+  height: calc(100vh - 56px);
+  margin-top: 56px;
+}
+
+/* ---- Panels ---- */
+#left-panel, #right-panel {
+  background: #111e2b;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a6496 #0f1923;
+}
+#left-panel  { border-right: 1px solid #1e3a52; }
+#right-panel { border-left:  1px solid #1e3a52; }
+
+.panel-section { margin-bottom: 16px; }
+.panel-section h3 {
+  font-size: 13px; font-weight: 700; color: #5bc0de;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding-bottom: 4px; border-bottom: 1px solid #1e3a52;
+  margin-bottom: 8px;
+}
+.layer-group  { margin-bottom: 10px; }
+.section-label { display: block; font-size: 12px; color: #6a8faa; margin-bottom: 4px; text-transform: uppercase; }
+.toggle-row   { display: flex; align-items: center; gap: 6px; padding: 4px 4px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.toggle-row:hover { background: #1a2f42; }
+.toggle-row input[type=checkbox] { accent-color: #5bc0de; cursor: pointer; }
+
+/* Hotspot year color dots */
+.hs-2564 { border-left: 3px solid #9b59b6; padding-left: 4px; }
+.hs-2565 { border-left: 3px solid #e67e22; padding-left: 4px; }
+.hs-2566 { border-left: 3px solid #e74c3c; padding-left: 4px; }
+.hs-2567 { border-left: 3px solid #f1c40f; padding-left: 4px; }
+.hs-2568 { border-left: 3px solid #2ecc71; padding-left: 4px; }
+
+/* Selects */
+label { display: block; margin-bottom: 6px; color: #8aaccc; font-size: 13px; }
+select {
+  width: 100%; padding: 6px 8px; margin-top: 3px;
+  background: #0d2137; border: 1px solid #2a6496;
+  color: #dce8f0; border-radius: 4px; font-size: 13px;
+}
+.btn-secondary {
+  width: 100%; margin-top: 6px; padding: 6px;
+  background: #1a3a5c; border: 1px solid #2a6496;
+  color: #5bc0de; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.btn-secondary:hover { background: #2a6496; }
+
+.radio-group label { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; cursor: pointer; }
+.radio-group input { accent-color: #5bc0de; }
+
+/* ---- Map ---- */
+#map-container { position: relative; }
+#map { width: 100%; height: 100%; background: #0d1f30; }
+
+/* Map Legend */
+#map-legend {
+  position: absolute; bottom: 28px; right: 10px; z-index: 500;
+  background: rgba(13,33,55,0.9); border: 1px solid #2a6496;
+  border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #dce8f0;
+}
+#map-legend strong { display: block; margin-bottom: 5px; color: #5bc0de; }
+#map-legend div { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.dot {
+  width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+}
+.dot.low       { background: #2ecc71; }
+.dot.medium    { background: #f1c40f; }
+.dot.high      { background: #e67e22; }
+.dot.very-high { background: #e74c3c; }
+
+/* ---- Summary Cards ---- */
+#summary-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.card {
+  display: flex; align-items: center; gap: 10px;
+  background: #0d2137; border-radius: 6px; padding: 10px 12px;
+  border-left: 4px solid #2a6496;
+}
+.card-total  { border-color: #e74c3c; }
+.card-high   { border-color: #e67e22; }
+.card-province { border-color: #5bc0de; }
+.card-icon   { font-size: 22px; }
+.card-value  { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+.card-label  { font-size: 10px; color: #6a8faa; margin-top: 2px; }
+
+/* ---- Charts ---- */
+.chart-box {
+  background: #0d2137; border-radius: 6px; padding: 10px;
+  margin-bottom: 10px; border: 1px solid #1e3a52;
+}
+.chart-box h4 {
+  font-size: 11px; font-weight: 600; color: #5bc0de;
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.half-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.half-charts > div { background: #091829; border-radius: 4px; padding: 8px; }
+
+/* ---- Table ---- */
+#tbl-top-district { width: 100%; border-collapse: collapse; font-size: 12px; }
+#tbl-top-district th {
+  background: #1a3a5c; color: #5bc0de;
+  padding: 6px 7px; text-align: left; border-bottom: 1px solid #2a6496;
+}
+#tbl-top-district td { padding: 5px 7px; border-bottom: 1px solid #1a2f42; }
+#tbl-top-district tr:hover td { background: #1a2f42; }
+.risk-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 3px;
+  font-size: 11px; font-weight: 600;
+}
+
+/* ---- Risk Criteria ---- */
+.risk-criteria-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 4px; border-bottom: 1px solid #1a2f42; font-size: 12px;
+}
+.risk-criteria-row:last-child { border-bottom: none; }
+.rc-dot {
+  width: 14px; height: 14px; border-radius: 3px;
+  flex-shrink: 0; margin-top: 2px;
+}
+.rc-text strong { display: block; font-size: 12px; color: #dce8f0; }
+.rc-text span   { font-size: 11px; color: #8aaccc; line-height: 1.4; }
+.risk-low       { background: #1a4a2e; color: #2ecc71; }
+.risk-medium    { background: #4a3a00; color: #f1c40f; }
+.risk-high      { background: #4a2a00; color: #e67e22; }
+.risk-very-high { background: #4a1010; color: #e74c3c; }
+
+/* ---- Detail Panel ---- */
+#detail-panel {
+  position: fixed; bottom: 20px; left: 240px;
+  width: 360px; max-height: 50vh; overflow-y: auto;
+  background: #0d2137; border: 1px solid #2a6496;
+  border-radius: 8px; padding: 14px; z-index: 800;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+#detail-panel.hidden { display: none; }
+#detail-close {
+  position: absolute; top: 8px; right: 10px;
+  background: none; border: none; color: #5bc0de;
+  font-size: 16px; cursor: pointer;
+}
+#detail-title { color: #5bc0de; font-size: 14px; margin-bottom: 8px; padding-right: 20px; }
+#detail-content { font-size: 12px; line-height: 1.7; }
+#detail-content .detail-row { display: flex; gap: 8px; border-bottom: 1px solid #1a3a5c; padding: 3px 0; }
+#detail-content .detail-label { color: #6a8faa; min-width: 110px; }
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0f1923; }
+::-webkit-scrollbar-thumb { background: #2a6496; border-radius: 3px; }
+
+/* ---- Leaflet overrides ---- */
+.leaflet-container { background: #0d1f30 !important; }
+.leaflet-popup-content-wrapper {
+  background: #0d2137; border: 1px solid #2a6496;
+  color: #dce8f0; border-radius: 6px; font-size: 12px;
+}
+.leaflet-popup-tip { background: #0d2137; }
+.leaflet-control-layers {
+  background: #0d2137 !important; border: 1px solid #2a6496 !important; color: #dce8f0 !important;
+}
+.brand-logos{display:flex;align-items:center;gap:10px}.brand-logo{width:62px;height:62px;object-fit:contain;background:#fff;border-radius:50%;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.25)}.header-left{display:flex;align-items:center;gap:14px}.scope-caption{font-size:12px;color:#7dd3fc;margin-bottom:5px}.crop-filter-wrap{margin-top:8px}.download-guide{display:inline-block;margin-top:10px;color:#7dd3fc;font-weight:700}.chart-crop-full{margin-top:10px}
+
+/* Place Leaflet zoom control immediately above the risk legend. */
+#map-container .leaflet-bottom.leaflet-right .leaflet-control-zoom{margin-right:16px;margin-bottom:132px;}
+
+/* 2569 update */
+#summary-cards{grid-template-columns:repeat(2,minmax(0,1fr));}
+.visitor-counter{font-size:12px;color:#c7e7ff;white-space:nowrap;padding:5px 8px;border:1px solid rgba(56,189,248,.35);border-radius:6px;background:rgba(2,20,38,.35);}
+#risk-methodology .risk-levels{margin-top:0;}
+
+/* ===== Accessibility and interactive-year update ===== */
+:root{
+  --panel-bg:#0a1a2a;
+  --panel-card:#0d2740;
+  --line:#2f6f9f;
+  --text:#f1f7fb;
+  --muted:#b7d2e5;
+  --accent:#67e8f9;
+}
+html,body{font-size:17px;color:var(--text);}
+#app-header{height:64px;padding:8px 16px;background:linear-gradient(90deg,#08233a 0%,#164c72 100%);border-bottom-color:#38bdf8;}
+#app-body{height:calc(100vh - 64px);margin-top:64px;grid-template-columns:245px minmax(520px,1fr) 340px;}
+#app-header h1{font-size:21px;color:#7dd3fc;letter-spacing:.2px;}
+#app-header p,#last-updated{font-size:14px;color:#c4def0;}
+#left-panel,#right-panel{background:var(--panel-bg);padding:12px;}
+.panel-section h3{font-size:16px;color:var(--accent);padding-bottom:7px;margin-bottom:10px;}
+.section-label{font-size:14px;color:#a8cbe2;}
+.toggle-row,label{font-size:15px;color:#e1eef7;line-height:1.45;}
+.toggle-row{padding:6px 5px;gap:8px;}
+.toggle-row input[type=checkbox],.radio-group input{width:16px;height:16px;}
+select,input[type=number],input[type=file]{width:100%;margin-top:5px;padding:9px 10px;background:#071b2c;border:1px solid #3d82b3;color:#fff;border-radius:6px;font-size:15px;}
+.field-help,.scope-caption{font-size:13px!important;color:#b8d6e9!important;opacity:1!important;}
+.btn-primary,.btn-secondary,.btn-print{font-size:15px;padding:9px 12px;min-height:38px;}
+.btn-primary{background:#0284c7;color:#fff;}.btn-primary:hover{background:#0369a1;}
+.btn-secondary{background:#334e68;color:#fff;border-color:#52789a;}.btn-secondary:hover{background:#466886;}
+.card{background:linear-gradient(135deg,#0c2942,#123a59);padding:13px 14px;border:1px solid rgba(125,211,252,.25);}
+.card-value{font-size:28px}.card-label{font-size:13px;color:#c2dceb;margin-top:4px;}
+.chart-box{background:#0b263e;border-color:#285b7f;padding:12px;}
+.chart-box h4{font-size:14px;color:#7dd3fc;line-height:1.4;}
+#tbl-top-district{font-size:14px;}
+#tbl-top-district th{font-size:14px;color:#a5f3fc;padding:8px;background:#164b70;}
+#tbl-top-district td{padding:8px 7px;color:#f1f5f9;}
+.risk-badge{font-size:13px;padding:4px 8px;}
+#map-legend{font-size:13px;padding:10px 13px;background:rgba(4,25,42,.94);}
+#map-legend strong{font-size:14px;color:#7dd3fc;}
+#map-legend .dot{width:13px;height:13px;}
+.leaflet-tooltip,.leaflet-popup-content{font-size:14px!important;}
+.hs-2566{border-left:4px solid #8b5cf6;padding-left:7px;}
+.hs-2567{border-left:4px solid #06b6d4;padding-left:7px;}
+.hs-2568{border-left:4px solid #f59e0b;padding-left:7px;}
+.hs-2569{border-left:4px solid #ef4444;padding-left:7px;}
+.hs-2566 input{accent-color:#8b5cf6;}
+.hs-2567 input{accent-color:#06b6d4;}
+.hs-2568 input{accent-color:#f59e0b;}
+.hs-2569 input{accent-color:#ef4444;}
+#excel-import-section{border:1px solid rgba(56,189,248,.35);background:rgba(11,38,62,.55);padding:10px;border-radius:8px;}
+#import-year{max-width:130px;}
+.data-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.import-status{margin-top:9px;padding:8px 9px;border-radius:6px;background:#071b2c;color:#c7ddea;font-size:13px;line-height:1.4;}
+.import-status.success{background:#063a2c;color:#bbf7d0;border:1px solid #15803d;}
+.import-status.error{background:#4c1111;color:#fecaca;border:1px solid #dc2626;}
+.import-status.working{background:#382b08;color:#fef08a;border:1px solid #ca8a04;}
+@media(max-width:1200px){#app-body{grid-template-columns:230px minmax(420px,1fr) 310px;}html,body{font-size:16px;}}
+
+/* ===== Admin access control ===== */
+.hidden{display:none!important;}
+.btn-admin,.btn-admin-logout{
+  border:1px solid #67e8f9;border-radius:7px;padding:8px 12px;cursor:pointer;
+  font-weight:800;background:#0b3553;color:#e8f8ff;
+}
+.btn-admin:hover,.btn-admin-logout:hover{background:#15577f;}
+.btn-admin-logout{border-color:#fca5a5;background:#5b1e2b;color:#fff;}
+.admin-modal{
+  position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;
+  background:rgba(2,12,23,.78);backdrop-filter:blur(3px);padding:20px;
+}
+.admin-modal-card{
+  position:relative;width:min(430px,100%);background:#0b2338;border:1px solid #4ea5d8;
+  border-radius:12px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.55);color:#f2f8fc;
+}
+.admin-modal-card h2{margin:0 36px 8px 0;color:#7dd3fc;font-size:23px;}
+.admin-modal-card p{margin:0 0 16px;color:#c3ddeb;line-height:1.5;}
+.admin-modal-card label{display:block;margin-top:12px;font-weight:700;}
+.admin-modal-card input{font-size:17px;padding:11px 12px;}
+.admin-modal-close{position:absolute;right:12px;top:10px;background:transparent;border:0;color:#fff;font-size:30px;cursor:pointer;}
+.admin-login-actions{display:flex;gap:10px;margin-top:18px;}
+.admin-login-status{min-height:24px;margin-top:12px;font-weight:700;color:#c3ddeb;}
+.admin-login-status.error{color:#fda4af;}.admin-login-status.success{color:#86efac;}.admin-login-status.working{color:#fde68a;}
+#excel-import-section{border:1px solid rgba(103,232,249,.42);background:linear-gradient(180deg,rgba(14,68,101,.45),rgba(7,27,44,.7));}
+@media print{.admin-modal,.btn-admin,.btn-admin-logout,#excel-import-section{display:none!important;}}
+
+.btn-guide-download{display:block;margin-top:12px;padding:10px 12px;border-radius:8px;background:#0ea5e9;color:#fff!important;text-decoration:none;font-weight:800;text-align:center;border:1px solid #7dd3fc;line-height:1.35}.btn-guide-download:hover{background:#0284c7}.btn-guide-download:focus-visible{outline:3px solid #facc15;outline-offset:2px}
+
+
+/* ===== Header, report and risk donut refinement ===== */
+#app-header{min-height:78px;height:78px;}
+#app-body{height:calc(100vh - 78px);margin-top:78px;}
+.brand-title{min-width:0;}
+.brand-title h1{font-size:24px!important;line-height:1.1;margin:0 0 2px!important;}
+.brand-title .system-subtitle{font-size:15px!important;line-height:1.25;margin:0!important;color:#d7ecfa!important;}
+.brand-title .developer-credit{font-size:14px!important;line-height:1.25;margin:2px 0 0!important;color:#fde68a!important;font-weight:700;}
+.header-right{display:flex;align-items:center;gap:8px;}
+.btn-print,.btn-admin{white-space:nowrap;}
+@media print{
+  #app-header{height:20mm!important;min-height:20mm!important;}
+  #app-body{height:174mm!important;margin-top:20mm!important;}
+  #map-container{display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;}
+  #map{width:100%!important;height:100%!important;margin:auto!important;}
+  .brand-title .system-subtitle{font-size:8.5pt!important;color:#222!important;}
+  .brand-title .developer-credit{font-size:8pt!important;color:#333!important;}
+}
+
+
+/* ===== Hierarchy-aware coverage card and accessible risk legend ===== */
+.risk-chart-layout{display:grid;grid-template-columns:minmax(150px,1fr) minmax(145px,.95fr);gap:14px;align-items:center;min-height:170px;}
+.risk-canvas-wrap{min-width:0;display:flex;align-items:center;justify-content:center;}
+.risk-canvas-wrap canvas{max-width:100%;max-height:190px;}
+.risk-legend-list{display:flex;flex-direction:column;gap:9px;padding:10px 11px;border-radius:8px;background:#06192a;border:1px solid #3979a5;}
+.risk-legend-item{display:grid;grid-template-columns:20px 1fr auto;gap:8px;align-items:center;color:#fff;font-size:15px;line-height:1.25;}
+.risk-legend-swatch{width:18px;height:13px;border:1px solid #fff;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.25);}
+.risk-legend-name{color:#f8fafc;font-weight:700;text-shadow:0 1px 1px #000;}
+.risk-legend-pct{color:#ffffff;font-size:15px;font-weight:900;letter-spacing:.1px;}
+#card-area-label{line-height:1.35;}
+@media(max-width:1450px){.risk-chart-layout{grid-template-columns:1fr;gap:8px}.risk-legend-list{display:grid;grid-template-columns:1fr 1fr}.risk-canvas-wrap canvas{max-height:150px}}
+@media print{.risk-legend-list{background:#fff;border-color:#777}.risk-legend-item,.risk-legend-name,.risk-legend-pct{color:#111!important;text-shadow:none}.risk-legend-swatch{border-color:#333}}
+
+/* ===== Risk consistency and high-contrast legend update ===== */
+:root{
+  --risk-low:#22c55e;
+  --risk-medium:#facc15;
+  --risk-high:#f97316;
+  --risk-very-high:#ef4444;
+}
+#map-legend{
+  color:#ffffff!important;
+  background:rgba(2,18,32,.97)!important;
+  border:2px solid #7dd3fc!important;
+  box-shadow:0 4px 16px rgba(0,0,0,.45)!important;
+  min-width:132px;
+}
+#map-legend strong{color:#ffffff!important;text-shadow:0 1px 2px #000!important;}
+#map-legend div{color:#f8fafc!important;font-weight:800!important;text-shadow:0 1px 2px #000!important;}
+#map-legend .dot,
+.risk-legend-swatch{
+  border:2px solid #ffffff!important;
+  box-shadow:0 0 0 1px #0f172a,0 1px 3px rgba(0,0,0,.5)!important;
+  flex:0 0 auto;
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+.risk-chart-layout{grid-template-columns:minmax(170px,1fr) minmax(165px,1fr)!important;}
+.risk-legend-list{
+  background:#031525!important;
+  border:2px solid #4aa8d8!important;
+  box-shadow:0 4px 12px rgba(0,0,0,.28);
+}
+.risk-legend-item{color:#ffffff!important;font-size:16px!important;}
+.risk-legend-name,.risk-legend-pct{color:#ffffff!important;text-shadow:0 1px 2px #000!important;}
+.risk-legend-pct{font-size:16px!important;}
+.risk-badge{border:1px solid currentColor;font-weight:900!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+.risk-low{background:#14532d!important;color:#dcfce7!important;}
+.risk-medium{background:#713f12!important;color:#fef9c3!important;}
+.risk-high{background:#7c2d12!important;color:#ffedd5!important;}
+.risk-very-high{background:#7f1d1d!important;color:#fee2e2!important;}
+
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  #map-legend{
+    color:#111!important;background:#ffffff!important;border:1.5px solid #222!important;
+    box-shadow:none!important;
+  }
+  #map-legend strong,#map-legend div{color:#111!important;text-shadow:none!important;}
+  #map-legend .dot,.risk-legend-swatch{border:1.5px solid #111!important;box-shadow:none!important;}
+  .risk-legend-list{background:#ffffff!important;border:1.5px solid #333!important;box-shadow:none!important;}
+  .risk-legend-item,.risk-legend-name,.risk-legend-pct{color:#111!important;text-shadow:none!important;font-weight:800!important;}
+  .risk-low{background:#dcfce7!important;color:#14532d!important;}
+  .risk-medium{background:#fef9c3!important;color:#713f12!important;}
+  .risk-high{background:#ffedd5!important;color:#7c2d12!important;}
+  .risk-very-high{background:#fee2e2!important;color:#7f1d1d!important;}
+}
+
+
+/* ===== 2567/2568 dynamic risk refresh + print Top-5 contrast ===== */
+@media print{
+  #title-top5,#title-trend,#title-risk,#title-top10{color:#111827!important;font-weight:900!important;}
+  #chart-top-district,#chart-trend{background:#fff!important;}
+  .chart-box h3,.chart-box .chart-title{color:#111827!important;text-shadow:none!important;}
+}
+
+
+/* =====================================================
+   2026 Responsive UI + Thai typography + yearly colors
+   ===================================================== */
+:root{
+  --font-ui:"Noto Sans Thai","Noto Sans","Leelawadee UI",Tahoma,sans-serif;
+  --header-h:76px;
+  --mobile-toolbar-h:48px;
+  --hotspot-current:#dc2626;
+  --hotspot-y1:#f59e0b;
+  --hotspot-y2:#0891b2;
+  --hotspot-y3:#7c3aed;
+}
+html,body,button,input,select,textarea,.leaflet-container,.chart-box,#tbl-top-district{
+  font-family:var(--font-ui)!important;
+  font-variant-numeric:tabular-nums;
+}
+body{font-size:16px!important;line-height:1.45;}
+#app-header{height:var(--header-h)!important;min-height:var(--header-h)!important;padding:8px 14px!important;}
+#app-body{height:calc(100vh - var(--header-h))!important;margin-top:var(--header-h)!important;}
+.brand-title h1{font-size:24px!important;line-height:1.08!important;letter-spacing:.1px;}
+.brand-title .system-subtitle{font-size:14px!important;line-height:1.25!important;}
+.brand-title .developer-credit{font-size:12px!important;line-height:1.2!important;}
+.panel-section h3{font-size:15px!important;}
+.section-label,label,.toggle-row,select,button{font-size:14px!important;}
+.card-label,.chart-box h4,.scope-caption{font-size:12px!important;}
+.card-value{font-size:24px!important;}
+#tbl-top-district{font-size:13px!important;}
+#tbl-top-district th,#tbl-top-district td{padding:7px 8px!important;}
+
+/* One semantic palette used by checkbox accents, map points and trend chart */
+.hs-2569{border-left:5px solid var(--hotspot-current)!important;padding-left:7px!important;}
+.hs-2568{border-left:5px solid var(--hotspot-y1)!important;padding-left:7px!important;}
+.hs-2567{border-left:5px solid var(--hotspot-y2)!important;padding-left:7px!important;}
+.hs-2566{border-left:5px solid var(--hotspot-y3)!important;padding-left:7px!important;}
+.hs-2569 input{accent-color:var(--hotspot-current)!important;}
+.hs-2568 input{accent-color:var(--hotspot-y1)!important;}
+.hs-2567 input{accent-color:var(--hotspot-y2)!important;}
+.hs-2566 input{accent-color:var(--hotspot-y3)!important;}
+.hs-layer:focus-visible,.toggle-row:focus-within{outline:2px solid #7dd3fc;outline-offset:2px;}
+
+#mobile-toolbar,#mobile-overlay{display:none;}
+
+/* Tablet: preserve map priority while keeping usable controls */
+@media (max-width:1180px) and (min-width:769px){
+  #app-body{grid-template-columns:240px minmax(0,1fr) 320px!important;}
+  .brand-logo{width:52px!important;height:52px!important;}
+  .header-right{flex-wrap:wrap;justify-content:flex-end;}
+  #last-updated{display:none;}
+}
+
+/* Smartphone layout: map stays primary; controls and dashboard become drawers */
+@media (max-width:768px){
+  :root{--header-h:112px;}
+  html,body{min-width:0!important;overflow:hidden!important;}
+  #app-header{
+    position:fixed!important;height:var(--header-h)!important;min-height:var(--header-h)!important;
+    padding:7px 10px!important;align-items:flex-start!important;gap:6px!important;flex-wrap:wrap!important;
+  }
+  .header-left{min-width:0!important;flex:1 1 100%!important;gap:8px!important;}
+  .brand-logos{gap:5px!important;flex:0 0 auto;}
+  .brand-logo{width:42px!important;height:42px!important;padding:2px!important;}
+  .brand-title{min-width:0;overflow:hidden;}
+  .brand-title h1{font-size:18px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brand-title .system-subtitle{font-size:11.5px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brand-title .developer-credit{font-size:10.5px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .header-right{width:100%!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;}
+  .visitor-counter,#last-updated{font-size:10px!important;}
+  #last-updated{display:none!important;}
+  .header-right button{min-height:34px!important;padding:5px 9px!important;font-size:12px!important;white-space:nowrap;}
+
+  #mobile-toolbar{
+    display:grid!important;grid-template-columns:1fr 1fr;gap:8px;position:fixed;z-index:1100;
+    top:var(--header-h);left:0;right:0;height:var(--mobile-toolbar-h);padding:6px 10px;
+    background:#091827;border-bottom:1px solid #2a6496;
+  }
+  #mobile-toolbar button{min-height:36px;border:1px solid #38bdf8;border-radius:8px;background:#12304b;color:#fff;font-weight:700;}
+  #mobile-overlay{position:fixed;z-index:1150;inset:calc(var(--header-h) + var(--mobile-toolbar-h)) 0 0;background:rgba(2,8,23,.58);}
+  #mobile-overlay:not([hidden]){display:block!important;}
+
+  #app-body{
+    display:block!important;height:calc(100vh - var(--header-h) - var(--mobile-toolbar-h))!important;
+    margin-top:calc(var(--header-h) + var(--mobile-toolbar-h))!important;overflow:hidden!important;
+  }
+  #map-container{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;}
+  #map{height:100%!important;min-height:0!important;}
+  #left-panel,#right-panel{
+    position:fixed!important;z-index:1200!important;top:calc(var(--header-h) + var(--mobile-toolbar-h))!important;
+    bottom:0!important;width:min(88vw,380px)!important;height:auto!important;max-height:none!important;
+    overflow-y:auto!important;padding:14px!important;transition:transform .24s ease,visibility .24s ease;
+    box-shadow:0 10px 35px rgba(0,0,0,.5);
+  }
+  #left-panel{left:0!important;transform:translateX(-105%);border-right:1px solid #38bdf8!important;}
+  #right-panel{right:0!important;left:auto!important;transform:translateX(105%);border-left:1px solid #38bdf8!important;}
+  #left-panel.mobile-open,#right-panel.mobile-open{transform:translateX(0)!important;visibility:visible!important;}
+  .panel-section h3{font-size:16px!important;}
+  .toggle-row,label,select,.btn-secondary,.btn-primary{font-size:15px!important;}
+  .toggle-row{min-height:42px;padding:8px!important;}
+  select,button,input[type=file]{min-height:44px;}
+  #summary-cards{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;}
+  .card{min-height:72px!important;padding:10px!important;}
+  .card-value{font-size:22px!important;}
+  .chart-box{padding:12px!important;margin-bottom:12px!important;}
+  .chart-box h4{font-size:13px!important;}
+  #tbl-top-district{font-size:12px!important;}
+  #tbl-top-district th,#tbl-top-district td{padding:7px 5px!important;}
+  #map-legend{right:8px!important;bottom:8px!important;font-size:11px!important;padding:7px 9px!important;max-width:150px;}
+  .leaflet-control-zoom{margin-right:8px!important;margin-bottom:92px!important;}
+  #detail-panel{left:10px!important;right:10px!important;bottom:10px!important;width:auto!important;max-height:45vh!important;}
+}
+
+@media (max-width:420px){
+  :root{--header-h:108px;}
+  .brand-logo{width:36px!important;height:36px!important;}
+  .brand-title h1{font-size:16px!important;}
+  .brand-title .system-subtitle{font-size:10.5px!important;}
+  .brand-title .developer-credit{font-size:9.5px!important;}
+  .visitor-counter{display:none!important;}
+  .header-right button{font-size:11px!important;padding:4px 7px!important;}
+  #summary-cards{grid-template-columns:1fr!important;}
+  #map-legend{font-size:10px!important;}
+}
+
+@media print{
+  #mobile-toolbar,#mobile-overlay{display:none!important;}
+  html,body,button,input,select,textarea{font-family:var(--font-ui)!important;}
+}
+
+/* Date filter: linked year > month > day controls */
+.date-filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end}
+.date-filter-grid label:last-child{grid-column:1/-1}
+.date-filter-grid select{width:100%;min-height:38px}
+#date-filter-help{margin:7px 0 0}
+@media (max-width:1100px){.date-filter-grid{grid-template-columns:1fr}}
+@media (max-width:1100px){.date-filter-grid label:last-child{grid-column:auto}}
+@media (max-width:768px){.date-filter-grid{grid-template-columns:1fr 1fr}.date-filter-grid label:last-child{grid-column:1/-1}}
+@media print{.date-filter-grid select{font-size:7.5pt!important}}
+
+
+/* Top monthly Hotspot timeline */
+#hotspot-timeline{position:fixed;z-index:1050;top:var(--header-h,72px);left:0;right:0;height:58px;display:grid;grid-template-columns:105px minmax(0,1fr) 175px;gap:12px;align-items:center;padding:7px 14px;background:linear-gradient(180deg,#102d43,#0b2133);border-bottom:1px solid #2d6b91;box-shadow:0 3px 12px rgba(0,0,0,.28)}
+.timeline-year-wrap{display:flex;align-items:center;gap:6px}.timeline-year-wrap label{font-size:12px;font-weight:800;white-space:nowrap}.timeline-year-wrap select{min-height:35px;width:70px;padding:3px}
+.timeline-track-wrap{display:grid;grid-template-columns:58px minmax(0,1fr);align-items:center;gap:8px}.timeline-track{position:relative;display:grid;grid-template-columns:repeat(12,minmax(36px,1fr));gap:3px}.timeline-track:before{content:"";position:absolute;left:2%;right:2%;top:50%;height:3px;background:#38637d;transform:translateY(-50%);z-index:0}.timeline-track button,.timeline-all{position:relative;z-index:1;min-height:34px;border:1px solid #3f718e;border-radius:18px;background:#153a52;color:#dbeafe;font-weight:700;font-size:11px;cursor:pointer}.timeline-track button:hover,.timeline-all:hover{background:#1e5677}.timeline-track button.active,.timeline-all.active{background:#ef4444;border-color:#fecaca;color:#fff;box-shadow:0 0 0 3px rgba(239,68,68,.18)}
+.timeline-status{text-align:right;font-size:12px;font-weight:800;color:#fde68a;white-space:nowrap}
+#app-body{margin-top:calc(var(--header-h,72px) + 58px)!important;height:calc(100vh - var(--header-h,72px) - 58px)!important}
+.comparison-box{min-height:0!important}.comparison-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.comparison-heading h4{margin:0}.comparison-heading span{font-size:10px;color:#b6cad9;text-align:right}.comparison-table-wrap{max-height:210px;overflow:auto;border:1px solid rgba(148,163,184,.25);border-radius:6px;margin-top:7px}
+#tbl-hotspot-comparison{width:100%;border-collapse:collapse;font-size:11px}#tbl-hotspot-comparison th,#tbl-hotspot-comparison td{padding:5px 6px;border-bottom:1px solid rgba(148,163,184,.18);text-align:right;white-space:nowrap}#tbl-hotspot-comparison th:first-child,#tbl-hotspot-comparison td:first-child{text-align:left}#tbl-hotspot-comparison thead th{position:sticky;top:0;background:#102d43;color:#fff;z-index:2}#tbl-hotspot-comparison tfoot th{position:sticky;bottom:0;background:#172f42;color:#fff}
+.change-badge{display:inline-block;min-width:52px;padding:2px 5px;border-radius:999px;text-align:center;font-weight:800}.change-up{background:#7f1d1d;color:#fecaca}.change-down{background:#14532d;color:#bbf7d0}.change-flat{background:#334155;color:#e2e8f0}.change-new{background:#7c2d12;color:#fed7aa}
+@media(max-width:768px){#hotspot-timeline{top:var(--header-h);height:92px;grid-template-columns:82px 1fr;padding:6px 8px;gap:6px}.timeline-track-wrap{grid-column:1/-1;grid-row:2;grid-template-columns:48px 1fr}.timeline-track{overflow-x:auto;display:flex;padding-bottom:3px}.timeline-track button{min-width:48px}.timeline-status{font-size:10px}.timeline-year-wrap select{width:60px}.timeline-status{grid-column:2}#mobile-toolbar{top:calc(var(--header-h) + 92px)!important}#app-body{margin-top:calc(var(--header-h) + 92px + var(--mobile-toolbar-h))!important;height:calc(100vh - var(--header-h) - 92px - var(--mobile-toolbar-h))!important}#left-panel,#right-panel{top:calc(var(--header-h) + 92px + var(--mobile-toolbar-h))!important}.comparison-table-wrap{max-height:260px}}
+@media print{#hotspot-timeline{display:none!important}#app-body{margin-top:18mm!important;height:178mm!important;grid-template-columns:minmax(0,1fr) 92mm!important}.comparison-box{display:block!important;grid-row:auto!important;padding:1.5mm!important}.comparison-heading h4{font-size:7.5pt!important}.comparison-heading span{font-size:6pt!important;color:#111!important}.comparison-table-wrap{max-height:48mm!important;overflow:hidden!important;border-color:#999!important}#tbl-hotspot-comparison{font-size:5.7pt!important;color:#111!important}#tbl-hotspot-comparison th,#tbl-hotspot-comparison td{padding:.55mm .7mm!important;color:#111!important;background:#fff!important;border-color:#ccc!important}#tbl-hotspot-comparison thead th,#tbl-hotspot-comparison tfoot th{position:static!important;background:#e5e7eb!important;color:#111!important}.change-badge{min-width:0!important;padding:0!important;background:transparent!important;color:#111!important}#right-panel{grid-template-rows:50mm 34mm 38mm 1fr!important}.chart-box:nth-of-type(3){display:none!important}#right-panel .chart-box:last-child{display:block!important}#chart-trend{max-height:26mm!important}#chart-risk{max-height:29mm!important}#tbl-top-district{font-size:5.8pt!important}#tbl-top-district th,#tbl-top-district td{padding:.7mm!important}}
+
+@media print{#trend-box,#risk-box,#top10-box,#hotspot-comparison-box{display:block!important}#top5-box{display:none!important}#right-panel .chart-box:nth-of-type(2){display:block!important}#right-panel .chart-box:nth-of-type(3){display:none!important}}

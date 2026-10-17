@@ -1,0 +1,23 @@
+{
+  "created_date": "2026-10-16",
+  "spreadsheet_id": "1pUDEiOunwraALqknLUT0VYVVSDmpTSZkS4O-ePA-9WQ",
+  "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1pUDEiOunwraALqknLUT0VYVVSDmpTSZkS4O-ePA-9WQ/edit",
+  "photo_folder_id": "1oUbGXBetamsQH2US9F08Kl1mKOeOg1im",
+  "photo_folder_url": "https://drive.google.com/drive/folders/1oUbGXBetamsQH2US9F08Kl1mKOeOg1im",
+  "hs_rows": 593,
+  "dataset_year_be": 2569,
+  "province": "กำแพงเพชร",
+  "timezone": "Asia/Bangkok",
+  "api_deployed": true,
+  "script_properties": {
+    "SPREADSHEET_ID": "1pUDEiOunwraALqknLUT0VYVVSDmpTSZkS4O-ePA-9WQ",
+    "PHOTO_FOLDER_ID": "1oUbGXBetamsQH2US9F08Kl1mKOeOg1im"
+  },
+  "api_endpoint": "https://script.google.com/macros/s/AKfycbxH2AfIx-vp5xR7d4wWcGr3P_FDRp7M3xH7Wt99pqmIg9HzkjIuf3FV3Gyj9vi8WLISag/exec",
+  "read_test": {
+    "rows": 593,
+    "unique_ids": 593,
+    "missing_coordinates": 0
+  },
+  "verified_date": "2026-10-17"
+}
