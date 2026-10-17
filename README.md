@@ -1,3 +1,11 @@
+# เว็บไซต์ที่เชื่อมฐานข้อมูลจริง
+
+เว็บไซต์: https://krit-pj.github.io/agri-hs-verification/
+
+กำหนด Apps Script API แล้วใน site-config.js และปิดโหมดข้าม Login การอัปเดต main จะทดสอบและเผยแพร่ผ่าน GitHub Actions โดยอัตโนมัติ ดู docs/LIVE_CONNECTION_TH.md สำหรับผลตรวจและข้อจำกัด
+
+---
+
 # รุ่นล่าสุด 2.1 — Hero ตราจังหวัด และโหมดทดสอบไม่ต้อง Login
 
 อ่าน [คู่มือรุ่น 2.1](docs/RELEASE_V21_TH.md) โหมดทดสอบทำงานเฉพาะในเครื่องและไม่เชื่อม Google จริง
