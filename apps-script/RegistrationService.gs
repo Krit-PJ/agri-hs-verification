@@ -1,0 +1,62 @@
+/* Registration grants no access until a manager approves the declared affiliation. */
+const REGISTRATION_PRIVACY_VERSION_ = '2026-10-v1';
+function registerUser_(payload) {
+  payload=payload||{};
+  assert_(getRegistrationPolicy_().configured,'POLICY_NOT_CONFIGURED','ผู้ดูแลต้องตั้งข้อมูลผู้ควบคุมข้อมูล ช่องทางติดต่อ และระยะเวลาเก็บข้อมูลก่อนเปิดลงทะเบียน');
+  assert_(payload.privacyAcknowledged===true && payload.privacyVersion===REGISTRATION_PRIVACY_VERSION_, 'PRIVACY_ACK_REQUIRED','กรุณาอ่านและรับทราบประกาศความเป็นส่วนตัวฉบับปัจจุบัน');
+  const phone=cleanText_(payload.phone,20).replace(/[ -]/g,'');
+  assert_(/^0[689][0-9]{8}$/.test(phone),'VALIDATION_ERROR','กรุณาระบุหมายเลขโทรศัพท์มือถือไทย 10 หลัก');
+  const name=cleanText_(payload.fullName,120),position=cleanText_(payload.position,120),level=cleanText_(payload.agencyLevel,16),code=cleanText_(payload.provinceCode,2),district=cleanText_(payload.district,120);
+  assert_(name && position && ['district','province'].indexOf(level)>=0 && HSNational.provinces[code],'VALIDATION_ERROR','กรุณาระบุชื่อ ตำแหน่ง และสังกัดให้ครบ');
+  assert_(level!=='district'||district,'VALIDATION_ERROR','กรุณาระบุอำเภอที่สังกัด');
+  const password=String(payload.password||'');
+  assert_(password.length>=10 && password.length<=128,'VALIDATION_ERROR','รหัสผ่านต้องมี 10–128 ตัวอักษร');
+  return withScriptLock_(function(){
+    ensureSchema_();
+    registrationAdmission_();
+    const existing=authAccountByKey_(readAuthAccounts_(),phone);
+    assert_(!existing,'ACCOUNT_EXISTS','หมายเลขนี้ลงทะเบียนแล้ว กรุณาติดต่อผู้ดูแลหากเข้าสู่ระบบไม่ได้');
+    const id=uuid_(),now=isoNow_(),agency=level==='district'?'สำนักงานเกษตรอำเภอ'+district:'สำนักงานเกษตรจังหวัด'+HSNational.provinces[code];
+    const row={registration_id:id,phone:phone,full_name:name,position:position,agency_level:level,agency:agency,province_code:code,district:level==='district'?district:'',privacy_version:REGISTRATION_PRIVACY_VERSION_,privacy_acknowledged_at:now,status:'pending',created_at:now};
+    // Never persist the supplied password in the registration sheet or QA log.
+    setupPasswordAccount(phone,password,{active:false,displayName:name,role:'inspector',phone:phone,assignedProvinceCode:code,agencyLevel:level,district:row.district,position:position,agency:agency});
+    try {appendObject_(APP.SHEETS.REGISTRATIONS,row);} catch(error) {PropertiesService.getScriptProperties().deleteProperty('AUTH_ACCOUNT_V2_'+phone);throw error;}
+    return {registrationId:id,status:'pending',message:'ลงทะเบียนแล้ว รอผู้ดูแลตรวจสอบสังกัดก่อนเข้าใช้งาน'};
+  });
+}
+function registrationCanManage_(actor,row){return actor.role==='super_admin'||actor.role==='admin'&&nationalAuthorized_(actor).indexOf(cleanText_(row.province_code))>=0;}
+function publicRegistration_(row){const result={};APP.HEADERS[APP.SHEETS.REGISTRATIONS].forEach(function(k){result[k]=row[k]||'';});return result;}
+function listRegistrations_(actor,payload){requireAdmin_(actor);const status=cleanText_(payload&&payload.status,24);return {items:rowsAsObjects_(APP.SHEETS.REGISTRATIONS).filter(function(r){return registrationCanManage_(actor,r)&&(!status||r.status===status);}).map(publicRegistration_)};}
+function reviewRegistration_(actor,payload,approve){
+ requireAdmin_(actor);
+ return withScriptLock_(function(){
+  const row=findOne_(APP.SHEETS.REGISTRATIONS,'registration_id',cleanText_(payload&&payload.registrationId,64));
+  assert_(row&&registrationCanManage_(actor,row),'FORBIDDEN','ไม่พบรายการในขอบเขตจังหวัดที่รับผิดชอบ');
+  assert_(row.status==='pending','CONFLICT','รายการนี้ได้รับการพิจารณาแล้ว');
+  const account=authAccountByKey_(readAuthAccounts_(),row.phone);assert_(account&&account.active===false,'CONFLICT','สถานะบัญชีไม่ตรงกับรายการลงทะเบียน');
+  // Approver verifies the declared district/province; applicants never choose roles.
+  row.status=approve?'approved':'rejected';row.reviewed_at=isoNow_();row.reviewed_by=actor.id;
+  updateObjectRow_(APP.SHEETS.REGISTRATIONS,row._row,row);
+  account.active=approve;account.sessionVersion=uuid_();
+  PropertiesService.getScriptProperties().setProperty('AUTH_ACCOUNT_V2_'+row.phone,JSON.stringify(account));
+  appendLog_(actor,uuid_(),approve?'approveRegistration':'rejectRegistration','registration',row.registration_id,'success',{status:row.status});
+  return {registrationId:row.registration_id,status:row.status};
+ });
+}
+function getHsPhotos_(actor,payload){const hs=requireAccessibleHs_(actor,payload&&payload.hsId);return {items:photoMetadataForHs_(cleanText_(hs.hs_id)).filter(function(p){const v=findOne_(APP.SHEETS.VERIFICATION,'verification_id',p.verificationId);return v&&v.status==='verified';})};}
+
+function getRegistrationPolicy_(){const props=PropertiesService.getScriptProperties(),controller=cleanText_(props.getProperty('PRIVACY_CONTROLLER'),500),contact=cleanText_(props.getProperty('PRIVACY_CONTACT'),500),retention=cleanText_(props.getProperty('PRIVACY_RETENTION'),1000);return {configured:Boolean(controller&&contact&&retention),version:REGISTRATION_PRIVACY_VERSION_,controller:controller,contact:contact,retention:retention,legalBasis:'ภารกิจเพื่อประโยชน์สาธารณะหรือการใช้อำนาจรัฐตามมาตรา 24(4) ซึ่งผู้ควบคุมข้อมูลต้องตรวจสอบว่าใช้กับภารกิจนี้ได้',purpose:'ตรวจสอบสิทธิ์และสังกัด จัดขอบเขตข้อมูล และบันทึกหลักฐานการตรวจสอบจุดความร้อน',dataCategories:'โทรศัพท์ ชื่อ ตำแหน่ง สังกัด พื้นที่รับผิดชอบ ประวัติการใช้งาน และพิกัดหรือภาพหลักฐานที่ส่ง',recipients:'เจ้าหน้าที่และผู้ดูแลที่ได้รับมอบหมายตามขอบเขตหน้าที่ และผู้ให้บริการ Google Workspace/Google Drive ตามการตั้งค่าของหน่วยงาน',rights:'ขอเข้าถึง แก้ไข ลบ จำกัด คัดค้าน หรือร้องเรียนตามเงื่อนไขกฎหมาย โดยติดต่อช่องทางที่ระบุ',acknowledgement:'การรับทราบประกาศความเป็นส่วนตัว ไม่ใช่การให้ความยินยอมแบบครอบคลุมทุกวัตถุประสงค์'};}
+
+/* Bound anonymous registration cost before password hashing or persistent writes. */
+function registrationAdmission_(){
+ const props=PropertiesService.getScriptProperties(),all=props.getProperties(),accounts=readAuthAccounts_();
+ const configured=Number(props.getProperty('REGISTRATION_MAX_ACCOUNTS')||200),limit=Number.isInteger(configured)&&configured>=1&&configured<=500?configured:200;
+ const cache=sessionCache_(),minute=Math.floor(Date.now()/60000),key='registration-rate:'+minute,count=Number(cache.get(key)||0);
+ assert_(count<5,'RATE_LIMITED','มีคำขอลงทะเบียนจำนวนมาก กรุณาลองใหม่ภายหลัง');
+ cache.put(key,String(count+1),120);
+ const records=rowsAsObjects_(APP.SHEETS.REGISTRATIONS);
+ assert_(Object.keys(accounts).length<limit&&records.length<limit,'REGISTRATION_CAPACITY','ระบบลงทะเบียนเต็มชั่วคราว กรุณาติดต่อผู้ดูแล');
+ // UTF-8 bytes count conservatively; reserve at least 8KB for this account and admin operations.
+ const bytes=Object.keys(all).reduce(function(total,k){return total+unescape(encodeURIComponent(k+String(all[k]))).length;},0);
+ assert_(bytes+8192<400000,'REGISTRATION_CAPACITY','พื้นที่บัญชีใกล้เต็ม กรุณาติดต่อผู้ดูแล');
+}

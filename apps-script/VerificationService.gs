@@ -28,9 +28,13 @@ function latestVerificationMap_() {
 
 function applyHsFilters_(rows, filters, actor, latest) {
   filters = filters || {};
+  let fiscalStart='',fiscalEnd='';
+  if(filters.fiscalYearBe){const fy=Number(filters.fiscalYearBe),end=cleanText_(filters.endMonth,7);assert_(Number.isInteger(fy)&&fy>=2400&&fy<=2800&&/^\d{4}-\d{2}$/.test(end),'VALIDATION_ERROR','ช่วงปีงบประมาณไม่ถูกต้อง');fiscalStart=String(fy-544)+'-10-01';const last=String(fy-543)+'-09';assert_(end>=fiscalStart.slice(0,7)&&end<=last&&Number(end.slice(5))>=1&&Number(end.slice(5))<=12,'VALIDATION_ERROR','เดือนสิ้นสุดต้องอยู่ในปีงบประมาณ');fiscalEnd=end;}
   const search = compact_(filters.search);
   return rows.filter(function (row) {
     if (String(row.active).toLowerCase() === 'false' || !actorCanAccessHs_(actor, row)) return false;
+    if(fiscalStart){const at=new Date(row.acquired_at);if(isNaN(at.getTime()))return false;const date=Utilities.formatDate(at,'Asia/Bangkok','yyyy-MM-dd');if(date<fiscalStart||date.slice(0,7)>fiscalEnd)return false;}
+
     if(filters.provinceCode&&typeof nationalCode_==='function'&&nationalCode_(row)!==filters.provinceCode)return false;
     const verification = latest[cleanText_(row.hs_id)];
     const status = verification ? cleanText_(verification.status) : 'pending';
@@ -105,7 +109,9 @@ function photoMetadataForHs_(hsId) {
       accuracyM: row.photo_accuracy_m === '' || row.photo_accuracy_m == null ? null : Number(row.photo_accuracy_m),
       capturedAtSource: cleanText_(row.photo_taken_at_source),
       distanceToHsM: row.distance_to_hs_m === '' || row.distance_to_hs_m == null ? null : Number(row.distance_to_hs_m),
-      sha256: cleanText_(row.original_sha256) || cleanText_(row.sha256),
+      sha256: cleanText_(row.sha256),
+      originalSha256: cleanText_(row.original_sha256) || cleanText_(row.sha256),
+      derivativeSha256: cleanText_(row.sha256),
       exif: parseStoredJson_(row.exif_json), evidenceQa: parseStoredJson_(row.evidence_qa_json),
       deviceCapture: parseStoredJson_(row.device_capture_json)
     };
@@ -262,7 +268,7 @@ function uploadPhoto_(actor, requestId, payload) {
     assert_(base64 && /^[A-Za-z0-9+/]*={0,2}$/.test(base64) && base64.length % 4 === 0, 'INVALID_BASE64', 'ข้อมูลรูปไม่ใช่ base64 ที่ถูกต้อง');
     let bytes;
     try { bytes = Utilities.base64Decode(base64); } catch (error) { throw new ApiError('INVALID_BASE64', 'ข้อมูลรูปไม่ใช่ base64 ที่ถูกต้อง'); }
-    assert_(bytes.length > 0 && bytes.length <= APP.MAX_PHOTO_BYTES, 'PHOTO_TOO_LARGE', 'รูปต้องมีขนาดไม่เกิน 5 MB', {maxBytes: APP.MAX_PHOTO_BYTES});
+    assert_(bytes.length > 0 && bytes.length <= APP.MAX_PHOTO_BYTES, 'PHOTO_TOO_LARGE', 'รูปต้องมีขนาดไม่เกิน 1 MB', {maxBytes: APP.MAX_PHOTO_BYTES});
     assert_(bytesMatchMime_(bytes, mimeType), 'MEDIA_SIGNATURE_MISMATCH', 'เนื้อหาไฟล์ไม่ตรงกับ MIME type');
     const metadata = HSEvidence.inspectBytes(bytes);
     const attachmentSource = cleanText_(payload.source) || 'import';
@@ -278,16 +284,28 @@ function uploadPhoto_(actor, requestId, payload) {
       deviceCapture.location=captureLocation;
       deviceCapture.captureAt=parseOptionalIsoDate_(payload.captureAt || payload.captureLocation.capturedAt,'captureAt');
     }
+    // A resized derivative may lose EXIF. Retain separately reported original EXIF, never label it server-read.
+    let reportedOriginal=null;
+    if(payload.originalMetadata && typeof payload.originalMetadata==='object'){
+      const original=payload.originalMetadata;
+      if(original.latitude!=null && original.longitude!=null){reportedOriginal={latitude:parseNumber_(original.latitude,-90,90,'originalMetadata.latitude'),longitude:parseNumber_(original.longitude,-180,180,'originalMetadata.longitude'),accuracyM:null,capturedAt:parseOptionalIsoDate_(original.capturedAt,'originalMetadata.capturedAt'),timeZoneKnown:original.timeZoneKnown===true,source:'client_reported_original_exif'};}
+    }
     // Imported photos never inherit the uploader's current device coordinates.
-    const evidencePoint = metadata.latitude != null && metadata.longitude != null ? metadata :
+    const evidencePoint = metadata.latitude != null && metadata.longitude != null ? metadata : reportedOriginal || (
       attachmentSource==='camera' && captureLocation && deviceCapture.captureAt ? {
         latitude:captureLocation.latitude,longitude:captureLocation.longitude,accuracyM:captureLocation.accuracyM,
         capturedAt:deviceCapture.captureAt,timeZoneKnown:true,source:'client_reported_camera'
-      } : metadata;
+      } : metadata);
     const evidenceQa = HSEvidence.assess({hs:{latitude:Number(hs.latitude),longitude:Number(hs.longitude),acquiredAt:cleanText_(hs.acquired_at)},metadata:evidencePoint,captureLocation:captureLocation,captureAt:deviceCapture.captureAt});
     evidenceQa.coordinateSource=evidencePoint.source;
+    if(evidencePoint.source==='client_reported_original_exif'){evidenceQa.status='review';evidenceQa.reasons.push('พิกัดจาก EXIF ภาพต้นฉบับรายงานโดยเครื่องผู้ใช้ ไม่ได้ตรวจจากไฟล์ต้นฉบับบนเซิร์ฟเวอร์');}
     if(metadata.parseStatus==='malformed') { evidenceQa.status='review'; evidenceQa.reasons.push('EXIF เสียหายหรืออ่านไม่ได้'); }
-    const originalHash=sha256Bytes_(bytes);
+    const derivativeHash=sha256Bytes_(bytes);
+    const claimedOriginal=cleanText_(payload.originalSha256,64);
+    assert_(!claimedOriginal||/^[a-f0-9]{64}$/i.test(claimedOriginal),'VALIDATION_ERROR','originalSha256 ไม่ถูกต้อง');
+    // Original hash is client-reported when the original file was resized before upload.
+    const originalHash=claimedOriginal||derivativeHash;
+    if(claimedOriginal && claimedOriginal!==derivativeHash){deviceCapture.originalHashSource='client_reported';deviceCapture.originalSha256=claimedOriginal;deviceCapture.originalMetadata=payload.originalMetadata&&typeof payload.originalMetadata==='object'?payload.originalMetadata:null;}
     const duplicates=rowsAsObjects_(APP.SHEETS.PHOTOS).filter(function(p){return (cleanText_(p.original_sha256)||cleanText_(p.sha256))===originalHash;});
     if(duplicates.length) { evidenceQa.status='review'; evidenceQa.reasons.push('พบไฟล์ภาพเดิมในระบบ โปรดสอบทวนการใช้หลักฐานซ้ำ'); }
     const extension = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp'}[mimeType];
@@ -317,7 +335,7 @@ function uploadPhoto_(actor, requestId, payload) {
         photo_latitude:evidencePoint.latitude == null ? '' : evidencePoint.latitude,
         photo_longitude:evidencePoint.longitude == null ? '' : evidencePoint.longitude,
         photo_accuracy_m:evidencePoint.accuracyM == null ? '' : evidencePoint.accuracyM,
-        photo_taken_at:metadata.capturedAt || '', photo_taken_at_source:metadata.timeSource || '',
+        photo_taken_at:evidencePoint.capturedAt || '', photo_taken_at_source:evidencePoint.source==='client_reported_original_exif'?'client_reported_original_exif':metadata.timeSource || '',
         device_capture_json:jsonStringifySafe_(deviceCapture), distance_to_hs_m:evidenceQa.distanceM == null ? '' : evidenceQa.distanceM,
         evidence_qa_json:jsonStringifySafe_(evidenceQa), original_sha256:originalHash
       };
@@ -337,9 +355,13 @@ function getPhoto_(actor, payload) {
   const photo = findOne_(APP.SHEETS.PHOTOS, 'photo_id', payload && payload.photoId);
   assert_(photo, 'NOT_FOUND', 'ไม่พบรูป');
   requireAccessibleHs_(actor, photo.hs_id);
+  const verification=findOne_(APP.SHEETS.VERIFICATION,'verification_id',photo.verification_id);
+  assert_(verification&&verification.status==='verified'&&cleanText_(verification.hs_id)===cleanText_(photo.hs_id),'FORBIDDEN','แสดงภาพได้เมื่อยืนยันผลตรวจแล้วเท่านั้น');
   const file = DriveApp.getFileById(cleanText_(photo.drive_file_id));
-  const blob = file.getBlob();
-  return {photoId: cleanText_(photo.photo_id), mimeType: cleanText_(photo.mime_type), fileName: file.getName(), base64: Utilities.base64Encode(blob.getBytes())};
+  const blob = file.getBlob(),bytes=blob.getBytes(),mimeType=cleanText_(photo.mime_type);
+  assert_(bytes.length<=APP.MAX_READ_PHOTO_BYTES,'PHOTO_TOO_LARGE','ภาพเดิมเกินขนาดที่อนุญาต');
+  assert_(APP.PHOTO_MIME_TYPES.indexOf(mimeType)>=0&&bytesMatchMime_(bytes,mimeType),'MEDIA_SIGNATURE_MISMATCH','รูปแบบภาพไม่ถูกต้อง');
+  return {photoId:cleanText_(photo.photo_id),mimeType:mimeType,fileName:cleanText_(photo.photo_id)+({'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'}[mimeType]),base64:Utilities.base64Encode(bytes)};
 }
 
 function locationValues_(actor, payload, level) {

@@ -12,6 +12,7 @@ function setupDatabaseConnection() {
   const book = SpreadsheetApp.openById(expected.SPREADSHEET_ID);
   DriveApp.getFolderById(expected.PHOTO_FOLDER_ID).getName();
   props.setProperties(expected);
+  if (!props.getProperty('PRIVACY_CONTROLLER')) props.setProperty('PRIVACY_CONTROLLER','สำนักงานเกษตรจังหวัด / กรมส่งเสริมการเกษตร');
   book.setSpreadsheetTimeZone('Asia/Bangkok');
   initializeBackend();
   return checkDatabaseReady();

@@ -44,7 +44,7 @@
       pending: items.filter(item => item.status === 'pending').length,
       drafts: items.filter(item=>item.status==='draft').length,
       scope: filters?.scope ? [filters.scope,filters.district,filters.month?'เดือน '+filters.month:''].filter(Boolean).join(' · ') : filters?.district || 'ทั้งจังหวัดกำแพงเพชร',
-      year: filters?.year || 'ทุกปีชุดข้อมูล'
+      year: filters?.year || 'ทุกปีงบประมาณ'
     };
   }
 
@@ -85,7 +85,7 @@
       </style></head><body>
       <div class="toolbar"><button type="button" onclick="history.back()">กลับหน้าระบบ</button><p class="print-note">กด “พิมพ์” แล้วเลือก “บันทึกเป็น PDF” ในหน้าต่างพิมพ์ของเบราว์เซอร์ หากต้องการไฟล์ PDF</p><button type="button" onclick="window.print()">พิมพ์ / บันทึก PDF</button></div>
       <main class="sheet"><header class="report-head"><div class="logos">${logoDoae ? `<img src="${logoDoae}" alt="ตรากรมส่งเสริมการเกษตร">` : ''}${logoKpp ? `<img src="${logoKpp}" alt="ตราสำนักงานเกษตรจังหวัดกำแพงเพชร">` : ''}</div><div><h1>รายงานผลการตรวจสอบจุดความร้อน</h1><div>${escapeHtml(model.scope)}</div></div></header>
-      <section class="meta" aria-label="ขอบเขตรายงาน"><strong>ขอบเขต:</strong> ${escapeHtml(model.scope)} · <strong>ปีชุดข้อมูล:</strong> ${escapeHtml(model.year)}<br><strong>จัดทำเมื่อ:</strong> ${generatedAt}<br><strong>แหล่งข้อมูล:</strong> ${sourceLabel}</section>
+      <section class="meta" aria-label="ขอบเขตรายงาน"><strong>ขอบเขต:</strong> ${escapeHtml(model.scope)} · <strong>ปีงบประมาณ:</strong> ${escapeHtml(model.year)}<br><strong>จัดทำเมื่อ:</strong> ${generatedAt}<br><strong>แหล่งข้อมูล:</strong> ${sourceLabel}</section>
       <section class="stats" aria-label="ยอดรวม"><div class="stat"><strong>${model.total}</strong><span>ทั้งหมด</span></div><div class="stat"><strong>${model.verified}</strong><span>ส่งผลตรวจแล้ว</span></div><div class="stat"><strong>${model.burned}</strong><span>พบการเผา</span></div><div class="stat"><strong>${model.notBurned}</strong><span>ไม่พบการเผา</span></div><div class="stat"><strong>${model.followup}</strong><span>ต้องติดตาม</span></div><div class="stat"><strong>${model.pending}</strong><span>รอตรวจ</span></div><div class="stat"><strong>${model.drafts}</strong><span>งานร่าง</span></div></section>
       <h2>รายการตรวจสอบและข้อมูลต้นทาง</h2><div class="report-table" tabindex="0" role="region" aria-label="ตารางรายงาน เลื่อนซ้ายขวา"><table><thead><tr><th>HS และข้อมูลต้นทาง ณ เวลารายงาน</th><th>ผู้ลงพื้นที่</th><th>วันเวลาตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr></thead><tbody>${rows.length ? rows.map(rowHtml).join('') : '<tr><td class="empty" colspan="5">ไม่มีข้อมูลในขอบเขตที่เลือก</td></tr>'}</tbody></table></div></main></body></html>`;
   }

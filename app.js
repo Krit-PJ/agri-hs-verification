@@ -15,7 +15,7 @@
   const DB_STORE = 'jobs';
   const PAGE_SIZE = 80;
   const nationalMode=typeof HSNationUI!=='undefined';
-  const scopedRows=()=>nationalMode?HSNationUI.filter(state.all):state.all;
+  const scopedRows=()=>{const rows=nationalMode?HSNationUI.filter(state.all):state.all;return state.authValidated&&state.profile?.role==='inspector'?rows.filter(r=>r.provinceCode===state.profile.assignedProvinceCode&&(!state.profile.district||r.district===state.profile.district)):rows;};
 
   const $ = id => document.getElementById(id);
   const dom = {};
@@ -30,12 +30,13 @@
   document.addEventListener('DOMContentLoaded', init);
 
   async function init() {
-    ['refreshDataButton','dataSourceLabel','selectionContext','summaryDistrict','summaryYear','summaryReset','printReportButton','roleLabel','adminLoginGate','adminLoginForm','loginUsername','loginPassword','loginButton','loginMessage','adminProtected','adminDisplayName','adminRoleDescription','logoutButton','serverSettingsCard','workspaceSettingsCard','hsImportFile','importDatasetYear','importPreview','confirmFileImport','importMessage','importPhotoInput','modeBadge','demoNotice','liveError','yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter','resetFilters','allHotspotsButton','resultCount','selectedCount','hotspotList','loadMore','mapLayout','mapFallback','summaryStats','summaryLevel','summaryBody','verifyDialog','verifyForm','verifyTitle','selectedMeta','navigateLink','locateButton','locationPanel','noGps','noGpsReasonWrap','noGpsReason','photoInput','photoPreview','noteInput','noteCount','actionInput','verifyMessage','saveDraftButton','reviewSubmitButton','confirmDialog','confirmSummary','confirmSubmit','cancelConfirm','closeDialog','retryButton','retryCount','toastRegion','menuButton','mainNav','apiEndpoint','connectButton','connectionDot','connectionMessage','sheetId','sourceSheet','driveId','saveConfigButton','configMessage','adminResult'].forEach(id => dom[id] = $(id));
+    ['inspectorAccount','refreshDataButton','dataSourceLabel','selectionContext','summaryDistrict','summaryYear','summaryReset','printReportButton','roleLabel','adminLoginGate','adminLoginForm','loginUsername','loginPassword','loginButton','loginMessage','adminProtected','adminDisplayName','adminRoleDescription','logoutButton','serverSettingsCard','workspaceSettingsCard','hsImportFile','importDatasetYear','importPreview','confirmFileImport','importMessage','importPhotoInput','modeBadge','demoNotice','liveError','yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter','resetFilters','allHotspotsButton','resultCount','selectedCount','hotspotList','loadMore','mapLayout','mapFallback','summaryStats','summaryLevel','summaryBody','verifyDialog','verifyForm','verifyTitle','selectedMeta','navigateLink','locateButton','locationPanel','noGps','noGpsReasonWrap','noGpsReason','photoInput','photoPreview','noteInput','noteCount','actionInput','verifyMessage','saveDraftButton','reviewSubmitButton','confirmDialog','confirmSummary','confirmSubmit','cancelConfirm','closeDialog','retryButton','retryCount','toastRegion','menuButton','mainNav','apiEndpoint','connectButton','connectionDot','connectionMessage','sheetId','sourceSheet','driveId','saveConfigButton','configMessage','adminResult'].forEach(id => dom[id] = $(id));
     if (sessionExpired()) clearSession();
     dom.apiEndpoint.value = state.endpoint;
     bindEvents();
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:()=>{dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';populateFilters();applyFilters();}});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
+    if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),reload:loadData});
     HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && ['admin','super_admin'].includes(state.profile?.role))});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     updateModeUI();
@@ -52,6 +53,7 @@
     });
     document.querySelectorAll('[data-layout]').forEach(button => button.addEventListener('click', () => setLayout(button.dataset.layout)));
     ['yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter'].forEach(id => dom[id].addEventListener('change', () => {
+      if (id === 'yearFilter') populateFiscalMonths();
       if (id === 'districtFilter') repopulateLocationFilters('district');
       if (id === 'tambonFilter') repopulateLocationFilters('tambon');
       applyFilters();
@@ -62,7 +64,7 @@
     dom.hotspotList.addEventListener('click', event => { const card=event.target.closest('[data-hs-id]'); if(!card)return; const item=state.all.find(x=>x.hsId===card.dataset.hsId);if(item){try{openVerify(item);}catch(error){console.error(error);toast('เปิดฟอร์มไม่สำเร็จ: '+friendlyError(error),true);}} });
     dom.loadMore.addEventListener('click', () => { state.visible += PAGE_SIZE; renderList(); });
     dom.summaryLevel.addEventListener('change', renderSummary);
-    dom.summaryDistrict.addEventListener('change',()=>{if(nationalMode){dom.districtFilter.value=dom.summaryDistrict.value;repopulateLocationFilters('district');applyFilters();}else renderSummary();}); dom.summaryYear.addEventListener('change',()=>{if(nationalMode){dom.yearFilter.value=dom.summaryYear.value;applyFilters();}else renderSummary();});
+    dom.summaryDistrict.addEventListener('change',()=>{if(nationalMode){dom.districtFilter.value=dom.summaryDistrict.value;repopulateLocationFilters('district');applyFilters();}else renderSummary();}); dom.summaryYear.addEventListener('change',()=>{if(nationalMode){dom.yearFilter.value=dom.summaryYear.value;populateFiscalMonths();applyFilters();}else renderSummary();});
     dom.summaryReset.addEventListener('click',()=>{dom.summaryDistrict.value='';dom.summaryLevel.value='province';if(nationalMode)resetFilters();else renderSummary();});
     dom.printReportButton.addEventListener('click',openSummaryReport);
     dom.refreshDataButton.addEventListener('click',refreshSharedData);
@@ -162,7 +164,7 @@
 
       populateFilters();
       state.latestYear=Math.max(...state.all.map(x=>Number(x.datasetYearBe)||Number(x.yearBe)).filter(Number.isFinite));
-      if (!state.dataLoaded) { dom.yearFilter.value=String(state.latestYear); dom.summaryYear.value=String(state.latestYear); }
+      if (!state.dataLoaded) { const period=HSFiscal.defaults(scopedRows());dom.yearFilter.value=String(period.year);populateFiscalMonths(period.endMonth);dom.summaryYear.value=String(period.year); }
       else { Object.entries({yearFilter:oldFilters.year,monthFilter:oldFilters.month,districtFilter:oldFilters.district,cropFilter:oldFilters.crop,statusFilter:oldFilters.status,resultFilter:oldFilters.result,searchFilter:oldFilters.search}).forEach(([id,v])=>{dom[id].value=v;});repopulateLocationFilters('district');dom.tambonFilter.value=oldFilters.tambon;repopulateLocationFilters('tambon');dom.villageFilter.value=oldFilters.village; }
       state.dataLoaded=true; applyFilters(); applyRoleUI();
       const times=state.all.map(x=>x.acquiredAt).filter(Boolean).sort();
@@ -205,14 +207,20 @@
   function deriveMonth(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : Number(new Intl.DateTimeFormat('en',{timeZone:'Asia/Bangkok',month:'numeric'}).format(d)); }
 
   function populateFilters() {
-    fillSelect(dom.yearFilter, unique(state.all.map(x => x.datasetYearBe)).sort((a,b) => b-a), 'ทุกปี');
-    fillSelect(dom.monthFilter, unique(state.all.map(x => x.month)).sort((a,b) => a-b), 'ทุกเดือน', x => MONTHS[x-1] || x);
+    const fiscalYears=unique([HSFiscal.defaults(state.all).year,...state.all.map(x=>HSFiscal.year(x.acquiredAt))]).sort((a,b)=>b-a);
+    fillSelect(dom.yearFilter,fiscalYears,'ทุกปีงบประมาณ');populateFiscalMonths();
     fillSelect(dom.districtFilter, unique(scopedRows().map(x => x.district)).sort(locale), 'ทุกอำเภอ');
     fillSelect(dom.cropFilter, unique(state.all.map(x => x.plantType)).filter(x => x !== 'ไม่ระบุ').sort(locale), 'ทุกชนิดพืช');
-    fillSelect(dom.summaryYear,unique(state.all.map(x=>x.datasetYearBe)).sort((a,b)=>b-a),'ทุกปีชุดข้อมูล');
+    fillSelect(dom.summaryYear,fiscalYears,'ทุกปีงบประมาณ');
     fillSelect(dom.summaryDistrict,unique(scopedRows().map(x=>x.district)).sort(locale),'ทั้งจังหวัด · ทุกอำเภอ');
     repopulateLocationFilters('district');
     if(nationalMode){const overview=!HSNationUI.selectedProvinceCode;[dom.districtFilter,dom.tambonFilter,dom.villageFilter,dom.summaryDistrict].forEach(e=>{e.disabled=overview;if(overview)e.value='';});}
+  }
+
+  function populateFiscalMonths(preferred) {
+    const fy=dom.yearFilter.value,old=preferred||dom.monthFilter.value;
+    const values=fy?HSFiscal.months(fy):[];fillSelect(dom.monthFilter,values,'ถึงสิ้นปีงบประมาณ',m=>MONTHS[Number(m.slice(5))-1]+' '+(Number(m.slice(0,4))+543));
+    dom.monthFilter.value=values.includes(old)?old:(values.filter(m=>scopedRows().some(r=>HSFiscal.date(r.acquiredAt).startsWith(m))).at(-1)||values[0]||'');
   }
 
   function repopulateLocationFilters(changed) {
@@ -245,12 +253,13 @@
     state.filtered = scopedRows().filter(x => {
       const result = x.verification?.result || x.result || '';
       const haystack = `${x.hsId} ${x.district} ${x.tambon} ${x.village} ${x.plantType} ${x.landType}`.toLocaleLowerCase('th');
-      return (!f.year || String(x.datasetYearBe) === f.year) && (!f.month || String(x.month) === f.month) &&
+      return HSFiscal.matches(x,f.year,f.month || (f.year?HSFiscal.months(f.year).at(-1):'')) &&
         (!f.district || x.district === f.district) && (!f.tambon || x.tambon === f.tambon) && (!f.village || x.village === f.village) &&
         (!f.crop || x.plantType === f.crop) && (!f.status || x.status === f.status) &&
         (!f.result || result === f.result) && (!f.search || haystack.includes(f.search));
     });
     if(nationalMode){dom.summaryDistrict.value=dom.districtFilter.value;dom.summaryYear.value=dom.yearFilter.value;}
+    const hint=$('fiscalPeriodHint');if(hint)hint.textContent=f.year?`ปีงบประมาณ ${f.year} · ตั้งแต่ตุลาคม ${Number(f.year)-1} ถึง ${f.month?MONTHS[Number(f.month.slice(5))-1]+' '+(Number(f.month.slice(0,4))+543):'กันยายน '+f.year}${state.filtered.length?'':' · ยังไม่มีข้อมูลในช่วงและขอบเขตนี้'}`:'แสดงข้อมูลทุกปีงบประมาณ';
     renderAll();
   }
 
@@ -294,7 +303,7 @@
 
   function renderSummary() {
     if (!dom.summaryStats) return;
-    if(nationalMode){const hint=document.getElementById('summaryScopeHint');if(hint)hint.textContent=[HSNationUI.scope(),'ปีชุดข้อมูล '+(dom.yearFilter.value||'ทุกปี'),dom.monthFilter.value?'เดือน '+MONTHS[Number(dom.monthFilter.value)-1]:'ทุกเดือน',dom.districtFilter.value,dom.tambonFilter.value,dom.villageFilter.value,dom.cropFilter.value,dom.statusFilter.value,dom.resultFilter.value].filter(Boolean).join(' · ');}
+    if(nationalMode){const hint=document.getElementById('summaryScopeHint');if(hint)hint.textContent=[HSNationUI.scope(),'ปีงบประมาณ '+(dom.yearFilter.value||'ทุกปี'),dom.monthFilter.value?'ถึงเดือน '+dom.monthFilter.value:'ถึงสิ้นปีงบประมาณ',dom.districtFilter.value,dom.tambonFilter.value,dom.villageFilter.value,dom.cropFilter.value,dom.statusFilter.value,dom.resultFilter.value].filter(Boolean).join(' · ');}
     const summaryRows = nationalMode?state.filtered:state.all.filter(x=>(!dom.summaryDistrict.value || x.district===dom.summaryDistrict.value)&&(!dom.summaryYear.value || String(x.datasetYearBe)===dom.summaryYear.value));
     const isConfirmed=x=>x.status==='verified' && ['burned','not_burned'].includes(x.verification?.result);
     const total = summaryRows.length, verified = summaryRows.filter(isConfirmed).length;
@@ -359,7 +368,14 @@
       dom.noteInput.value = item.verification.notes || ''; dom.noteCount.textContent = `${dom.noteInput.value.length}/500`;
       dom.actionInput.value = item.verification.action || '';
     }
-    HSField.reset(state.selected,state.serverConfig?.profile); renderLocation(); renderPhotos(); dom.verifyDialog.showModal();
+    HSField.reset(state.selected,state.serverConfig?.profile); renderLocation(); renderPhotos(); dom.verifyDialog.showModal();renderSavedPhotos(item);const canRecord=!state.endpoint||Boolean(state.authValidated&&state.token);dom.reviewSubmitButton.disabled=!canRecord;dom.saveDraftButton.disabled=!canRecord;if(!canRecord)setMessage(dom.verifyMessage,'กรุณาลงทะเบียนและเข้าสู่ระบบก่อนบันทึกผลตรวจ','error');
+  }
+
+  async function renderSavedPhotos(item) {
+    let box=$('savedHSPhotos');if(!box){box=document.createElement('section');box.id='savedHSPhotos';box.className='saved-hs-photos';dom.selectedMeta.after(box);}box.replaceChildren();
+    if(!state.endpoint||!state.authValidated){box.textContent='ภาพหลักฐานเปิดให้ผู้ใช้งานที่เข้าสู่ระบบและมีสิทธิ์ในพื้นที่';return;}
+    box.textContent='กำลังอ่านภาพหลักฐานที่ยืนยันแล้ว…';
+    try{const result=await api('getHSPhotos',{hsId:item.hsId});if(state.selected?.hsId!==item.hsId)return;box.replaceChildren();const title=document.createElement('h3');title.textContent='ภาพหลักฐานที่ยืนยันแล้ว';box.append(title);for(const photo of result.items||[]){const button=document.createElement('button');button.type='button';button.className='secondary-button';button.textContent='ดูภาพหลักฐาน';button.onclick=async()=>{button.disabled=true;try{const r=await api('getPhoto',{photoId:photo.photoId});if(state.selected?.hsId!==item.hsId)return;if(!['image/jpeg','image/png','image/webp'].includes(r.mimeType)||!r.base64||r.base64.length>7100000)throw Error('ข้อมูลภาพไม่ถูกต้อง');const img=document.createElement('img');img.alt='หลักฐานผลตรวจ '+item.hsId;img.loading='lazy';img.src=`data:${r.mimeType};base64,${r.base64}`;img.style.maxWidth='100%';button.replaceWith(img);}catch(e){button.disabled=false;button.textContent=friendlyError(e);}};box.append(button);}if(!result.items?.length)box.append('ยังไม่มีภาพของผลตรวจที่ยืนยันแล้ว');}catch(e){box.textContent='อ่านภาพไม่ได้: '+friendlyError(e);}
   }
 
   function closeVerify() { if (!state.busy) dom.verifyDialog.close(); }
@@ -486,7 +502,7 @@
     job.verificationId = verificationId;
     for (const photo of job.photos) {
       if (photo.uploaded) continue;
-      await api('uploadPhoto', { verificationId,hsId:job.payload.hsId,fileName:photo.fileName,mimeType:photo.mimeType,base64:photo.base64,capturedAt:photo.capturedAt,source:photo.source }, photo.requestId);
+      await api('uploadPhoto', { verificationId,hsId:job.payload.hsId,fileName:photo.fileName,mimeType:photo.mimeType,base64:photo.base64,capturedAt:photo.capturedAt,source:photo.source,originalSha256:photo.originalSha256,originalMetadata:photo.metadata }, photo.requestId);
       photo.uploaded = true;
     }
     return verification;
@@ -525,7 +541,7 @@
   }
 
   function syncFiltersFromHs(item) {
-    dom.yearFilter.value=String(item.datasetYearBe);dom.monthFilter.value=String(item.month);
+    dom.yearFilter.value=String(HSFiscal.year(item.acquiredAt));populateFiscalMonths(HSFiscal.date(item.acquiredAt).slice(0,7));
     dom.districtFilter.value=item.district;repopulateLocationFilters('district');dom.tambonFilter.value=item.tambon;repopulateLocationFilters('tambon');dom.villageFilter.value=item.village;
     dom.cropFilter.value=item.plantType;dom.statusFilter.value=item.status;dom.resultFilter.value='';dom.searchFilter.value='';
     dom.selectionContext.textContent=`เติมตัวกรองจาก HS ${item.hsId} แล้ว · ${areaLabel(item)} · กดล้างตัวกรองเพื่อดูพื้นที่อื่น`;dom.selectionContext.hidden=false;applyFilters();
@@ -539,16 +555,17 @@
     const canManage=authenticated && ['admin','super_admin'].includes(role);
     const canConfigure=authenticated && role==='super_admin';
     if(typeof HSTeam!=='undefined')HSTeam.updateAccess();
-    dom.adminLoginGate.hidden=canManage;
+    dom.adminLoginGate.hidden=authenticated;
     dom.adminProtected.hidden=!canManage;
-    dom.roleLabel.textContent=canManage ? (role==='super_admin' ? 'Super Admin · จัดการแหล่งข้อมูลและระบบ' : 'Admin · ตรวจ QA / ส่งออก / รายงาน') : 'ยังไม่ได้เข้าสู่ระบบ';
+    if(typeof HSRegistration!=='undefined')HSRegistration.refresh();
+    dom.roleLabel.textContent=authenticated&&!canManage?'ผู้บันทึกข้อมูล · '+(profile.agency||profile.displayName):canManage ? (role==='super_admin' ? 'Super Admin · จัดการแหล่งข้อมูลและระบบ' : 'Admin · ตรวจ QA / ส่งออก / รายงาน') : 'ยังไม่ได้เข้าสู่ระบบ';
     dom.adminDisplayName.textContent=profile?.displayName || profile?.username || 'ผู้ดูแลระบบ';
     dom.adminRoleDescription.textContent=role==='super_admin' ? 'Super Admin' : role==='admin' ? 'Admin' : '';
     document.querySelectorAll('[data-super-admin-only]').forEach(element=>{element.hidden=!canConfigure;});
     [dom.saveConfigButton,dom.hsImportFile,dom.importDatasetYear,dom.sheetId,dom.sourceSheet,dom.driveId].forEach(element=>{element.disabled=!canConfigure;});
     document.querySelectorAll('[data-admin-action]').forEach(button=>{button.disabled=!canManage || (button.dataset.adminAction==='sync' && !canConfigure);});
     dom.confirmFileImport.disabled=!canConfigure || !state.importCandidate;
-    if (!canManage && profile && authenticated) setMessage(dom.loginMessage,'บัญชีนี้ไม่มีสิทธิ์เปิดพื้นที่ผู้ดูแล','error');
+    const account=dom.inspectorAccount;if(account){account.hidden=!(authenticated&&!canManage);if(!account.hidden){account.replaceChildren();const text=document.createElement('p');text.textContent='เข้าสู่ระบบแล้ว: '+(profile.displayName||profile.username)+' · '+(profile.agency||'');const out=document.createElement('button');out.type='button';out.className='secondary-button';out.textContent='ออกจากระบบ';out.onclick=logoutAdmin;account.append(text,out);}}
   }
 
   async function refreshSharedData() {
@@ -624,14 +641,14 @@
       const role=normalizedRole(result?.profile?.role);
       if(!result?.token || !result?.profile)throw new Error('เซิร์ฟเวอร์ไม่ได้ส่งข้อมูลเข้าสู่ระบบที่ครบถ้วน');
       state.csrf=result.csrf||'';sessionStorage.setItem('hsverify.csrf',state.csrf);state.authValidated=true;state.token=result.token;state.profile={...result.profile,role};state.expiresAt=result.expiresAt || '';
-      if(!['admin','super_admin'].includes(role)){
+      if(!['inspector','admin','super_admin'].includes(role)){
         try{await api('logout',{});}catch(_){/* access is still cleared locally */}
-        clearSession();throw new Error('บัญชีนี้ไม่มีสิทธิ์ Admin หรือ Super Admin');
+        clearSession();throw new Error('บัญชีนี้ไม่มีสิทธิ์ใช้งาน');
       }
       sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
       if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
       state.serverConfig={profile:state.profile};dom.loginUsername.value='';setMessage(dom.loginMessage,'เข้าสู่ระบบสำเร็จ','success');applyRoleUI();
-      state.dataLoaded=false;await loadData();toast(`เข้าสู่ระบบในชื่อ ${state.profile.displayName || state.profile.username}`);
+      state.dataLoaded=false;await loadData();if(role==='inspector')switchView('work');toast(`เข้าสู่ระบบในชื่อ ${state.profile.displayName || state.profile.username}`);
     } catch(error){clearSession();applyRoleUI();setMessage(dom.loginMessage,friendlyError(error),'error');}
     finally{dom.loginPassword.value='';dom.loginButton.disabled=false;}
   }
@@ -685,7 +702,7 @@
     const apiAction = { sync:'syncSource',qa:'qa',export:'export' }[action];
     button.disabled = true; dom.adminResult.textContent = 'กำลังทำงาน…';
     try {
-      const data = await api(apiAction,action === 'export' ? { dataset:'verifications',filters:{provinceCode:nationalMode?HSNationUI.selectedProvinceCode:undefined,year:dom.yearFilter.value,month:dom.monthFilter.value,district:dom.districtFilter.value,tambon:dom.tambonFilter.value,village:dom.villageFilter.value,plantType:dom.cropFilter.value,status:dom.statusFilter.value,result:dom.resultFilter.value,search:dom.searchFilter.value} } : {},action==='sync' ? uuid() : undefined);
+      const data = await api(apiAction,action === 'export' ? { dataset:'verifications',filters:{provinceCode:nationalMode?HSNationUI.selectedProvinceCode:undefined,fiscalYearBe:dom.yearFilter.value,endMonth:dom.monthFilter.value,district:dom.districtFilter.value,tambon:dom.tambonFilter.value,village:dom.villageFilter.value,plantType:dom.cropFilter.value,status:dom.statusFilter.value,result:dom.resultFilter.value,search:dom.searchFilter.value} } : {},action==='sync' ? uuid() : undefined);
       if (action === 'export') downloadServerExport(data);
       dom.adminResult.textContent = `${new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})} · สำเร็จ\n${action === 'export' ? `ดาวน์โหลด ${Number(data?.rowCount || 0).toLocaleString('th-TH')} แถวแล้ว` : formatAdminResult(data)}`;
       if (action === 'sync') await loadData();

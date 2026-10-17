@@ -13,6 +13,8 @@ function doPost(event) {
     assert_(action, 'INVALID_REQUEST', 'ต้องระบุ action');
     const payload = envelope.payload == null ? {} : envelope.payload;
     assert_(payload && typeof payload === 'object' && !Array.isArray(payload), 'INVALID_REQUEST', 'payload ต้องเป็น object');
+    if (action === 'getRegistrationPolicy') return outputJson_({ok:true,requestId:requestId,data:getRegistrationPolicy_()});
+    if (action === 'register') return outputJson_({ok:true,requestId:requestId,data:registerUser_(payload)});
     if (action === 'getTeam') return outputJson_({ok:true,requestId:requestId,data:getTeam_()});
     if (action === 'login') {
       return outputJson_({ok: true, requestId: requestId, data: login_(payload)});
@@ -35,6 +37,11 @@ function dispatch_(actor, action, requestId, payload) {
   const mutationActions = ['saveVerification', 'verifyHS', 'uploadPhoto', 'syncSource', 'importSource', 'setConfig', 'importRows'];
   if (mutationActions.indexOf(action) >= 0) requestId = requireUuid_(requestId, 'requestId');
   switch (action) {
+    case 'getMyProfile':return {profile:actor};
+    case 'listRegistrations':return listRegistrations_(actor,payload);
+    case 'approveRegistration':return reviewRegistration_(actor,payload,true);
+    case 'rejectRegistration':return reviewRegistration_(actor,payload,false);
+    case 'getHSPhotos':return getHsPhotos_(actor,payload);
     case 'nationalPreview':return nationalPreview_(actor,payload);
     case 'nationalReadSource':return nationalReadSource_(actor,payload);
     case 'nationalCommit':return nationalCommit_(actor,requireUuid_(requestId,'requestId'),payload);

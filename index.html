@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="design-tokens.css?v=2.1">
   <link rel="stylesheet" href="styles.css?v=2.1">
+  <link rel="stylesheet" href="registration.css?v=2.2">
 </head>
 <body>
   <a class="skip-link" href="#main">ข้ามไปเนื้อหาหลัก</a>
@@ -72,9 +73,9 @@
 
       <section class="filter-card" aria-labelledby="filterTitle">
         <div class="section-title"><div><p class="eyebrow">ค้นหาเร็ว</p><h2 id="filterTitle">ตัวกรองจุดความร้อน</h2></div><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button></div>
-        <p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
-          <label>ปีชุดข้อมูล พ.ศ.<select id="yearFilter"><option value="">ทุกปี</option></select></label>
-          <label>เดือน<select id="monthFilter"><option value="">ทุกเดือน</option></select></label>
+        <p id="fiscalPeriodHint" class="field-hint" role="status"></p><p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
+          <label>ปีงบประมาณ พ.ศ.<select id="yearFilter"><option value="">ทุกปี</option></select></label>
+          <label>ถึงเดือน (เริ่มตุลาคม)<select id="monthFilter"><option value="">ทุกเดือน</option></select></label>
           <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
           <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
           <label>หมู่บ้าน<select id="villageFilter"><option value="">ทุกหมู่บ้าน</option></select></label>
@@ -89,7 +90,7 @@
 
     <section id="summaryView" class="view" aria-labelledby="summaryTitle" hidden>
       <div class="page-heading"><p class="eyebrow">ภาพรวมการทำงาน</p><h1 id="summaryTitle">สรุปผลการตรวจสอบ</h1><p class="muted">เลือกทั้งจังหวัดหรือเฉพาะอำเภอได้ โดยไม่ขึ้นกับตัวกรองในหน้าแผนที่</p></div>
-      <p id="summaryScopeHint" class="field-hint" role="status"></p><div class="summary-filters"><label>ขอบเขตสรุป<select id="summaryDistrict"><option value="">ทั้งจังหวัด · ทุกอำเภอ</option></select></label><label>ปีชุดข้อมูล<select id="summaryYear"><option value="">ทุกปีชุดข้อมูล</option></select></label><button id="summaryReset" class="secondary-button" type="button">ล้างตัวกรองในขอบเขตนี้</button><button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / บันทึก PDF</button></div>
+      <p id="summaryScopeHint" class="field-hint" role="status"></p><div class="summary-filters"><label>ขอบเขตสรุป<select id="summaryDistrict"><option value="">ทั้งจังหวัด · ทุกอำเภอ</option></select></label><label>ปีงบประมาณ<select id="summaryYear"><option value="">ทุกปีชุดข้อมูล</option></select></label><button id="summaryReset" class="secondary-button" type="button">ล้างตัวกรองในขอบเขตนี้</button><button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / บันทึก PDF</button></div>
       <div id="summaryStats" class="stat-grid"></div>
       <section class="table-card"><div class="section-title"><div><p class="eyebrow">ความคืบหน้า</p><h2>แยกตามพื้นที่</h2></div><label class="inline-label">ระดับ<select id="summaryLevel"><option value="province">ทั้งจังหวัด</option><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div><div class="table-scroll" tabindex="0" role="region" aria-label="ตารางสรุปผล เลื่อนซ้ายขวาเพื่อดูข้อมูลทั้งหมด"><table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ความคืบหน้า</th></tr></thead><tbody id="summaryBody"></tbody></table></div></section>
     </section>
@@ -98,7 +99,7 @@
       <div class="page-heading"><p class="eyebrow">พื้นที่ควบคุม</p><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p id="roleLabel" class="role-chip">ยังไม่ได้เข้าสู่ระบบ</p></div>
 
       <section id="adminLoginGate" class="settings-card login-card" aria-labelledby="loginTitle">
-        <div class="section-title"><div><p class="eyebrow">บัญชีผู้ดูแล</p><h2 id="loginTitle">เข้าสู่ระบบ Admin / Super Admin</h2></div></div>
+        <div class="section-title"><div><p class="eyebrow">บัญชีผู้ดูแล</p><h2 id="loginTitle">เข้าสู่ระบบผู้ใช้งาน / Admin / Super Admin</h2></div></div>
         <p class="field-hint">ลงชื่อเข้าใช้ด้วยบัญชีผู้ดูแลของหน่วยงาน</p>
         <form id="adminLoginForm">
           <label>ชื่อผู้ใช้ <em class="required-word">จำเป็น</em><input id="loginUsername" type="text" autocomplete="username" required></label>
@@ -163,6 +164,7 @@
       </section>
       <p id="teamLoginHint" class="field-hint">Admin และ Super Admin สามารถเข้าสู่ระบบเพื่อเพิ่มหรือแก้ไขข้อมูลทีมได้</p>
     </section>
+    <section id="inspectorAccount" class="card" hidden></section>
   </main>
   <footer class="site-footer">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.<small>ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></small></footer>
 
@@ -200,10 +202,13 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.1"></script><script src="data-source.js?v=2.1"></script>
   <script src="evidence.js"></script>
-  <script src="field-extension.js"></script>
+  <script src="image-compression.js?v=2.2"></script>
+  <script src="field-extension.js?v=2.2"></script>
   <script src="report.js?v=2.1"></script>
   <script src="site-config.js?v=2.1"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
   <script src="team.js"></script>
-  <script src="app.js?v=2.1" defer></script>
+  <script src="fiscal-period.js?v=2.2"></script>
+  <script src="registration-ui.js?v=2.2"></script>
+  <script src="app.js?v=2.2" defer></script>
 </body>
 </html>

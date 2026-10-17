@@ -1,5 +1,5 @@
 const APP = Object.freeze({
-  VERSION: '2.0.0',
+  VERSION: '2.2.0',
   PROVINCE: 'กำแพงเพชร',
   LAND_TYPE: 'พื้นที่เกษตร',
   PLANT_TYPES: Object.freeze(['นาข้าว', 'อ้อย', 'เกษตรอื่น ๆ', 'อื่น ๆ']),
@@ -12,7 +12,8 @@ const APP = Object.freeze({
   MAX_PAGE_SIZE: 500,
   MAX_IMPORT_ROWS: 5000,
   MAX_BODY_CHARS: 7500000,
-  MAX_PHOTO_BYTES: 5 * 1024 * 1024,
+  MAX_PHOTO_BYTES: 1000000,
+  MAX_READ_PHOTO_BYTES: 5 * 1024 * 1024,
   PHOTO_MIME_TYPES: Object.freeze(['image/jpeg', 'image/png', 'image/webp']),
   TOKEN_MIN_LENGTH: 24,
   AUTH_SESSION_SECONDS: 4 * 60 * 60,
@@ -24,9 +25,11 @@ const APP = Object.freeze({
     VERIFICATION: 'HS_Verification',
     PHOTOS: 'HS_Photos',
     INSPECTORS: 'Inspector_Profile',
-    LOG: 'Verification_Log'
+    LOG: 'Verification_Log',
+    REGISTRATIONS: 'User_Registration'
   }),
   HEADERS: Object.freeze({
+    User_Registration: Object.freeze(['registration_id','phone','full_name','position','agency_level','agency','province_code','district','privacy_version','privacy_acknowledged_at','status','created_at','reviewed_at','reviewed_by']),
     HS_Base: Object.freeze([
       'hs_id', 'acquired_at', 'latitude', 'longitude', 'province', 'district',
       'tambon', 'village', 'land_type', 'plant_type', 'source_sheet',
