@@ -105,3 +105,7 @@ Province = กำแพงเพชร, LandType = พื้นที่เก�
 Admin: ตรวจสอบผล/QA/ส่งออก; Super Admin: เปลี่ยนต้นทาง Google Sheet URL, sync และยืนยันนำเข้า Excel/CSV/JSON/GeoJSON พร้อม preview QA ฝั่ง server; การสร้างบัญชียังใช้ Apps Script editor และ createInspector ตามคู่มือ
 
 วิเคราะห์ข้อมูลร่วมและข้อจำกัด: `docs/SHARED_DATA.md` · ผลทดสอบล่าสุด: `docs/VALIDATION.md`
+
+
+## รุ่น 2.4
+ดู [รายการปรับปรุงและติดตั้ง](docs/RELEASE_V24_TH.md) และใช้ `docs/AppsScript-v24-All.gs` สำหรับโค้ด Apps Script รวมล่าสุด

@@ -1,10 +1,10 @@
 const APP = Object.freeze({
-  VERSION: '2.3.0',
+  VERSION: '2.4.0',
   PROVINCE: 'กำแพงเพชร',
   LAND_TYPE: 'พื้นที่เกษตร',
   PLANT_TYPES: Object.freeze(['นาข้าว', 'อ้อย', 'เกษตรอื่น ๆ', 'อื่น ๆ']),
   PERSON_CATEGORIES: Object.freeze(['นักวิชาการส่งเสริมการเกษตร', 'กำนัน', 'ผู้ใหญ่บ้าน', 'ผู้ช่วยผู้ใหญ่บ้าน', 'อกม.', 'อื่นๆ']),
-  RESULTS: Object.freeze(['burned', 'not_burned', 'not_found', 'needs_review']),
+  RESULTS: Object.freeze(['burned', 'not_burned', 'not_found', 'needs_review', 'inaccessible']),
   STATUSES: Object.freeze(['draft', 'verified']),
   DEFAULT_SOURCE_SHEET: 'hsPlant2026',
   DETAIL_FALLBACK_SHEET: 'hsAll',
