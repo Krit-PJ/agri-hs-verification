@@ -6,3 +6,5 @@ node_modules/
 # Local deployment backups and test logs
 docs/AppsScript-before-*.gs
 test-v24.log
+
+.boundary-tools/
