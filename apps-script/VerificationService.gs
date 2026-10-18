@@ -497,6 +497,7 @@ function getConfig_(actor) {
   const data = {
     national:typeof HSNational!=='undefined',
     authorizedProvinceCodes:typeof nationalAuthorized_==='function'?nationalAuthorized_(actor):[],
+    boundaries:typeof getBoundaryConfig_==='function'?getBoundaryConfig_(actor):null,
     version: APP.VERSION,
     province:typeof HSNational!=='undefined'?(actor.role==='admin'?(HSNational.provinces[actor.assignedProvinceCode]||'ยังไม่กำหนดจังหวัด'):'ประเทศไทย'):APP.PROVINCE,
     landType: APP.LAND_TYPE,
