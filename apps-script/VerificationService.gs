@@ -29,7 +29,8 @@ function latestVerificationMap_() {
 function applyHsFilters_(rows, filters, actor, latest) {
   filters = filters || {};
   let fiscalStart='',fiscalEnd='';
-  if(filters.fiscalYearBe){const fy=Number(filters.fiscalYearBe),end=cleanText_(filters.endMonth,7);assert_(Number.isInteger(fy)&&fy>=2400&&fy<=2800&&/^\d{4}-\d{2}$/.test(end),'VALIDATION_ERROR','ช่วงปีงบประมาณไม่ถูกต้อง');fiscalStart=String(fy-544)+'-10-01';const last=String(fy-543)+'-09';assert_(end>=fiscalStart.slice(0,7)&&end<=last&&Number(end.slice(5))>=1&&Number(end.slice(5))<=12,'VALIDATION_ERROR','เดือนสิ้นสุดต้องอยู่ในปีงบประมาณ');fiscalEnd=end;}
+  if(filters.startMonth!=null){const start=String(filters.startMonth),end=String(filters.endMonth||'');assert_(/^\d{4}-(0[1-9]|1[0-2])$/.test(start)&&/^\d{4}-(0[1-9]|1[0-2])$/.test(end)&&start<=end&&Number(start.slice(0,4))>=1900&&Number(end.slice(0,4))<=2300,'VALIDATION_ERROR','ช่วงเดือนเริ่มต้นและสิ้นสุดไม่ถูกต้อง');fiscalStart=start+'-01';fiscalEnd=end;}
+  else if(filters.fiscalYearBe){const fy=Number(filters.fiscalYearBe),end=cleanText_(filters.endMonth,7);assert_(Number.isInteger(fy)&&fy>=2400&&fy<=2800&&/^\d{4}-\d{2}$/.test(end),'VALIDATION_ERROR','ช่วงปีงบประมาณไม่ถูกต้อง');fiscalStart=String(fy-544)+'-10-01';const last=String(fy-543)+'-09';assert_(end>=fiscalStart.slice(0,7)&&end<=last&&Number(end.slice(5))>=1&&Number(end.slice(5))<=12,'VALIDATION_ERROR','เดือนสิ้นสุดต้องอยู่ในปีงบประมาณ');fiscalEnd=end;}
   const search = compact_(filters.search);
   return rows.filter(function (row) {
     if (String(row.active).toLowerCase() === 'false' || !actorCanAccessHs_(actor, row)) return false;
@@ -396,7 +397,7 @@ function summaries_(actor, payload) {
     const plant = cleanText_(row.plant_type) || '(ไม่ระบุ)';
     if(verification && status==='verified') {
       result.submitted += 1;
-      if(['not_found','needs_review'].indexOf(outcome)>=0) result.followUpRequired += 1;
+      if(['not_found','needs_review','inaccessible'].indexOf(outcome)>=0) result.followUpRequired += 1;
       else result.confirmed += 1;
       if(verificationEvidenceState_(verification)==='pending') result.evidencePending += 1;
     }
@@ -504,7 +505,7 @@ function getConfig_(actor) {
     results: APP.RESULTS.slice(),
     personCategories: APP.PERSON_CATEGORIES.slice(),
     limits: {maxImportRows: APP.MAX_IMPORT_ROWS, maxPageSize: APP.MAX_PAGE_SIZE, maxPhotoBytes: APP.MAX_PHOTO_BYTES, photoMimeTypes: APP.PHOTO_MIME_TYPES.slice()},
-    profile: {assignedProvinceCode:actor.assignedProvinceCode||'',inspectorId: actor.id, displayName: actor.displayName, district: actor.district, tambon: actor.tambon, role: actor.role, personCategory: actor.personCategory || '', personCategoryOther: actor.personCategoryOther || '', position: actor.position || '', agency: actor.agency || ''}
+    profile: {agencyLevel:actor.agencyLevel||'',phone:actor.phone||'',authMethod:actor.authMethod||'',assignedProvinceCode:actor.assignedProvinceCode||'',inspectorId: actor.id, displayName: actor.displayName, district: actor.district, tambon: actor.tambon, role: actor.role, personCategory: actor.personCategory || '', personCategoryOther: actor.personCategoryOther || '', position: actor.position || '', agency: actor.agency || ''}
   };
   if (['admin', 'super_admin'].indexOf(actor.role) >= 0 && (typeof nationalReadActor_!=='function'||actor.role==='super_admin')) {
     const properties = PropertiesService.getScriptProperties();

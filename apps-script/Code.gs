@@ -13,6 +13,8 @@ function doPost(event) {
     assert_(action, 'INVALID_REQUEST', 'ต้องระบุ action');
     const payload = envelope.payload == null ? {} : envelope.payload;
     assert_(payload && typeof payload === 'object' && !Array.isArray(payload), 'INVALID_REQUEST', 'payload ต้องเป็น object');
+    if (action === 'getCounters') return outputJson_({ok:true,requestId:requestId,data:getCounters_()});
+    if (action === 'recordVisit') return outputJson_({ok:true,requestId:requestId,data:recordVisit_(payload)});
     if (action === 'getRegistrationPolicy') return outputJson_({ok:true,requestId:requestId,data:getRegistrationPolicy_()});
     if (action === 'register') return outputJson_({ok:true,requestId:requestId,data:registerUser_(payload)});
     if (action === 'getTeam') return outputJson_({ok:true,requestId:requestId,data:getTeam_()});
@@ -25,6 +27,7 @@ function doPost(event) {
     if(typeof nationalPublicRead_==='function' && action==='bootstrap' && !envelope.token)return outputJson_({ok:true,requestId:requestId,data:nationalPublicRead_()});
     const actor = authenticate_(envelope.token);
     if(typeof nationalCsrf_==='function')nationalCsrf_(envelope);
+    if (action === 'recordUsage') return outputJson_({ok:true,requestId:requestId,data:recordUsage_(actor)});
     if (action === 'logout') {
       return outputJson_({ok: true, requestId: requestId, data: logoutSession_(envelope.token)});
     }

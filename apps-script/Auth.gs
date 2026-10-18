@@ -288,7 +288,7 @@ function setupPhoneOnlyInspectorAccount_(phone, profile) {
     username:key,
     authMethod:'phone_only',
     sessionVersion:uuid_(),
-    active:false,
+    active:true,
     profile:{
       inspectorId:cleanText_(profile.inspectorId,64)||('account:'+key),
       displayName:cleanText_(profile.displayName,120)||key,

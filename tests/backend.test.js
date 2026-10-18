@@ -218,3 +218,10 @@ test('v1.2 server cannot be tricked into marking a new submission evidence-free'
  const legacy=c.publicVerification_({verification_id:'legacy',status:'verified',result:'burned'});
  assert.equal(legacy.evidenceRequired,false);assert.equal(legacy.evidenceState,'not_required');
 });
+test('inaccessible is saved separately from not_found and counted as follow-up',()=>{
+ const {c,db,app}=backend();db[app.SHEETS.BASE].push(hs);
+ assert.ok(app.RESULTS.includes('inaccessible'));
+ const v=c.saveVerification_(actor,'inaccessible-request',{hsId:'HS1',result:'inaccessible',missingGpsReason:'unsafe access',evidenceRequired:true,photoMissingReason:'cannot reach site'}).verification;
+ assert.equal(v.result,'inaccessible');assert.equal(v.photoMissingReason,'cannot reach site');
+ const summary=c.summaries_(actor,{});assert.equal(summary.byResult.inaccessible,1);assert.equal(summary.byResult.not_found,undefined);assert.equal(summary.followUpRequired,1);
+});

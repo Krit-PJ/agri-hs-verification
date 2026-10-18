@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');const ui=fs.readFileSync(require.resolve('../registration-ui.js'),'utf8');
 test('registration requires published policy and acknowledgement without password fields',()=>{assert.match(ui,/getRegistrationPolicy/);assert.match(ui,/disabled=!policy\?\.configured/);assert.match(ui,/privacyVersion:policy.version/);assert.match(ui,/privacyAcknowledged:f.privacyAcknowledged.checked/);assert.doesNotMatch(ui,/name="password(?:Confirm)?"/);assert.match(ui,/result.items\|\|result.rows/);assert.match(ui,/raw.registration_id/);});
-test('registration never persists passwords and displays requests as text',()=>{assert.doesNotMatch(ui,/localStorage|sessionStorage/);assert.match(ui,/details.textContent=/);});
+test('registration never persists passwords and displays requests as text',()=>{assert.doesNotMatch(ui,/sessionStorage/);assert.match(ui,/localStorage.setItem\('hsverify.lastPhone',phone\)/);assert.match(ui,/details.textContent=/);});
 
 test('registration includes notice inline without the removed external notice link',()=>{assert.doesNotMatch(ui,/<a[^>]+privacy\.html/);assert.match(ui,/Google Workspace \/ Google Drive/);});

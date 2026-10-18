@@ -2,3 +2,7 @@ node_modules/
 .env
 .clasprc.json
 *.secret.*
+
+# Local deployment backups and test logs
+docs/AppsScript-before-*.gs
+test-v24.log

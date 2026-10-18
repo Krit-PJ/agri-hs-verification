@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="design-tokens.css?v=2.1">
   <link rel="stylesheet" href="styles.css?v=2.1">
-  <link rel="stylesheet" href="registration.css?v=2.3">
+  <link rel="stylesheet" href="registration.css?v=2.4.1">
 </head>
 <body>
   <a class="skip-link" href="#main">ข้ามไปเนื้อหาหลัก</a>
@@ -40,7 +40,7 @@
   <section id="previewToolbar" class="preview-toolbar" hidden aria-label="โหมดทดสอบในเครื่อง"><strong>โหมดทดสอบ · ไม่ต้อง Login</strong><span>ข้อมูลทดสอบบันทึกเฉพาะเครื่องนี้ ไม่เชื่อม Google จริง</span><label>ทดสอบบทบาท<select id="previewRole"><option value="super_admin">Super Admin</option><option value="admin">Admin รายจังหวัด</option><option value="public">ผู้ใช้ทั่วไป</option></select></label><label>จังหวัดที่มอบหมายให้ Admin ทดสอบ<select id="previewProvince"></select></label></section><main id="main">
     <section id="workView" class="view active" aria-labelledby="workTitle">
       <div class="work-heading">
-        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนเพื่อบันทึกผล หรือใช้ระบบกรองข้อมูลด้านล่าง</p></div>
+        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนเพื่อบันทึกผล หรือใช้ระบบกรองข้อมูลด้านล่าง</p><div class="period-range" role="group" aria-label="ช่วงเวลาจุดความร้อน"><label>เดือน–ปี เริ่มต้น<input id="startMonthFilter" type="month"></label><span aria-hidden="true">ถึง</span><label>เดือน–ปี สิ้นสุด<input id="endMonthFilter" type="month"></label><button id="resetPeriod" type="button" class="secondary-button">ช่วงข้อมูลล่าสุด</button></div><p id="periodRangeHint" class="field-hint" role="status"></p></div>
         <button id="retryButton" class="secondary-button compact" type="button" hidden>ลองส่งงานค้าง <span id="retryCount">0</span></button>
       </div>
 
@@ -50,7 +50,7 @@
       </aside>
       <aside id="liveError" class="notice error" role="alert" hidden></aside>
 
-      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map</p><h2>แผนที่จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กำลังอ่านชุดข้อมูลล่าสุด…</p></div><button id="refreshDataButton" type="button" class="primary-button">↻ อัปเดตข้อมูล</button></div>
+      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map</p><h2>แผนที่จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กำลังอ่านชุดข้อมูลล่าสุด…</p></div><a id="trafficMapLink" class="secondary-button" href="https://www.google.com/maps/@?api=1&amp;map_action=map&amp;layer=traffic" target="_blank" rel="noopener">จราจร · เปิด Google Maps ↗</a><button id="refreshDataButton" type="button" class="primary-button">↻ อัปเดตข้อมูล</button></div>
       <div class="result-toolbar">
         <p><strong id="resultCount">0</strong> จุดที่พบ <span id="selectedCount" class="muted"></span></p>
         <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
@@ -63,7 +63,7 @@
         <div class="map-wrap">
           <div id="map" aria-label="แผนที่จุดความร้อน"></div>
           <div id="mapFallback" class="map-fallback" hidden><strong>เปิดแผนที่ไม่ได้</strong><span>ยังเลือกรายการด้านล่างและนำทางด้วย Google Maps ได้</span></div>
-          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบ</span><span><i class="dot blocked"></i>เข้าตรวจไม่ได้</span></div>
+          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot" style="background:#2677ad"></i>งานร่าง</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบ</span><span><i class="dot blocked"></i>เข้าตรวจสอบไม่ได้</span></div>
         </div>
         <section class="result-panel" aria-labelledby="resultTitle">
           <div class="panel-heading"><h2 id="resultTitle">รายการจุด</h2><button id="allHotspotsButton" class="secondary-button all-hotspots" type="button" aria-pressed="false">จุดความร้อนทั้งหมด</button></div>
@@ -74,15 +74,15 @@
 
       <section class="filter-card" aria-labelledby="filterTitle">
         <div class="section-title"><div><p class="eyebrow">ค้นหาเร็ว</p><h2 id="filterTitle">ตัวกรองจุดความร้อน</h2></div><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button></div>
-        <p id="fiscalPeriodHint" class="field-hint" role="status"></p><p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
-          <label>ปีงบประมาณ พ.ศ.<select id="yearFilter"><option value="">ทุกปี</option></select></label>
-          <label>ถึงเดือน (เริ่มตุลาคม)<select id="monthFilter"><option value="">ทุกเดือน</option></select></label>
+        <select id="yearFilter" hidden aria-hidden="true" tabindex="-1"></select><select id="monthFilter" hidden aria-hidden="true" tabindex="-1"></select><p id="fiscalPeriodHint" hidden class="field-hint" role="status"></p><p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
+          <label>จังหวัด<select id="quickProvinceFilter"></select></label>
+
           <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
           <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
           <label>หมู่บ้าน<select id="villageFilter"><option value="">ทุกหมู่บ้าน</option></select></label>
           <label>พืช/พื้นที่<select id="cropFilter"><option value="">ทุกประเภท</option></select></label>
           <label>สถานะ<select id="statusFilter"><option value="">ทุกสถานะ</option><option value="pending">รอตรวจ</option><option value="draft">งานร่าง</option><option value="verified">ตรวจแล้ว</option></select></label>
-          <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option></select></label>
+          <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option><option value="inaccessible">เข้าตรวจสอบไม่ได้</option></select></label>
           <label class="search-label">ค้นหา HS<input id="searchFilter" type="search" inputmode="search" placeholder="เลข HS หรือชื่อพื้นที่"></label>
         </div>
       </section>
@@ -167,7 +167,7 @@
     </section>
     <section id="inspectorAccount" class="card" hidden></section>
   </main>
-  <footer class="site-footer">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.<small>ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></small></footer>
+  <footer class="site-footer"><span id="visitCounter" class="site-counters" role="status">กำลังอ่านสถิติการใช้งาน…</span>Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.<small>ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></small></footer>
 
   <dialog id="verifyDialog" class="verify-dialog">
     <form id="verifyForm" method="dialog">
@@ -181,7 +181,7 @@
         <label class="outcome fire"><input type="radio" name="outcome" value="burned" required><span aria-hidden="true">♧</span><strong>พบการเผา</strong></label>
         <label class="outcome clear"><input type="radio" name="outcome" value="not_burned" required><span aria-hidden="true">✓</span><strong>ไม่พบการเผา</strong></label>
         <label class="outcome blocked"><input type="radio" name="outcome" value="not_found" required><span aria-hidden="true">?</span><strong>ไม่พบจุด</strong></label>
-        <label class="outcome blocked"><input type="radio" name="outcome" value="needs_review" required><span aria-hidden="true">↻</span><strong>ต้องตรวจซ้ำ</strong></label>
+        <label class="outcome blocked"><input type="radio" name="outcome" value="inaccessible" required><span aria-hidden="true">!</span><strong>เข้าตรวจสอบไม่ได้</strong></label><label class="outcome blocked"><input type="radio" name="outcome" value="needs_review" required><span aria-hidden="true">↻</span><strong>ต้องตรวจซ้ำ</strong></label>
       </div></fieldset>
       <details class="conditional-fields"><summary>ยืนยันสภาพพื้นที่จริง</summary><label>พื้นที่ตรงกับข้อมูลต้นทางหรือไม่<select id="observedMatches"><option value="">ยังไม่ได้ยืนยัน</option><option value="yes">ตรงกับข้อมูลต้นทาง</option><option value="no">แตกต่างจากข้อมูลต้นทาง</option></select></label><div id="observedFields" hidden><label>ประเภทพื้นที่จริง<select id="observedLandType"><option>พื้นที่เกษตร</option><option>ไม่ใช่พื้นที่เกษตร</option><option>ยังระบุไม่ได้</option></select></label><label>ชนิดพืชจริง<input id="observedPlantType" maxlength="150" placeholder="ระบุเมื่อทราบ"></label></div></details><label id="fireStateWrap" hidden>สถานะไฟขณะตรวจ<select id="fireState"><option value="unknown">ยังระบุไม่ได้</option><option value="active">ยังมีไฟ / ควัน</option><option value="extinguished">ไฟดับแล้ว</option></select></label><div class="photo-actions"><label class="photo-field camera-field">ถ่ายภาพ <span class="optional">แนบหลักฐาน หรือระบุเหตุผล · สูงสุด 3 รูป</span><input id="photoInput" type="file" accept="image/*" capture="environment" aria-label="เปิดกล้องถ่ายภาพหลักฐาน"><span class="photo-button">◉ เปิดกล้อง</span></label>
       <label class="photo-field import-photo-field">Import photo <span class="optional">เลือกภาพจากเครื่อง · สูงสุดรวม 3 รูป</span><input id="importPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple><span class="photo-button">＋ นำเข้ารูปภาพ</span></label></div>
@@ -203,14 +203,14 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.1"></script><script src="data-source.js?v=2.1"></script>
   <script src="evidence.js"></script>
-  <script src="image-compression.js?v=2.3"></script>
-  <script src="field-extension.js?v=2.3"></script>
-  <script src="report.js?v=2.1"></script>
-  <script src="phone-demo-config.js?v=2.3"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
+  <script src="image-compression.js?v=2.4"></script>
+  <script src="field-extension.js?v=2.4"></script>
+  <script src="report.js?v=2.4"></script>
+  <script src="phone-demo-config.js?v=2.4"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
   <script src="team.js"></script>
-  <script src="fiscal-period.js?v=2.3"></script>
-  <script src="registration-ui.js?v=2.3"></script>
-  <script src="app.js?v=2.3" defer></script>
-<script src="phone-demo.js?v=2.3" defer></script>
+  <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.4"></script>
+  <script src="registration-ui.js?v=2.4.1"></script>
+  <script src="app.js?v=2.4" defer></script>
+<script src="phone-demo.js?v=2.4" defer></script>
 </body>
 </html>
