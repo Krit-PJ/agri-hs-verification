@@ -136,6 +136,7 @@
       if(L.control?.layers)L.control.layers({'ถนน':streets,'ดาวเทียม':satellite,'ภูมิประเทศ':terrain},{},{collapsed:true}).addTo(state.map);
       const traffic=$('trafficMapLink');if(traffic){const updateTraffic=()=>{const center=state.map.getCenter();traffic.href='https://www.google.com/maps/@?api=1&map_action=map&center='+encodeURIComponent(center.lat+','+center.lng)+'&zoom='+Math.min(20,state.map.getZoom())+'&layer=traffic';};state.map.on('moveend',updateTraffic);updateTraffic();}
       state.markers = L.layerGroup().addTo(state.map);
+      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired())});state.boundaries.sync();}
     } catch (error) { showMapFallback('เบราว์เซอร์นี้เปิดแผนที่ไม่ได้'); }
   }
 
@@ -577,6 +578,7 @@
   }
 
   function applyRoleUI() {
+    state.boundaries?.sync();
     if(nationalMode){HSNationUI.sync();document.querySelectorAll('#workspaceSettingsCard,#fileImportCard,[data-admin-action=sync]').forEach(e=>e.style.display='none');}
     const profile=state.profile || state.serverConfig?.profile;
     const role=normalizedRole(profile?.role);

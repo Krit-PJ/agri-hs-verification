@@ -109,3 +109,7 @@ Admin: ตรวจสอบผล/QA/ส่งออก; Super Admin: เปล
 
 ## รุ่น 2.4
 ดู [รายการปรับปรุงและติดตั้ง](docs/RELEASE_V24_TH.md) และใช้ `docs/AppsScript-v24-All.gs` สำหรับโค้ด Apps Script รวมล่าสุด
+
+
+## Frontend 2.5 — ขอบเขตพื้นที่
+เพิ่มขอบเขตจังหวัด อำเภอ ตำบลตามสิทธิ์ Admin / Super Admin ดู [วิธีใช้และข้อจำกัด](docs/BOUNDARIES_V25_TH.md) โดยใช้ Apps Script รุ่น 2.4 เดิม

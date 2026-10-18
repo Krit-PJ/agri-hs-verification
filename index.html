@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="design-tokens.css?v=2.1">
   <link rel="stylesheet" href="styles.css?v=2.1">
   <link rel="stylesheet" href="registration.css?v=2.4.1">
+  <link rel="stylesheet" href="boundaries.css?v=2.5">
 </head>
 <body>
   <a class="skip-link" href="#main">ข้ามไปเนื้อหาหลัก</a>
@@ -59,6 +60,7 @@
         </div>
       </div>
 
+      <section id="boundaryPanel" class="boundary-panel" aria-label="ขอบเขตการปกครองตามสิทธิ์" hidden></section>
       <div id="mapLayout" class="map-layout">
         <div class="map-wrap">
           <div id="map" aria-label="แผนที่จุดความร้อน"></div>
@@ -201,7 +203,7 @@
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.1"></script><script src="data-source.js?v=2.1"></script>
+  <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.5"></script><script src="data-source.js?v=2.1"></script>
   <script src="evidence.js"></script>
   <script src="image-compression.js?v=2.4"></script>
   <script src="field-extension.js?v=2.4"></script>
@@ -210,6 +212,7 @@
   <script src="team.js"></script>
   <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.4"></script>
   <script src="registration-ui.js?v=2.4.1"></script>
-  <script src="app.js?v=2.4" defer></script>
+  <script src="boundaries.js?v=2.5"></script>
+  <script src="app.js?v=2.5" defer></script>
 </body>
 </html>
