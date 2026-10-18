@@ -113,3 +113,7 @@ Admin: ตรวจสอบผล/QA/ส่งออก; Super Admin: เปล
 
 ## Frontend 2.5 — ขอบเขตพื้นที่
 เพิ่มขอบเขตจังหวัด อำเภอ ตำบลตามสิทธิ์ Admin / Super Admin ดู [วิธีใช้และข้อจำกัด](docs/BOUNDARIES_V25_TH.md) โดยใช้ Apps Script รุ่น 2.4 เดิม
+
+
+## Apps Script 2.5
+โค้ดรวมล่าสุด: `docs/AppsScript-v25-All.gs` เพิ่ม `getBoundaryConfig` (ต้องใช้ session) คืนขอบเขตตามบัญชีที่เซิร์ฟเวอร์ยืนยัน และแนบ metadata ใน config โดยไม่เปลี่ยน schema บัญชี หรือข้อมูล HS

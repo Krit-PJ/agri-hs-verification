@@ -43,6 +43,7 @@ function dispatch_(actor, action, requestId, payload) {
   const mutationActions = ['saveVerification', 'verifyHS', 'uploadPhoto', 'syncSource', 'importSource', 'setConfig', 'importRows'];
   if (mutationActions.indexOf(action) >= 0) requestId = requireUuid_(requestId, 'requestId');
   switch (action) {
+    case 'getBoundaryConfig':return getBoundaryConfig_(actor);
     case 'getMyProfile':return {profile:actor};
     case 'listRegistrations':return listRegistrations_(actor,payload);
     case 'approveRegistration':return reviewRegistration_(actor,payload,true);
