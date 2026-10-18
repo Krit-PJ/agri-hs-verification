@@ -1,6 +1,6 @@
 // ==== Config.gs ====
 const APP = Object.freeze({
-  VERSION: '2.2.0',
+  VERSION: '2.2.2',
   PROVINCE: 'กำแพงเพชร',
   LAND_TYPE: 'พื้นที่เกษตร',
   PLANT_TYPES: Object.freeze(['นาข้าว', 'อ้อย', 'เกษตรอื่น ๆ', 'อื่น ๆ']),
@@ -1984,7 +1984,7 @@ function saveTeam_(actor,payload){
 
 // ==== RegistrationService.gs ====
 /* Registration grants no access until a manager approves the declared affiliation. */
-const REGISTRATION_PRIVACY_VERSION_ = '2026-10-v1';
+const REGISTRATION_PRIVACY_VERSION_ = '2026-10-v2';
 function registerUser_(payload) {
   payload=payload||{};
   assert_(getRegistrationPolicy_().configured,'POLICY_NOT_CONFIGURED','ผู้ดูแลต้องตั้งข้อมูลผู้ควบคุมข้อมูล ช่องทางติดต่อ และระยะเวลาเก็บข้อมูลก่อนเปิดลงทะเบียน');
@@ -2030,7 +2030,7 @@ function reviewRegistration_(actor,payload,approve){
 }
 function getHsPhotos_(actor,payload){const hs=requireAccessibleHs_(actor,payload&&payload.hsId);return {items:photoMetadataForHs_(cleanText_(hs.hs_id)).filter(function(p){const v=findOne_(APP.SHEETS.VERIFICATION,'verification_id',p.verificationId);return v&&v.status==='verified';})};}
 
-function getRegistrationPolicy_(){const props=PropertiesService.getScriptProperties(),controller=cleanText_(props.getProperty('PRIVACY_CONTROLLER'),500),contact=cleanText_(props.getProperty('PRIVACY_CONTACT'),500),retention=cleanText_(props.getProperty('PRIVACY_RETENTION'),1000);return {configured:Boolean(controller&&contact&&retention),version:REGISTRATION_PRIVACY_VERSION_,controller:controller,contact:contact,retention:retention,legalBasis:'ภารกิจเพื่อประโยชน์สาธารณะหรือการใช้อำนาจรัฐตามมาตรา 24(4) ซึ่งผู้ควบคุมข้อมูลต้องตรวจสอบว่าใช้กับภารกิจนี้ได้',purpose:'ตรวจสอบสิทธิ์และสังกัด จัดขอบเขตข้อมูล และบันทึกหลักฐานการตรวจสอบจุดความร้อน',dataCategories:'โทรศัพท์ ชื่อ ตำแหน่ง สังกัด พื้นที่รับผิดชอบ ประวัติการใช้งาน และพิกัดหรือภาพหลักฐานที่ส่ง',recipients:'เจ้าหน้าที่และผู้ดูแลที่ได้รับมอบหมายตามขอบเขตหน้าที่ และผู้ให้บริการ Google Workspace/Google Drive ตามการตั้งค่าของหน่วยงาน',rights:'ขอเข้าถึง แก้ไข ลบ จำกัด คัดค้าน หรือร้องเรียนตามเงื่อนไขกฎหมาย โดยติดต่อช่องทางที่ระบุ',acknowledgement:'การรับทราบประกาศความเป็นส่วนตัว ไม่ใช่การให้ความยินยอมแบบครอบคลุมทุกวัตถุประสงค์'};}
+function getRegistrationPolicy_(){const props=PropertiesService.getScriptProperties(),controller=cleanText_(props.getProperty('PRIVACY_CONTROLLER'),500),contact=cleanText_(props.getProperty('PRIVACY_CONTACT'),500),retention=cleanText_(props.getProperty('PRIVACY_RETENTION'),1000);return {configured:Boolean(controller&&contact&&retention),version:REGISTRATION_PRIVACY_VERSION_,noticeKind:'privacy_acknowledgement',noticeTitle:'เอกสารรับทราบการใช้ข้อมูลส่วนบุคคล',controller:controller,contact:contact,retention:retention,legalBasis:'ภารกิจเพื่อประโยชน์สาธารณะหรือการใช้อำนาจรัฐตามมาตรา 24(4) ซึ่งผู้ควบคุมข้อมูลต้องตรวจสอบว่าใช้กับภารกิจนี้ได้',purpose:'ตรวจสอบสิทธิ์และสังกัด จัดขอบเขตข้อมูล และบันทึกหลักฐานการตรวจสอบจุดความร้อน',dataCategories:'โทรศัพท์ ชื่อ ตำแหน่ง สังกัด พื้นที่รับผิดชอบ ประวัติการใช้งาน และพิกัดหรือภาพหลักฐานที่ส่ง',recipients:'เจ้าหน้าที่และผู้ดูแลที่ได้รับมอบหมายตามขอบเขตหน้าที่ และผู้ให้บริการ Google Workspace/Google Drive ตามการตั้งค่าของหน่วยงาน',rights:'ขอเข้าถึง แก้ไข ลบ จำกัด คัดค้าน หรือร้องเรียนตามเงื่อนไขกฎหมาย โดยติดต่อช่องทางที่ระบุ',acknowledgement:'การรับทราบประกาศความเป็นส่วนตัว ไม่ใช่การให้ความยินยอมแบบครอบคลุมทุกวัตถุประสงค์'};}
 
 /* Bound anonymous registration cost before password hashing or persistent writes. */
 function registrationAdmission_(){
@@ -2044,6 +2044,14 @@ function registrationAdmission_(){
  // UTF-8 bytes count conservatively; reserve at least 8KB for this account and admin operations.
  const bytes=Object.keys(all).reduce(function(total,k){return total+unescape(encodeURIComponent(k+String(all[k]))).length;},0);
  assert_(bytes+8192<400000,'REGISTRATION_CAPACITY','พื้นที่บัญชีใกล้เต็ม กรุณาติดต่อผู้ดูแล');
+}
+
+/** Read-only readiness check. Does not create accounts, change policy or disclose contact details. */
+function checkRegistrationPolicyReady() {
+  const policy=getRegistrationPolicy_();
+  const report={version:policy.version,configured:policy.configured,controllerConfigured:Boolean(policy.controller),contactConfigured:Boolean(policy.contact),retentionConfigured:Boolean(policy.retention),noticeKind:policy.noticeKind};
+  console.log(JSON.stringify(report));
+  return report;
 }
 
 // ==== Code.gs ====
@@ -2199,4 +2207,15 @@ function checkDatabaseReady() {
     loginAccounts: Object.keys(readAuthAccounts_()).length,
     note: 'ผลนี้ตรวจโครงสร้างเท่านั้น ต้อง deploy และทดสอบ API/อัปโหลดภาพจริงก่อนใช้งานภาคสนาม'
   };
+}
+
+/** Applies only the privacy settings explicitly supplied by the system owner. */
+function setupApprovedPrivacyPolicy() {
+  const props=PropertiesService.getScriptProperties();
+  props.setProperties({
+    PRIVACY_CONTROLLER:'สำนักงานเกษตรจังหวัดกำแพงเพชร / กรมส่งเสริมการเกษตร',
+    PRIVACY_CONTACT:'kamphaengphet.doae@gmail.com',
+    PRIVACY_RETENTION:'ตามนโยบายและข้อกำหนดของหน่วยงาน สำนักงานเกษตรจังหวัดกำแพงเพชร'
+  });
+  return checkRegistrationPolicyReady();
 }

@@ -44,3 +44,14 @@ function checkDatabaseReady() {
     note: 'ผลนี้ตรวจโครงสร้างเท่านั้น ต้อง deploy และทดสอบ API/อัปโหลดภาพจริงก่อนใช้งานภาคสนาม'
   };
 }
+
+/** Applies only the privacy settings explicitly supplied by the system owner. */
+function setupApprovedPrivacyPolicy() {
+  const props=PropertiesService.getScriptProperties();
+  props.setProperties({
+    PRIVACY_CONTROLLER:'สำนักงานเกษตรจังหวัดกำแพงเพชร / กรมส่งเสริมการเกษตร',
+    PRIVACY_CONTACT:'kamphaengphet.doae@gmail.com',
+    PRIVACY_RETENTION:'ตามนโยบายและข้อกำหนดของหน่วยงาน สำนักงานเกษตรจังหวัดกำแพงเพชร'
+  });
+  return checkRegistrationPolicyReady();
+}
