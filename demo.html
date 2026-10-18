@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#007f78">
+  <meta name="description" content="ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตร แยกขอบเขตจังหวัดตามสิทธิ์และข้อมูลที่มีจริง">
+  <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="design-tokens.css?v=2.1">
+  <link rel="stylesheet" href="styles.css?v=2.1">
+  <link rel="stylesheet" href="registration.css?v=2.3">
+</head>
+<body>
+  <a class="skip-link" href="#main">ข้ามไปเนื้อหาหลัก</a>
+  <header class="topbar">
+    <div class="brand">
+      <div class="agency-logos" aria-label="หน่วยงานผู้จัดทำ">
+        <img class="agency-logo doae" src="assets/logo-doae.png" alt="ตรากรมส่งเสริมการเกษตร">
+        <a id="provinceLogoLink" href="#provinceFilter" title="ตราจังหวัดที่กำลังแสดง"><img id="provinceLogo" class="agency-logo" src="assets/logo-kpp.png" alt="ตราประจำจังหวัดกำแพงเพชร"></a><span id="provinceLogoFallback" class="province-mark" hidden aria-label="ภาพรวมหลายจังหวัด">TH</span>
+      </div>
+      <div class="brand-copy"><strong id="systemTitle">ระบบตรวจสอบจุดความร้อน</strong><small id="areaSubtitle">พื้นที่การเกษตร</small><small class="developer-credit">พัฒนาโดย ดร. กิตติ  โพธิ์จวง กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร</small></div>
+    </div>
+    <div class="header-actions">
+      <span id="headerIdentity">ผู้ใช้ทั่วไป</span><span id="modeBadge" class="mode-badge demo">ตัวอย่างในเครื่อง</span>
+      <button id="menuButton" class="icon-button mobile-only" type="button" aria-label="เปิดเมนู" aria-expanded="false">☰</button>
+    </div>
+  </header>
+
+  <section class="header-context" aria-label="พื้นที่และบัญชีผู้ใช้"><div class="province-context"><label>จังหวัดที่กำลังดู<select id="provinceFilter"></select></label><details class="coverage-details"><summary>รายละเอียดชุดข้อมูล</summary><p id="provinceCoverage" class="field-hint" role="status"></p></details></div><div id="accountDock"></div></section>
+  <nav id="mainNav" class="main-nav" aria-label="เมนูหลัก">
+    <button class="nav-item active" data-view="work" type="button">ตรวจสอบจุดความร้อน</button>
+    <button class="nav-item" data-view="summary" type="button">สรุปผลการตรวจสอบ</button>
+    <button class="nav-item" data-view="team" type="button">ทีมผู้พัฒนาและที่ปรึกษา</button>
+    <button class="nav-item" data-view="admin" type="button">ผู้ดูแลระบบ</button>
+    <a class="nav-item" href="https://krit-pj.github.io/agri-risk-map-burning/" target="_blank" rel="noopener">แผนที่ความเสี่ยง ↗</a>
+  </nav>
+
+  <section id="previewToolbar" class="preview-toolbar" hidden aria-label="โหมดทดสอบในเครื่อง"><strong>โหมดทดสอบ · ไม่ต้อง Login</strong><span>ข้อมูลทดสอบบันทึกเฉพาะเครื่องนี้ ไม่เชื่อม Google จริง</span><label>ทดสอบบทบาท<select id="previewRole"><option value="super_admin">Super Admin</option><option value="admin">Admin รายจังหวัด</option><option value="public">ผู้ใช้ทั่วไป</option></select></label><label>จังหวัดที่มอบหมายให้ Admin ทดสอบ<select id="previewProvince"></select></label></section><main id="main">
+    <section id="workView" class="view active" aria-labelledby="workTitle">
+      <div class="work-heading">
+        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนเพื่อบันทึกผล หรือใช้ระบบกรองข้อมูลด้านล่าง</p></div>
+        <button id="retryButton" class="secondary-button compact" type="button" hidden>ลองส่งงานค้าง <span id="retryCount">0</span></button>
+      </div>
+
+      <aside id="demoNotice" class="notice warning" role="status">
+        <strong>โหมดตัวอย่างในเครื่อง</strong>
+        <span>ข้อมูลและผลตรวจอยู่ในอุปกรณ์นี้เท่านั้น ยังไม่บันทึกขึ้นระบบกลาง</span>
+      </aside>
+      <aside id="liveError" class="notice error" role="alert" hidden></aside>
+
+      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map</p><h2>แผนที่จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กำลังอ่านชุดข้อมูลล่าสุด…</p></div><button id="refreshDataButton" type="button" class="primary-button">↻ อัปเดตข้อมูล</button></div>
+      <div class="result-toolbar">
+        <p><strong id="resultCount">0</strong> จุดที่พบ <span id="selectedCount" class="muted"></span></p>
+        <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
+          <button class="active" data-layout="map" type="button">แผนที่</button>
+          <button data-layout="list" type="button">รายการ</button>
+        </div>
+      </div>
+
+      <div id="mapLayout" class="map-layout">
+        <div class="map-wrap">
+          <div id="map" aria-label="แผนที่จุดความร้อน"></div>
+          <div id="mapFallback" class="map-fallback" hidden><strong>เปิดแผนที่ไม่ได้</strong><span>ยังเลือกรายการด้านล่างและนำทางด้วย Google Maps ได้</span></div>
+          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบ</span><span><i class="dot blocked"></i>เข้าตรวจไม่ได้</span></div>
+        </div>
+        <section class="result-panel" aria-labelledby="resultTitle">
+          <div class="panel-heading"><h2 id="resultTitle">รายการจุด</h2><button id="allHotspotsButton" class="secondary-button all-hotspots" type="button" aria-pressed="false">จุดความร้อนทั้งหมด</button></div>
+          <div id="hotspotList" class="hotspot-list" aria-live="polite"></div>
+          <button id="loadMore" class="secondary-button full" type="button" hidden>แสดงเพิ่ม</button>
+        </section>
+      </div>
+
+      <section class="filter-card" aria-labelledby="filterTitle">
+        <div class="section-title"><div><p class="eyebrow">ค้นหาเร็ว</p><h2 id="filterTitle">ตัวกรองจุดความร้อน</h2></div><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button></div>
+        <p id="fiscalPeriodHint" class="field-hint" role="status"></p><p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
+          <label>ปีงบประมาณ พ.ศ.<select id="yearFilter"><option value="">ทุกปี</option></select></label>
+          <label>ถึงเดือน (เริ่มตุลาคม)<select id="monthFilter"><option value="">ทุกเดือน</option></select></label>
+          <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
+          <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
+          <label>หมู่บ้าน<select id="villageFilter"><option value="">ทุกหมู่บ้าน</option></select></label>
+          <label>พืช/พื้นที่<select id="cropFilter"><option value="">ทุกประเภท</option></select></label>
+          <label>สถานะ<select id="statusFilter"><option value="">ทุกสถานะ</option><option value="pending">รอตรวจ</option><option value="draft">งานร่าง</option><option value="verified">ตรวจแล้ว</option></select></label>
+          <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option></select></label>
+          <label class="search-label">ค้นหา HS<input id="searchFilter" type="search" inputmode="search" placeholder="เลข HS หรือชื่อพื้นที่"></label>
+        </div>
+      </section>
+
+    </section>
+
+    <section id="summaryView" class="view" aria-labelledby="summaryTitle" hidden>
+      <div class="page-heading"><p class="eyebrow">ภาพรวมการทำงาน</p><h1 id="summaryTitle">สรุปผลการตรวจสอบ</h1><p class="muted">เลือกทั้งจังหวัดหรือเฉพาะอำเภอได้ โดยไม่ขึ้นกับตัวกรองในหน้าแผนที่</p></div>
+      <p id="summaryScopeHint" class="field-hint" role="status"></p><div class="summary-filters"><label>ขอบเขตสรุป<select id="summaryDistrict"><option value="">ทั้งจังหวัด · ทุกอำเภอ</option></select></label><label>ปีงบประมาณ<select id="summaryYear"><option value="">ทุกปีชุดข้อมูล</option></select></label><button id="summaryReset" class="secondary-button" type="button">ล้างตัวกรองในขอบเขตนี้</button><button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / บันทึก PDF</button></div>
+      <div id="summaryStats" class="stat-grid"></div>
+      <section class="table-card"><div class="section-title"><div><p class="eyebrow">ความคืบหน้า</p><h2>แยกตามพื้นที่</h2></div><label class="inline-label">ระดับ<select id="summaryLevel"><option value="province">ทั้งจังหวัด</option><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div><div class="table-scroll" tabindex="0" role="region" aria-label="ตารางสรุปผล เลื่อนซ้ายขวาเพื่อดูข้อมูลทั้งหมด"><table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ความคืบหน้า</th></tr></thead><tbody id="summaryBody"></tbody></table></div></section>
+    </section>
+
+    <section id="adminView" class="view" aria-labelledby="adminTitle" hidden>
+      <div class="page-heading"><p class="eyebrow">พื้นที่ควบคุม</p><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p id="roleLabel" class="role-chip">ยังไม่ได้เข้าสู่ระบบ</p></div>
+
+      <section id="adminLoginGate" class="settings-card login-card" aria-labelledby="loginTitle">
+        <div class="section-title"><div><p class="eyebrow">บัญชีผู้ดูแล</p><h2 id="loginTitle">เข้าสู่ระบบผู้ใช้งาน / Admin / Super Admin</h2></div></div>
+        <p class="field-hint">ลงชื่อเข้าใช้ด้วยบัญชีผู้ดูแลของหน่วยงาน</p>
+        <form id="adminLoginForm">
+          <label>ชื่อผู้ใช้ <em class="required-word">จำเป็น</em><input id="loginUsername" type="text" autocomplete="username" required></label>
+          <label>รหัสผ่าน <em class="required-word">จำเป็น</em><input id="loginPassword" type="password" autocomplete="current-password" required></label>
+          <button id="loginButton" class="primary-button full" type="submit">เข้าสู่ระบบ</button>
+          <p id="loginMessage" class="form-message" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <div id="adminProtected" hidden>
+        <div class="admin-session-bar">
+          <p><strong id="adminDisplayName">ผู้ดูแลระบบ</strong><small id="adminRoleDescription"></small></p>
+          <button id="logoutButton" class="secondary-button" type="button">ออกจากระบบ</button>
+        </div>
+        <p id="nationalUnassigned" class="notice warning" hidden>บัญชี Admin ยังไม่ได้รับมอบหมายจังหวัด จึงจัดการข้อมูลไม่ได้ กรุณาให้ Super Admin กำหนดจังหวัด</p>
+<section id="nationalImportPanel" class="settings-card" hidden><h2>นำเข้า HS ตามจังหวัดและปี</h2><p>เลือกแหล่งข้อมูล → อ่าน → ตรวจสิทธิ์และ QA → ยืนยันจังหวัด/ปี → บันทึกทีละส่วน</p>
+<label>จังหวัดที่จะนำเข้า (เลือกได้หลายจังหวัดตามสิทธิ์)<select id="nationalProvinces" multiple size="5"></select></label>
+<div class="team-fields"><label>การจัดปี<select id="nationalYearMode"><option value="multi">หลายปี · แยกปีปฏิทินจากวันเกิดเหตุ</option><option value="single">ปีชุดข้อมูลเดียว · คงปีชุดข้อมูลที่กำหนด</option></select></label><label>ปีชุดข้อมูล พ.ศ. (โหมดปีเดียว)<input id="nationalYear" type="number" min="2400" max="2800" value="2569"></label></div>
+<label>Excel / CSV / JSON / GeoJSON หลายไฟล์<input id="nationalFiles" type="file" multiple accept=".xlsx,.xls,.csv,.json,.geojson"></label><button id="nationalReadFiles" type="button" class="secondary-button">อ่านไฟล์และตรวจ QA</button>
+<details><summary>แหล่ง Google Sheets รายจังหวัด</summary><label>จังหวัดของแหล่งข้อมูล<select id="nationalSourceProvince"></select></label><label>Google Sheet URL<input id="nationalSourceUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label><div class="button-row"><button id="nationalSaveSource" type="button" class="secondary-button">บันทึกแหล่งข้อมูล (ยังไม่ตรวจสิทธิ์อ่าน)</button><button id="nationalReadSheet" type="button" class="secondary-button">อ่าน Google Sheet และตรวจ QA</button></div></details>
+<p>อ่าน AllData ก่อน หากไม่มีจะอ่านเฉพาะชีตรายจุดที่หัวตารางครบ ไม่ใช้ชีตสรุปแทนข้อมูลจุด · จำกัด 50,000 แถวต่อชุดและ 5,000 จุดต่อจังหวัด/ปี · การแทนข้อมูลมีผลเฉพาะคู่จังหวัด/ปีที่แสดงด้านล่าง</p><pre id="nationalQA" class="import-preview">ยังไม่อ่านข้อมูล</pre><button id="nationalConfirm" class="primary-button" type="button" disabled>ยืนยันแทนข้อมูลเฉพาะจังหวัด/ปีตามผล QA</button></section>
+<section id="nationalAssignment" class="settings-card" hidden><h2>มอบหมายจังหวัดให้ Admin</h2><label>ชื่อผู้ใช้ Admin ที่มีอยู่<input id="assignUsername" autocomplete="off"></label><label>จังหวัด<select id="assignProvinceCode"></select></label><button id="assignProvinceButton" type="button" class="secondary-button">บันทึกจังหวัดและยกเลิก session เดิมของบัญชี</button></section><p id="nationalStatus" class="form-message" role="status"></p><section id="serverSettingsCard" class="settings-card" data-super-admin-only hidden>
+          <div class="section-title"><div><p class="eyebrow">การเชื่อมต่อ</p><h2>เซิร์ฟเวอร์กลาง</h2></div><span id="connectionDot" class="connection-dot offline" title="ยังไม่เชื่อมต่อ"></span></div>
+          <label>URL ของ API<input id="apiEndpoint" type="url" autocomplete="url" readonly></label>
+          <p class="field-hint">ปลายทางนี้กำหนดไว้ใน site-config.js ก่อนเผยแพร่เว็บ เพื่อให้หน้าเข้าสู่ระบบไม่ต้องกรอก URL</p>
+          <button id="connectButton" class="secondary-button" type="button">ตรวจสอบการเชื่อมต่อ</button>
+          <p id="connectionMessage" class="form-message" aria-live="polite"></p>
+        </section>
+        <section id="workspaceSettingsCard" class="settings-card" data-super-admin-only hidden>
+          <div class="section-title"><div><p class="eyebrow">ปลายทางข้อมูล</p><h2>Google Workspace</h2></div></div>
+          <label>Google Sheet URL หรือ ID ต้นทาง<input id="sheetId" type="text" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label><p class="field-hint">เฉพาะ Super Admin เท่านั้นที่ตั้งหรือเปลี่ยนแหล่งข้อมูลกลางได้</p>
+          <label>ชื่อชีตต้นทาง<input id="sourceSheet" type="text" autocomplete="off" placeholder="hsPlant2026"></label>
+          <label>Google Drive Folder ID<input id="driveId" type="text" autocomplete="off" placeholder="เว้นว่างให้ระบบสร้างโฟลเดอร์ส่วนตัว"></label>
+          <button id="saveConfigButton" class="primary-button full" type="button">บันทึกค่าบนเซิร์ฟเวอร์</button>
+          <p id="configMessage" class="form-message" aria-live="polite"></p>
+        </section>
+      <section id="fileImportCard" class="settings-card import-card" data-super-admin-only hidden>
+        <div class="section-title"><div><p class="eyebrow">นำเข้าจากไฟล์ · Super Admin</p><h2>นำเข้าไฟล์ HS</h2></div><span class="role-chip">ตรวจข้อมูลก่อนยืนยัน</span></div>
+        <p class="field-hint">รองรับ Excel .xlsx/.xls, CSV, JSON และ GeoJSON · อ่าน hsAll และเทียบ hsPlant2026 เมื่อมี Pivot · ไม่ต้องกรอกข้อมูลรายจุด</p>
+        <div class="import-fields"><label>ไฟล์ข้อมูล<input id="hsImportFile" type="file" accept=".xlsx,.xls,.csv,.json,.geojson"></label><label>ปีชุดข้อมูล<input id="importDatasetYear" type="number" min="2500" max="2700" value="2569"></label></div>
+        <div id="importPreview" class="import-preview">เลือกไฟล์เพื่อดูยอด จังหวัด ชนิดพืช และข้อมูลที่ไม่ผ่าน QA</div>
+        <div class="button-row"><button id="confirmFileImport" class="primary-button" type="button" disabled>ยืนยันนำเข้าชุดข้อมูลนี้</button></div><p id="importMessage" class="form-message" aria-live="polite"></p>
+      </section>
+      <section class="action-card">
+        <div class="section-title"><div><p class="eyebrow">เครื่องมือข้อมูล</p><h2>ซิงก์ ตรวจสอบ และส่งออก</h2></div></div>
+        <div class="admin-actions">
+          <button data-admin-action="sync" data-super-admin-only class="action-tile" type="button" hidden><span>↻</span><strong>ซิงก์จาก Google Sheet</strong><small>อ่านและปรับปรุง HS จากต้นทาง</small></button>
+          <button data-admin-action="qa" class="action-tile" type="button"><span>✓</span><strong>ตรวจคุณภาพ</strong><small>ตรวจแถวซ้ำและข้อมูลไม่ครบ</small></button>
+          <button data-admin-action="export" class="action-tile" type="button"><span>⇧</span><strong>ส่งออกผล</strong><small>ดาวน์โหลด CSV ผลตรวจทั้งหมด</small></button>
+          <button data-admin-action="print" class="action-tile" type="button"><span>▤</span><strong>พิมพ์รายงาน</strong><small>เปิดรายงานเพื่อพิมพ์หรือบันทึก PDF</small></button>
+        </div>
+        <div id="adminResult" class="admin-result" aria-live="polite">ยังไม่มีการทำงาน</div>
+      </section>
+      </div>
+    </section>
+    <section id="teamView" class="view" aria-labelledby="teamTitle" hidden>
+      <div class="page-heading"><p class="eyebrow">บุคลากร</p><h1 id="teamTitle">ทีมผู้พัฒนาและที่ปรึกษา</h1><p>ผู้ร่วมพัฒนาและให้คำปรึกษาระบบตรวจสอบจุดความร้อน</p></div>
+      <div id="teamList" class="team-grid" aria-live="polite"></div>
+      <p id="teamMessage" class="form-message" aria-live="polite"></p>
+      <section id="teamEditor" class="settings-card" hidden><h2>เพิ่ม / แก้ไขข้อมูลบุคลากร</h2><p class="field-hint">บันทึกชื่อ ตำแหน่ง และสังกัดที่ต้องการแสดงต่อผู้ใช้เว็บไซต์</p>
+        <form id="teamForm"><input id="teamEditId" type="hidden"><div class="team-fields"><label>ชื่อ - สกุล<input id="teamName" required maxlength="150"></label><label>ตำแหน่ง<input id="teamPosition" required maxlength="200"></label><label>สังกัด<input id="teamAgency" required maxlength="250"></label></div><div class="button-row"><button class="primary-button" type="submit">บันทึกข้อมูล</button><button id="teamCancel" class="secondary-button" type="button">ยกเลิกการแก้ไข</button></div></form>
+      </section>
+      <p id="teamLoginHint" class="field-hint">Admin และ Super Admin สามารถเข้าสู่ระบบเพื่อเพิ่มหรือแก้ไขข้อมูลทีมได้</p>
+    </section>
+    <section id="inspectorAccount" class="card" hidden></section>
+  </main>
+  <footer class="site-footer">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.<small>ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></small></footer>
+
+  <dialog id="verifyDialog" class="verify-dialog">
+    <form id="verifyForm" method="dialog">
+      <div class="dialog-header"><div><p class="eyebrow">บันทึกผลลงพื้นที่</p><h2 id="verifyTitle">จุด HS</h2></div><button id="closeDialog" class="icon-button" type="button" aria-label="ปิด">×</button></div>
+      <div id="selectedMeta" class="selected-meta"></div>
+      <section class="person-section"><label>ประเภทผู้ลงพื้นที่ <select id="personCategory"><option value="">เลือกประเภทบุคคล</option></select></label><label id="personOtherWrap" hidden>ประเภทบุคคลอื่น โปรดระบุ<input id="personCategoryOther" maxlength="150"></label><details><summary>บันทึกแทนผู้ลงพื้นที่ / ตรวจย้อนหลัง</summary><label>ชื่อผู้ลงพื้นที่<input id="fieldInspectorName" maxlength="200" placeholder="เว้นว่างเพื่อใช้ชื่อผู้เข้าสู่ระบบ"></label><label>วันเวลาตรวจจริง<input id="inspectedAt" type="datetime-local"></label><small>ผู้ส่งรายงานยังเป็นบัญชีที่เข้าสู่ระบบ ระบบเก็บแยกจากผู้ลงพื้นที่</small></details></section><div class="quick-actions"><a id="navigateLink" class="secondary-button" href="#" target="_blank" rel="noopener">นำทาง Google Maps ↗</a><button id="locateButton" class="secondary-button" type="button">⌖ ใช้ตำแหน่งของฉัน</button></div>
+      <div id="locationPanel" class="location-panel" aria-live="polite"><span class="location-icon">⌖</span><div><strong>ยังไม่ได้บันทึกตำแหน่ง</strong><small>กดใช้ตำแหน่งของฉันเมื่ออยู่หน้างาน</small></div></div>
+      <label id="noGpsLabel" class="check-label"><input id="noGps" type="checkbox"><span><strong>บันทึกโดยไม่มี GPS</strong><small>ใช้เมื่ออุปกรณ์หรือพื้นที่ไม่สามารถรับพิกัดได้</small></span></label>
+      <label id="noGpsReasonWrap" hidden>เหตุผลที่ไม่มี GPS <em class="required-word">จำเป็น</em><select id="noGpsReason"><option value="">เลือกเหตุผล</option><option value="permission_denied">ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง</option><option value="signal_unavailable">ไม่มีสัญญาณ GPS ในพื้นที่</option><option value="device_unavailable">อุปกรณ์ไม่รองรับหรือ GPS ขัดข้อง</option><option value="field_safety">ไม่ปลอดภัยที่จะบันทึกตำแหน่งหน้างาน</option><option value="other">เหตุผลอื่น</option></select></label>
+      <fieldset><legend>ผลการตรวจ <em>จำเป็น</em></legend><div class="outcome-grid">
+        <label class="outcome fire"><input type="radio" name="outcome" value="burned" required><span aria-hidden="true">♧</span><strong>พบการเผา</strong></label>
+        <label class="outcome clear"><input type="radio" name="outcome" value="not_burned" required><span aria-hidden="true">✓</span><strong>ไม่พบการเผา</strong></label>
+        <label class="outcome blocked"><input type="radio" name="outcome" value="not_found" required><span aria-hidden="true">?</span><strong>ไม่พบจุด</strong></label>
+        <label class="outcome blocked"><input type="radio" name="outcome" value="needs_review" required><span aria-hidden="true">↻</span><strong>ต้องตรวจซ้ำ</strong></label>
+      </div></fieldset>
+      <details class="conditional-fields"><summary>ยืนยันสภาพพื้นที่จริง</summary><label>พื้นที่ตรงกับข้อมูลต้นทางหรือไม่<select id="observedMatches"><option value="">ยังไม่ได้ยืนยัน</option><option value="yes">ตรงกับข้อมูลต้นทาง</option><option value="no">แตกต่างจากข้อมูลต้นทาง</option></select></label><div id="observedFields" hidden><label>ประเภทพื้นที่จริง<select id="observedLandType"><option>พื้นที่เกษตร</option><option>ไม่ใช่พื้นที่เกษตร</option><option>ยังระบุไม่ได้</option></select></label><label>ชนิดพืชจริง<input id="observedPlantType" maxlength="150" placeholder="ระบุเมื่อทราบ"></label></div></details><label id="fireStateWrap" hidden>สถานะไฟขณะตรวจ<select id="fireState"><option value="unknown">ยังระบุไม่ได้</option><option value="active">ยังมีไฟ / ควัน</option><option value="extinguished">ไฟดับแล้ว</option></select></label><div class="photo-actions"><label class="photo-field camera-field">ถ่ายภาพ <span class="optional">แนบหลักฐาน หรือระบุเหตุผล · สูงสุด 3 รูป</span><input id="photoInput" type="file" accept="image/*" capture="environment" aria-label="เปิดกล้องถ่ายภาพหลักฐาน"><span class="photo-button">◉ เปิดกล้อง</span></label>
+      <label class="photo-field import-photo-field">Import photo <span class="optional">เลือกภาพจากเครื่อง · สูงสุดรวม 3 รูป</span><input id="importPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple><span class="photo-button">＋ นำเข้ารูปภาพ</span></label></div>
+      <p class="field-hint">หากเปิดกล้องไม่ได้ ให้ถ่ายด้วยแอปกล้องแล้วเลือก “นำเข้ารูปภาพ” · รองรับ JPEG, PNG, WebP · อ่านพิกัดและเวลาจากภาพต้นฉบับ JPEG อัตโนมัติ · ภาพ PNG/WebP แนบได้แต่ยังอ่านพิกัดไม่ได้ · ภาพละไม่เกิน 5 MB</p><label>ไม่มีภาพแนบ<select id="photoMissingReason"><option value="">เลือกเหตุผลที่ไม่แนบภาพถ่าย (เฉพาะเมื่อไม่มีภาพ)</option><option value="field_safety">ไม่ปลอดภัยที่จะถ่ายภาพ</option><option value="device_unavailable">กล้องหรือไฟล์ภาพไม่พร้อม</option><option value="retrospective">รายงานย้อนหลัง ไม่มีภาพต้นฉบับ</option></select></label><div id="photoPreview" class="photo-preview"></div>
+      <label>หมายเหตุ <span class="optional">ไม่บังคับ</span><textarea id="noteInput" rows="3" maxlength="500" placeholder="รายละเอียดที่ช่วยให้ตรวจสอบย้อนหลังได้"></textarea><small id="noteCount" class="field-hint">0/500</small></label>
+      <label>การดำเนินการ <span class="optional">ไม่บังคับ</span><input id="actionInput" type="text" maxlength="1000" placeholder="เช่น ประสานผู้นำชุมชน หรือติดตามซ้ำ"></label>
+      <p id="verifyMessage" class="form-message" aria-live="polite"></p>
+      <div class="sticky-submit"><button id="saveDraftButton" class="secondary-button" type="button">เก็บงานร่าง</button><button id="reviewSubmitButton" class="primary-button" type="submit">ตรวจทานและยืนยัน</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm-dialog">
+    <div class="confirm-icon" aria-hidden="true">✓</div><h2>ยืนยันการบันทึกผล?</h2><div id="confirmSummary" class="confirm-summary"></div>
+    <div class="button-row"><button id="cancelConfirm" class="secondary-button" type="button">กลับไปแก้ไข</button><button id="confirmSubmit" class="primary-button" type="button">ยืนยันและส่ง</button></div>
+  </dialog>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.1"></script><script src="data-source.js?v=2.1"></script>
+  <script src="evidence.js"></script>
+  <script src="image-compression.js?v=2.3"></script>
+  <script src="field-extension.js?v=2.3"></script>
+  <script src="report.js?v=2.1"></script>
+  <script src="phone-demo-config.js?v=2.3"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
+  <script src="team.js"></script>
+  <script src="fiscal-period.js?v=2.3"></script>
+  <script src="registration-ui.js?v=2.3"></script>
+  <script src="app.js?v=2.3" defer></script>
+<script src="phone-demo.js?v=2.3" defer></script>
+</body>
+</html>

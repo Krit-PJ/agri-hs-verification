@@ -9,6 +9,8 @@ const AUTH_PASSWORD_PEPPER_PROPERTY_ = 'AUTH_PASSWORD_PEPPER';
 const AUTH_DUMMY_SALT_PROPERTY_ = 'AUTH_DUMMY_SALT';
 const AUTH_SESSION_PREFIX_ = 'auth-session:';
 const AUTH_FAILURE_PREFIX_ = 'auth-failure:';
+const AUTH_GLOBAL_RATE_PREFIX_ = 'auth-global-rate:';
+const AUTH_GLOBAL_ATTEMPTS_PER_MINUTE_ = 60;
 
 function ensureAuthSecrets_() {
   const properties = PropertiesService.getScriptProperties();
@@ -58,6 +60,7 @@ function publicAccountProfile_(account) {
     assignedProvinceCode: cleanText_(profile.assignedProvinceCode,2),
     agencyLevel: cleanText_(profile.agencyLevel,16),
     phone: cleanText_(profile.phone,20),
+    authMethod: account.authMethod === 'phone_only' ? 'phone_only' : 'password',
     role: ['inspector', 'admin', 'super_admin'].indexOf(profile.role) >= 0 ? profile.role : 'inspector',
     district: cleanText_(profile.district, 120),
     tambon: cleanText_(profile.tambon, 120),
@@ -125,6 +128,14 @@ function clearLoginFailures_(username) {
   sessionCache_().remove(authRateKey_(username));
 }
 
+function authGlobalAdmission_() {
+  const cache = sessionCache_();
+  const key = AUTH_GLOBAL_RATE_PREFIX_ + Math.floor(Date.now() / 60000);
+  const count = Number(cache.get(key) || 0);
+  assert_(count < AUTH_GLOBAL_ATTEMPTS_PER_MINUTE_, 'RATE_LIMITED', 'มีคำขอเข้าสู่ระบบจำนวนมาก กรุณาลองใหม่ภายหลัง');
+  cache.put(key, String(count + 1), 120);
+}
+
 function sessionKey_(token) {
   return AUTH_SESSION_PREFIX_ + tokenHash_(token);
 }
@@ -138,6 +149,7 @@ function login_(payload) {
 function loginUnlocked_(payload) {
   payload = payload || {};
   ensureAuthSecrets_();
+  authGlobalAdmission_();
   let username;
   try { username = normalizeUsername_(payload.username); } catch (ignored) { username = 'invalid-user'; }
   const password = payload.password == null ? '' : String(payload.password);
@@ -151,18 +163,58 @@ function loginUnlocked_(payload) {
   const storedIterations = account ? Number(account.iterations) : 0;
   const iterations = storedIterations >= APP.AUTH_HASH_ITERATIONS && storedIterations <= 100000 ? storedIterations : APP.AUTH_HASH_ITERATIONS;
   const candidate = passwordHash_(password, salt, iterations);
-  const valid = account && account.active !== false && secureEquals_(candidate, account.hash);
+  const valid = account && account.authMethod !== 'phone_only' && account.active !== false && secureEquals_(candidate, account.hash);
   if (!valid) {
     recordLoginFailure_(username);
     throw new ApiError('UNAUTHORIZED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
 
   clearLoginFailures_(username);
+  return createAccountSession_(username, account);
+}
+
+function createAccountSession_(username, account) {
   const token = (uuid_() + uuid_()).replace(/-/g, '');
   const csrf=(uuid_()+uuid_()).replace(/-/g,'');
   const expiresAtMs = Date.now() + APP.AUTH_SESSION_SECONDS * 1000;
   sessionCache_().put(sessionKey_(token), JSON.stringify({csrf:csrf, username: username, version: account.sessionVersion, expiresAt: expiresAtMs}), APP.AUTH_SESSION_SECONDS);
   return {csrf:csrf, token: token, profile: publicAccountProfile_(account), expiresAt: new Date(expiresAtMs).toISOString()};
+}
+
+function loginPhone_(payload) {
+  const lock=LockService.getScriptLock();
+  assert_(lock.tryLock(10000), 'RATE_LIMITED', 'ระบบเข้าสู่ระบบกำลังมีผู้ใช้งาน กรุณาลองอีกครั้ง');
+  try { return loginPhoneUnlocked_(payload); } finally { lock.releaseLock(); }
+}
+
+function loginPhoneUnlocked_(payload) {
+  payload=payload||{};
+  ensureAuthSecrets_();
+  authGlobalAdmission_();
+  const supplied=cleanText_(payload.phone,20).replace(/[ -]/g,'');
+  const phone=/^0[689][0-9]{8}$/.test(supplied)?supplied:'invalid-phone';
+  assertLoginAllowed_(phone);
+  const account=authAccountByKey_(readAuthAccounts_(),phone);
+  const profile=account&&account.profile||{};
+  const registration=phone==='invalid-phone'?null:rowsAsObjects_(APP.SHEETS.REGISTRATIONS).filter(function(row){
+    return cleanText_(row.phone,20).replace(/[ -]/g,'')===phone&&cleanText_(row.status,24)==='approved';
+  })[0];
+  const valid=Boolean(
+    registration&&account&&account.active===true&&account.authMethod==='phone_only'&&
+    cleanText_(account.username,64).toLowerCase()===phone&&profile.role==='inspector'&&
+    cleanText_(profile.phone,20).replace(/[ -]/g,'')===phone&&
+    cleanText_(profile.assignedProvinceCode,2)===cleanText_(registration.province_code,2)&&
+    cleanText_(profile.agencyLevel,16)===cleanText_(registration.agency_level,16)&&
+    cleanText_(profile.district,120)===cleanText_(registration.district,120)&&
+    ['district','province'].indexOf(cleanText_(profile.agencyLevel,16))>=0&&
+    (typeof HSNational==='undefined'||Boolean(HSNational.provinces[cleanText_(profile.assignedProvinceCode,2)]))
+  );
+  if(!valid){
+    recordLoginFailure_(phone);
+    throw new ApiError('UNAUTHORIZED','ไม่สามารถเข้าสู่ระบบด้วยหมายเลขโทรศัพท์นี้ได้');
+  }
+  clearLoginFailures_(phone);
+  return createAccountSession_(phone,account);
 }
 
 function authenticateSession_(token) {
@@ -203,6 +255,7 @@ function setupPasswordAccount(username, password, profile) {
   const salt = (uuid_() + uuid_()).replace(/-/g, '');
   accounts[key] = {
     username: cleanText_(username, 64),
+    authMethod: 'password',
     salt: salt,
     iterations: APP.AUTH_HASH_ITERATIONS,
     hash: passwordHash_(password, salt, APP.AUTH_HASH_ITERATIONS),
@@ -225,6 +278,34 @@ function setupPasswordAccount(username, password, profile) {
   };
   if(typeof HSNational!=='undefined')PropertiesService.getScriptProperties().setProperty('AUTH_ACCOUNT_V2_'+key,JSON.stringify(accounts[key]));else PropertiesService.getScriptProperties().setProperty(AUTH_ACCOUNTS_PROPERTY_, JSON.stringify(accounts));
   return {configured: true, profile: publicAccountProfile_(accounts[key])};
+}
+
+function setupPhoneOnlyInspectorAccount_(phone, profile) {
+  const key=cleanText_(phone,20).replace(/[ -]/g,'');
+  assert_(/^0[689][0-9]{8}$/.test(key),'VALIDATION_ERROR','กรุณาระบุหมายเลขโทรศัพท์มือถือไทย 10 หลัก');
+  profile=profile||{};
+  const account={
+    username:key,
+    authMethod:'phone_only',
+    sessionVersion:uuid_(),
+    active:false,
+    profile:{
+      inspectorId:cleanText_(profile.inspectorId,64)||('account:'+key),
+      displayName:cleanText_(profile.displayName,120)||key,
+      role:'inspector',
+      assignedProvinceCode:cleanText_(profile.assignedProvinceCode,2),
+      agencyLevel:cleanText_(profile.agencyLevel,16),
+      phone:key,
+      district:cleanText_(profile.district,120),
+      tambon:cleanText_(profile.tambon,120),
+      personCategory:cleanText_(profile.personCategory,120),
+      personCategoryOther:cleanText_(profile.personCategoryOther,200),
+      position:cleanText_(profile.position,120),
+      agency:cleanText_(profile.agency,200)
+    }
+  };
+  PropertiesService.getScriptProperties().setProperty('AUTH_ACCOUNT_V2_'+key,JSON.stringify(account));
+  return {configured:true,profile:publicAccountProfile_(account)};
 }
 
 function setupRequestedLoginAccounts() {

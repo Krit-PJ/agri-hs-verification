@@ -9,9 +9,11 @@ function authBackend() {
   const properties = {};
   const cache = new Map();
   const inspectors = [];
+  const registrations = [];
   const digestCalls = {count: 0};
   const scriptProperties = {
     getProperty: key => Object.prototype.hasOwnProperty.call(properties, key) ? properties[key] : null,
+    getProperties: () => ({...properties}),
     setProperty: (key, value) => { properties[key] = String(value); },
     deleteProperty: key => { delete properties[key]; }
   };
@@ -43,9 +45,9 @@ function authBackend() {
   for (const name of ['Config', 'Utils', 'Auth', 'Code']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script', name + '.gs'), 'utf8'), context);
   }
-  context.rowsAsObjects_ = () => inspectors;
+  context.rowsAsObjects_ = name => name === 'User_Registration' ? registrations : inspectors;
   context.updateObjectRow_ = () => {};
-  return {c: context, properties, cache, inspectors, digestCalls};
+  return {c: context, properties, cache, inspectors, registrations, digestCalls};
 }
 
 function expectCode(fn, code) {
@@ -71,6 +73,7 @@ test('login creates an opaque expiring session, validates current backend role, 
   assert.match(login.token, /^[0-9a-f]{64}$/);
   assert.equal(login.profile.username, 'CaseUser');
   assert.equal(login.profile.role, 'super_admin');
+  assert.equal(login.profile.authMethod, 'password');
   assert.ok(Date.parse(login.expiresAt) > Date.now());
   assert.equal(c.authenticate_(login.token).role, 'super_admin');
 
@@ -101,6 +104,64 @@ test('HTTP login runs before token authentication and HTTP logout revokes the su
   const logout = JSON.parse(c.doPost({postData: {contents: JSON.stringify({action: 'logout', token: response.data.token, payload: {}})}}).getContent());
   assert.deepEqual(logout.data, {loggedOut: true});
   expectCode(() => c.authenticate_(response.data.token), 'UNAUTHORIZED');
+});
+
+test('phone login is a public action that creates the same session only for an approved active phone-only inspector', () => {
+  const {c, properties, registrations} = authBackend();
+  const phone = '0812345678';
+  const account = {
+    username: phone,
+    authMethod: 'phone_only',
+    sessionVersion: crypto.randomUUID(),
+    active: true,
+    profile: {inspectorId: 'account:' + phone, displayName: 'Field Inspector', role: 'inspector', phone, assignedProvinceCode: '62', agencyLevel: 'district', district: 'A'}
+  };
+  properties.AUTH_ACCOUNTS_V1 = JSON.stringify({[phone]: account});
+  registrations.push({phone, status: 'approved', province_code: '62', agency_level: 'district', district: 'A'});
+  const response = JSON.parse(c.doPost({postData: {contents: JSON.stringify({action: 'loginPhone', payload: {phone}})}}).getContent());
+  assert.equal(response.ok, true);
+  assert.match(response.data.token, /^[0-9a-f]{64}$/);
+  assert.match(response.data.csrf, /^[0-9a-f]{64}$/);
+  assert.equal(response.data.profile.authMethod, 'phone_only');
+  assert.equal(response.data.profile.role, 'inspector');
+  assert.equal(c.authenticateSession_(response.data.token).district, 'A');
+});
+
+test('phone login gives one generic rejection for unknown, pending, rejected, disabled, scope-mismatched, and admin accounts', () => {
+  function rejection(changeAccount, registrationStatus) {
+    const {c, properties, registrations} = authBackend();
+    const phone = '0899999999';
+    const account = {
+      username: phone,
+      authMethod: 'phone_only',
+      sessionVersion: crypto.randomUUID(),
+      active: true,
+      profile: {role: 'inspector', phone, assignedProvinceCode: '62', agencyLevel: 'district', district: 'A'}
+    };
+    if (changeAccount) changeAccount(account);
+    if (registrationStatus) registrations.push({phone, status: registrationStatus, province_code: '62', agency_level: 'district', district: 'A'});
+    properties.AUTH_ACCOUNTS_V1 = JSON.stringify({[phone]: account});
+    try { c.loginPhone_({phone}); } catch (error) { return {code: error.code, message: error.message}; }
+    assert.fail('phone login should be rejected');
+  }
+  const expected = rejection(null, null);
+  assert.deepEqual(rejection(null, 'pending'), expected);
+  assert.deepEqual(rejection(null, 'rejected'), expected);
+  assert.deepEqual(rejection(account => { account.active = false; }, 'approved'), expected);
+  assert.deepEqual(rejection(account => { account.profile.district = 'B'; }, 'approved'), expected);
+  assert.deepEqual(rejection(account => { account.profile.role = 'admin'; }, 'approved'), expected);
+  assert.equal(expected.code, 'UNAUTHORIZED');
+});
+
+test('phone login retains per-phone throttling, adds a global budget, and never places a raw failed phone in cache keys', () => {
+  const {c, cache} = authBackend();
+  const phone = '0866666666';
+  for (let i = 0; i < 5; i += 1) expectCode(() => c.loginPhone_({phone}), 'UNAUTHORIZED');
+  expectCode(() => c.loginPhone_({phone}), 'RATE_LIMITED');
+  assert.equal([...cache.keys()].some(key => key.includes(phone)), false);
+  const other = authBackend();
+  for (let i = 0; i < 60; i += 1) other.c.authGlobalAdmission_();
+  expectCode(() => other.c.authGlobalAdmission_(), 'RATE_LIMITED');
 });
 
 test('requested account helper consumes bootstrap properties and deletes plaintext values', () => {

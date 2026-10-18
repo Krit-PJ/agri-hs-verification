@@ -7,6 +7,7 @@
   const COLORS = { pending:'#e3651d', draft:'#2677ad', burned:'#cb2c29', not_burned:'#18845d', not_found:'#687976', needs_review:'#7a5ab5' };
   const STORE_ENDPOINT = 'hsverify.apiEndpoint';
   const previewMode=typeof HSPreview!=='undefined'&&HSPreview.enabled;
+  const phoneDemoMode=Boolean(globalThis.HS_SITE_CONFIG?.phoneDemoMode)&&['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&!globalThis.HS_SITE_CONFIG?.apiEndpoint;
   const STORE_DEMO = previewMode?'hsverify.preview.results':'hsverify.demoResults';
   const SESSION_TOKEN = 'hsverify.sessionToken';
   const SESSION_PROFILE = 'hsverify.sessionProfile';
@@ -22,9 +23,9 @@
   const state = {
     all: [], filtered: [], visible: PAGE_SIZE, selected: null, map: null,
     markers: null, mapFailed: false, photos: [], location: null,
-    endpoint: previewMode?'':globalThis.HS_SITE_CONFIG?.apiEndpoint || localStorage.getItem(STORE_ENDPOINT) || '', token: sessionStorage.getItem(SESSION_TOKEN) || '',
-    profile: readSessionProfile(), expiresAt:sessionStorage.getItem(SESSION_EXPIRES_AT) || '',
-    csrf:sessionStorage.getItem('hsverify.csrf')||'',authValidated:false, serverConfig: null, busy: false, dataLoaded:false, importCandidate:null, sourceName:"", latestYear:null
+    endpoint: (previewMode||phoneDemoMode)?'':globalThis.HS_SITE_CONFIG?.apiEndpoint || localStorage.getItem(STORE_ENDPOINT) || '', token: phoneDemoMode?'':sessionStorage.getItem(SESSION_TOKEN) || '',
+    profile: phoneDemoMode?null:readSessionProfile(), expiresAt:phoneDemoMode?'':sessionStorage.getItem(SESSION_EXPIRES_AT) || '',
+    csrf:phoneDemoMode?'':sessionStorage.getItem('hsverify.csrf')||'',authValidated:false, serverConfig: null, busy: false, dataLoaded:false, importCandidate:null, sourceName:"", latestYear:null
   };
 
   document.addEventListener('DOMContentLoaded', init);
@@ -36,7 +37,7 @@
     bindEvents();
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:()=>{dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';populateFilters();applyFilters();}});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
-    if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),reload:loadData});
+    if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onLogout:logoutAdmin,reload:loadData});
     HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && ['admin','super_admin'].includes(state.profile?.role))});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     updateModeUI();
@@ -118,6 +119,7 @@
     dom.modeBadge.className = `mode-badge ${live ? 'live' : 'demo'}`;
     dom.modeBadge.textContent = live ? 'เชื่อมระบบกลาง' : 'ตัวอย่างในเครื่อง';
     dom.demoNotice.hidden = live;
+    if(phoneDemoMode){dom.demoNotice.innerHTML='<strong>ตัวอย่างเบอร์โทร · ดูข้อมูลเท่านั้น</strong><span>ไม่ยืนยันตัวตน ไม่ให้สิทธิ์บันทึก และไม่เชื่อม Google จริง · ข้อมูลบัญชีตัวอย่างหายเมื่อปิดหรือโหลดหน้าใหม่</span>';dom.saveDraftButton.disabled=true;dom.reviewSubmitButton.disabled=true;dom.confirmSubmit.disabled=true;}
     dom.connectionDot.className = `connection-dot ${live ? 'offline' : 'offline'}`;
   }
 
@@ -472,6 +474,7 @@
   }
 
   async function submitVerification(status) {
+    if(phoneDemoMode){toast('บัญชีตัวอย่างดูข้อมูลได้เท่านั้น ไม่สามารถบันทึกผลตรวจ',true);return;}
     if (!validateForm(status) || state.busy) return;
     dom.confirmDialog.close(); setBusy(true); setMessage(dom.verifyMessage,status === 'draft' ? 'กำลังเก็บงานร่าง…' : 'กำลังบันทึกผล…');
     const job = { id:uuid(), endpoint:state.endpoint, inspectorId:state.serverConfig?.profile?.inspectorId, requestId:uuid(), payload:getFormPayload(status), photos:state.photos.map(({preview,...x}) => x), createdAt:new Date().toISOString(), attempts:0 };
@@ -602,6 +605,7 @@
   }
 
   async function api(action,payload={},requestId) {
+    if(phoneDemoMode)throw new Error('โหมดตัวอย่างเบอร์โทรไม่เชื่อม API และไม่อนุญาตการบันทึกข้อมูลจริง');
     if(previewMode)return HSPreview.api(action,payload,requestId);
     if (!state.endpoint) throw new Error('ยังไม่ได้ตั้งค่า URL ของ API');
     const envelope = { action,payload,token:state.token || undefined,csrf:state.csrf || undefined };
@@ -619,11 +623,26 @@
   }
 
   function saveEndpoint(value) {
+    if(phoneDemoMode)throw new Error('โหมดตัวอย่างไม่อนุญาตให้เชื่อม API จริง');
     value = String(value ?? state.endpoint).trim().replace(/\/$/,'');
     state.endpoint = value;
     if (value) localStorage.setItem(STORE_ENDPOINT,value); else localStorage.removeItem(STORE_ENDPOINT);
     dom.apiEndpoint.value=value;
     updateModeUI();
+  }
+
+  async function loginPhoneInspector(phone) {
+    if(phoneDemoMode)throw new Error('ใช้ปุ่มเข้าสู่ตัวอย่างสำหรับโหมดตัวอย่าง');
+    if(!state.endpoint)throw new Error('ยังไม่ได้เชื่อมระบบกลาง');
+    clearSession();
+    try {
+      const result=await api('loginPhone',{phone});
+      if(!result?.token||result.profile?.role!=='inspector'||!result.csrf)throw new Error('ข้อมูลสิทธิ์ผู้บันทึกไม่ถูกต้อง');
+      state.csrf=result.csrf;state.authValidated=true;state.token=result.token;state.profile=result.profile;state.expiresAt=result.expiresAt||'';
+      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
+      if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
+      state.serverConfig={profile:state.profile};applyRoleUI();state.dataLoaded=false;await loadData();switchView('work');toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);
+    } catch(error){clearSession();applyRoleUI();throw error;}
   }
 
   async function loginAdmin(event) {
