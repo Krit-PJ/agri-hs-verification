@@ -4,13 +4,13 @@ var HSBoundaries = (() => {
   function scope(profile, valid) {
     if (!valid || !profile) return null;
     if (profile.role === 'super_admin') return {role: 'super_admin', code: ''};
-    if (profile.role === 'admin' && /^\d{2}$/.test(profile.assignedProvinceCode || '')) return {role: 'admin', code: profile.assignedProvinceCode};
+    if (['admin','inspector'].includes(profile.role) && /^\d{2}$/.test(profile.assignedProvinceCode || '')) return {role:profile.role,code:profile.assignedProvinceCode,...(profile.role==='inspector'&&profile.agencyLevel==='district'?{district:profile.district||''}:{})};
     return null;
   }
   function intersects(a, b) { return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1]; }
   function plan(catalog, access, selected, bounds, zoom, enabled) {
     if (!access) return [];
-    const codes = access.role === 'admin' ? [access.code] : selected ? [selected] : catalog.map(p => p.code);
+    const codes = access.role !== 'super_admin' ? [access.code] : selected ? [selected] : catalog.map(p => p.code);
     const candidates = catalog.filter(p => codes.includes(p.code));
     const jobs = enabled.province ? [{level:'province', codes}] : [];
     for (const [level, minimum, limit] of [['district',8,8], ['subdistrict',10,4]]) {
@@ -25,7 +25,7 @@ var HSBoundaries = (() => {
     let access = null, catalog = null, catalogPromise = null, revision = 0, key = '', selected = '', controller = null;
     const cache = new Map(), group = L.layerGroup().addTo(map);
     const colors = {province:'#174f38',district:'#75530c',subdistrict:'#6f57a1'};
-    panel.innerHTML = '<div class="boundary-heading"><strong>ขอบเขตการปกครอง</strong><button type="button" id="boundaryFit" class="secondary-button">ดูเต็มขอบเขต</button></div><div class="boundary-options"><label id="boundaryProvinceLabel">พื้นที่ขอบเขต<select id="boundaryProvince"></select></label><label><input id="boundaryProvinceOn" type="checkbox" checked><i class="boundary-line province"></i>จังหวัด</label><label><input id="boundaryDistrictOn" type="checkbox" checked><i class="boundary-line district"></i>อำเภอ</label><label><input id="boundarySubdistrictOn" type="checkbox"><i class="boundary-line subdistrict"></i>ตำบล</label></div><p id="boundaryStatus" role="status" aria-live="polite"></p><details><summary>แหล่งข้อมูลและข้อจำกัด</summary><p>ชุดขอบเขตที่หน่วยงานนำเข้า ครอบคลุม 77 จังหวัด บางพื้นที่มีข้อมูลไม่ครบ เส้นลดรายละเอียดเพื่อแสดงบนเว็บ ไม่ใช่แนวเขตรังวัดหรือหลักฐานรับรองพิกัด HS</p><p>อำเภอแสดงเมื่อซูมระดับ 8 ขึ้นไป ตำบลระดับ 10 ขึ้นไป โดยโหลดเฉพาะจังหวัดที่อยู่ในจอ เพื่อประหยัดข้อมูลมือถือ</p></details>';
+    panel.innerHTML = '<div class="boundary-heading"><strong>ขอบเขตการปกครอง</strong><button type="button" id="boundaryFit" class="secondary-button">ดูเต็มขอบเขต</button></div><div class="boundary-options"><label id="boundaryProvinceLabel">พื้นที่ขอบเขต<select id="boundaryProvince"></select></label><label><input id="boundaryProvinceOn" type="checkbox" checked><i class="boundary-line province"></i>จังหวัด</label><label><input id="boundaryDistrictOn" type="checkbox"><i class="boundary-line district"></i>อำเภอ</label><label><input id="boundarySubdistrictOn" type="checkbox"><i class="boundary-line subdistrict"></i>ตำบล</label></div><p id="boundaryStatus" role="status" aria-live="polite"></p><details><summary>แหล่งข้อมูลและข้อจำกัด</summary><p>ชุดขอบเขตที่หน่วยงานนำเข้า ครอบคลุม 77 จังหวัด บางพื้นที่มีข้อมูลไม่ครบ เส้นลดรายละเอียดเพื่อแสดงบนเว็บ ไม่ใช่แนวเขตรังวัดหรือหลักฐานรับรองพิกัด HS</p><p>อำเภอแสดงเมื่อซูมระดับ 8 ขึ้นไป ตำบลระดับ 10 ขึ้นไป โดยโหลดเฉพาะจังหวัดที่อยู่ในจอ เพื่อประหยัดข้อมูลมือถือ</p></details>';
     const el = id => panel.querySelector('#'+id), status = value => {el('boundaryStatus').textContent=value;};
     const enabled = () => ({province:el('boundaryProvinceOn').checked,district:el('boundaryDistrictOn').checked,subdistrict:el('boundarySubdistrictOn').checked});
     function reset() { revision++; controller?.abort(); group.clearLayers(); cache.clear(); }
@@ -56,23 +56,24 @@ var HSBoundaries = (() => {
         for(const job of jobs){
           const raw=await read(job.level==='province'?(job.codes.length===1?job.codes[0]+'/province.geojson':'provinces.geojson'):job.code+'/'+job.level+'.geojson',signal);
           if(id!==revision)return;
-          const data=job.level==='province'?{type:'FeatureCollection',features:raw.features.filter(f=>job.codes.includes(f.properties.provinceCode))}:raw;
+          const scoped=raw.features.filter(f=>(job.level!=='province'||job.codes.includes(f.properties.provinceCode))&&(!access.district||job.level==='province'||f.properties.__district===access.district));
+          const data={type:'FeatureCollection',features:scoped};
           add(data,job.level);features+=data.features.length;
         }
         if(id!==revision)return;
-        status('แสดงขอบเขต '+features.toLocaleString('th-TH')+' พื้นที่ · '+(access.role==='admin'?'ตามจังหวัดที่ได้รับมอบหมาย':selected?'จังหวัด'+catalog.find(p=>p.code===selected)?.name:'ทั่วประเทศ')+' · ซูมเข้าเพื่อดูรายละเอียดอำเภอ/ตำบล'+((selected||access.code)?(catalog.find(p=>p.code===(selected||access.code))?.partial?' · จังหวัดนี้มีขอบเขตบางส่วนยังไม่ครบ':''):' · 35 จังหวัดมีข้อมูลบางส่วนยังไม่ครบ')); 
+        status('แสดงขอบเขต '+features.toLocaleString('th-TH')+' พื้นที่ · '+(access.role!=='super_admin'?'จังหวัดที่ได้รับมอบหมาย'+(access.district?' · อำเภอ'+access.district:''):selected?'จังหวัด'+catalog.find(p=>p.code===selected)?.name:'ทั่วประเทศ')+' · ซูมเข้าเพื่อดูรายละเอียดอำเภอ/ตำบล'+((selected||access.code)?(catalog.find(p=>p.code===(selected||access.code))?.partial?' · จังหวัดนี้มีขอบเขตบางส่วนยังไม่ครบ':''):' · 35 จังหวัดมีข้อมูลบางส่วนยังไม่ครบ'));
       }catch(error){if(id===revision&&!signal.aborted){group.clearLayers();status('โหลดขอบเขตไม่สำเร็จ กรุณาเลื่อนแผนที่หรือลองใหม่ ข้อมูล HS ยังใช้งานได้');}}
     }
-    async function fit(){if(!access)return;const fitKey=key;try{controller?.abort();controller=new AbortController();await loadCatalog();if(fitKey!==key||!access)return;const items=catalog.filter(p=>access.role==='admin'?p.code===access.code:!selected||p.code===selected);if(!items.length)return;const boxes=items.map(p=>p.bbox);map.fitBounds([[Math.min(...boxes.map(b=>b[1])),Math.min(...boxes.map(b=>b[0]))],[Math.max(...boxes.map(b=>b[3])),Math.max(...boxes.map(b=>b[2]))]],{padding:[20,20],maxZoom:10});draw();}catch(_){status('ยังเปิดขอบเขตไม่ได้ กรุณาลองใหม่');}}
+    async function fit(){if(!access)return;const fitKey=key;try{controller?.abort();controller=new AbortController();await loadCatalog();if(fitKey!==key||!access)return;const items=catalog.filter(p=>access.role!=='super_admin'?p.code===access.code:!selected||p.code===selected);if(!items.length)return;const boxes=items.map(p=>p.bbox);map.fitBounds([[Math.min(...boxes.map(b=>b[1])),Math.min(...boxes.map(b=>b[0]))],[Math.max(...boxes.map(b=>b[3])),Math.max(...boxes.map(b=>b[2]))]],{padding:[20,20],maxZoom:10});draw();}catch(_){status('ยังเปิดขอบเขตไม่ได้ กรุณาลองใหม่');}}
     async function sync(){
-      const next=scope(env.profile(),env.valid()),nextKey=next?next.role+':'+next.code:'';
+      const next=scope(env.profile(),env.valid()),nextKey=next?next.role+':'+next.code+':'+(next.district||''):'';
       if(nextKey===key)return;key=nextKey;reset();access=next;panel.hidden=!access;if(!access)return;
       selected=access.code;status('กำลังอ่านรายการพื้นที่…');
       controller=new AbortController();const current=key;
       try{await loadCatalog(controller.signal);if(current!==key)return;
         const select=el('boundaryProvince');select.replaceChildren();if(access.role==='super_admin')select.add(new Option('ทั่วประเทศ',''));
         for(const p of catalog.filter(p=>access.role==='super_admin'||p.code===access.code))select.add(new Option(p.name+(p.partial?' · ข้อมูลบางส่วน':''),p.code));
-        select.value=selected;select.disabled=access.role==='admin';await draw();
+        select.value=selected;select.disabled=access.role!=='super_admin';await draw();
       }catch(_){if(current===key)status('อ่านรายการขอบเขตไม่สำเร็จ กดดูเต็มขอบเขตเพื่อลองใหม่');}
     }
     map.createPane('boundaryPane');map.getPane('boundaryPane').style.zIndex=350;

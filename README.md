@@ -117,3 +117,7 @@ Admin: ตรวจสอบผล/QA/ส่งออก; Super Admin: เปล
 
 ## Apps Script 2.5
 โค้ดรวมล่าสุด: `docs/AppsScript-v25-All.gs` เพิ่ม `getBoundaryConfig` (ต้องใช้ session) คืนขอบเขตตามบัญชีที่เซิร์ฟเวอร์ยืนยัน และแนบ metadata ใน config โดยไม่เปลี่ยน schema บัญชี หรือข้อมูล HS
+
+
+## รุ่น 2.6
+โค้ด Apps Script รวมล่าสุด `docs/AppsScript-v26-All.gs` ดู [การแก้เบอร์โทร การอนุมัติ บัญชีรายบุคคล และสำเนาในเครื่อง](docs/RELEASE_V26_TH.md)

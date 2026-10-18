@@ -8,3 +8,5 @@ docs/AppsScript-before-*.gs
 test-v24.log
 
 .boundary-tools/
+
+test-v26.log

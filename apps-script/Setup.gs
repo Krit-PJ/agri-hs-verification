@@ -55,3 +55,13 @@ function setupApprovedPrivacyPolicy() {
   });
   return checkRegistrationPolicyReady();
 }
+
+function backupRegistrationBeforePhoneRepair(){
+ const book=getSpreadsheet_(),sheet=getRequiredSheet_(APP.SHEETS.REGISTRATIONS);
+ const name='Backup_User_Registration_'+Utilities.formatDate(new Date(),'Asia/Bangkok','yyyyMMdd_HHmmss')+'_'+uuid_().slice(0,4);
+ sheet.copyTo(book).setName(name);const result={backupSheet:name,rows:Math.max(0,sheet.getLastRow()-1)};console.log(JSON.stringify(result));return result;
+}
+function checkRuntimeV26(){
+ const policy=getRegistrationPolicy_(),result={version:APP.VERSION,registrationMode:policy.registrationMode,privacyConfigured:policy.configured,cacheScopeValidation:true,personalAdminAccounts:true,phoneRepair:repairPhoneCells_(false)};
+ console.log(JSON.stringify(result));return result;
+}

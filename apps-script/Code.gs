@@ -24,6 +24,7 @@ function doPost(event) {
     if (action === 'loginPhone') {
       return outputJson_({ok: true, requestId: requestId, data: loginPhone_(payload)});
     }
+    if(action==='getDatasetInfo'&&!envelope.token)return outputJson_({ok:true,requestId:requestId,data:getDatasetInfo_({role:'public',id:'public'})});
     if(typeof nationalPublicRead_==='function' && action==='bootstrap' && !envelope.token)return outputJson_({ok:true,requestId:requestId,data:nationalPublicRead_()});
     const actor = authenticate_(envelope.token);
     if(typeof nationalCsrf_==='function')nationalCsrf_(envelope);
@@ -43,6 +44,10 @@ function dispatch_(actor, action, requestId, payload) {
   const mutationActions = ['saveVerification', 'verifyHS', 'uploadPhoto', 'syncSource', 'importSource', 'setConfig', 'importRows'];
   if (mutationActions.indexOf(action) >= 0) requestId = requireUuid_(requestId, 'requestId');
   switch (action) {
+    case 'getDatasetInfo':return getDatasetInfo_(actor);
+    case 'listAdminAccounts':return listAdminAccounts_(actor);
+    case 'createProvincialAdmin':return createProvincialAdmin_(actor,payload);
+    case 'changeOwnCredentials':return changeOwnCredentials_(actor,payload);
     case 'getBoundaryConfig':return getBoundaryConfig_(actor);
     case 'getMyProfile':return {profile:actor};
     case 'listRegistrations':return listRegistrations_(actor,payload);

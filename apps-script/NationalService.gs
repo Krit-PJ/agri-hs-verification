@@ -2,14 +2,14 @@
 /* Metadata only: public display geometry stays on the static site, never in Sheets. */
 function getBoundaryConfig_(actor){
  actor=actor||{role:'public'};
- const manager=actor.role==='admin'||actor.role==='super_admin';
+ const manager=['admin','super_admin','inspector'].indexOf(actor.role)>=0;
  const codes=manager?nationalAuthorized_(actor).filter(function(code){return !!HSNational.provinces[code];}):[];
- return {apiVersion:APP.VERSION,datasetVersion:'2026-10-v1',visible:manager&&codes.length>0,scope:actor.role==='super_admin'?'national':actor.role==='admin'?'assigned_province':'none',authorizedProvinceCodes:codes,levels:['province','district','subdistrict'],manifestPath:'data/boundaries/index.json',storage:'public_static_frontend',displayOnly:true,spatialValidationEnabled:false,coverage:{provinces:77,districts:929,subdistricts:7331,partialProvinces:35},minimumZoom:{district:8,subdistrict:10}};
+ return {apiVersion:APP.VERSION,datasetVersion:'2026-10-v1',visible:manager&&codes.length>0,scope:actor.role==='super_admin'?'national':actor.role==='admin'?'assigned_province':actor.role==='inspector'?(actor.agencyLevel==='district'?'assigned_district':'assigned_province'):'none',authorizedProvinceCodes:codes,levels:['province','district','subdistrict'],manifestPath:'data/boundaries/index.json',storage:'public_static_frontend',displayOnly:true,spatialValidationEnabled:false,coverage:{provinces:77,districts:929,subdistricts:7331,partialProvinces:35},minimumZoom:{district:8,subdistrict:10}};
 }
 /* Read-only deployment diagnostic: no accounts, properties or database rows are changed. */
 function checkBoundaryIntegrationReady(){
  const admin=getBoundaryConfig_({role:'admin',assignedProvinceCode:'62'}),superAdmin=getBoundaryConfig_({role:'super_admin'}),inspector=getBoundaryConfig_({role:'inspector',assignedProvinceCode:'62'});
- const result={version:APP.VERSION,datasetVersion:admin.datasetVersion,adminProvinceScope:admin.visible&&admin.authorizedProvinceCodes.length===1&&admin.authorizedProvinceCodes[0]==='62',superAdminProvinceCount:superAdmin.authorizedProvinceCodes.length,inspectorBoundaryHidden:!inspector.visible,displayOnly:true,spatialValidationEnabled:false};
+ const result={version:APP.VERSION,datasetVersion:admin.datasetVersion,adminProvinceScope:admin.visible&&admin.authorizedProvinceCodes.length===1&&admin.authorizedProvinceCodes[0]==='62',superAdminProvinceCount:superAdmin.authorizedProvinceCodes.length,inspectorBoundaryScoped:inspector.visible&&inspector.authorizedProvinceCodes.length===1,displayOnly:true,spatialValidationEnabled:false};
  console.log(JSON.stringify(result));return result;
 }
 function nationalCode_(row){return HSNational.provinceCode(row.province,row.province_code||row.provinceCode);}
@@ -19,7 +19,7 @@ function nationalGuard_(actor,action){
  if(['syncSource','importSource','importRows','previewImportRows','setConfig'].indexOf(action)>=0)throw new ApiError('PREVIEW_REQUIRED','ใช้ขั้นตอนนำเข้าระดับประเทศ ตรวจ QA และยืนยันจังหวัด/ปีก่อนบันทึก');
  if(actor.role==='admin')assert_(nationalAuthorized_(actor).length,'PROVINCE_UNASSIGNED','Admin ยังไม่กำหนดจังหวัด');
 }
-function nationalCsrf_(envelope){const actions=['saveVerification','verifyHS','uploadPhoto','saveTeam','nationalCommit','nationalSetSource','assignProvince','approveRegistration','rejectRegistration'];if(actions.indexOf(envelope.action)<0)return;const token=cleanText_(envelope.token,256),raw=sessionCache_().get(sessionKey_(token));assert_(raw,'UNAUTHORIZED','การเปลี่ยนข้อมูลต้องใช้ session เข้าสู่ระบบ');const s=JSON.parse(raw);assert_(s.csrf&&secureEquals_(s.csrf,cleanText_(envelope.csrf,128)),'CSRF_INVALID','session หรือ CSRF ไม่ตรง กรุณาเข้าสู่ระบบใหม่');}
+function nationalCsrf_(envelope){const actions=['saveVerification','verifyHS','uploadPhoto','saveTeam','nationalCommit','nationalSetSource','assignProvince','approveRegistration','rejectRegistration','createProvincialAdmin','changeOwnCredentials'];if(actions.indexOf(envelope.action)<0)return;const token=cleanText_(envelope.token,256),raw=sessionCache_().get(sessionKey_(token));assert_(raw,'UNAUTHORIZED','การเปลี่ยนข้อมูลต้องใช้ session เข้าสู่ระบบ');const s=JSON.parse(raw);assert_(s.csrf&&secureEquals_(s.csrf,cleanText_(envelope.csrf,128)),'CSRF_INVALID','session หรือ CSRF ไม่ตรง กรุณาเข้าสู่ระบบใหม่');}
 function nationalReadActor_(actor,row){const code=nationalCode_(row);if(actor.role==='super_admin')return true;const codes=actor.role==='public'?nationalPublicCodes_():nationalAuthorized_(actor);return codes.indexOf(code)>=0 && !(actor.role==='inspector' && actor.agencyLevel==='district' && (!actor.district || cleanText_(row.district)!==cleanText_(actor.district)));}
 function nationalPublicCodes_(){const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_PROVINCE_CODES');return (raw?raw.split(','):['62']).map(function(c){return c.trim();}).filter(function(c){return !!HSNational.provinces[c];});}
 function nationalSnapshot_(rows){return sha256_(JSON.stringify(rows.map(function(r){return Object.keys(r).filter(function(k){return k!=='_row';}).sort().map(function(k){return [k,r[k]];});}).sort()));}

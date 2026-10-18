@@ -51,15 +51,26 @@ function objectToRow_(sheetName, object) {
 function appendObject_(sheetName, object) {
   const sheet = getRequiredSheet_(sheetName);
   const row = objectToRow_(sheetName, object);
-  sheet.getRange(sheet.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+  const rowNumber=sheet.getLastRow()+1;
+  formatPhoneCells_(sheet,sheetName,rowNumber);
+  sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
+  if(typeof touchHsRevision_==='function' && [APP.SHEETS.BASE,APP.SHEETS.VERIFICATION,APP.SHEETS.PHOTOS].indexOf(sheetName)>=0)touchHsRevision_();
   return object;
 }
 
 function updateObjectRow_(sheetName, rowNumber, object) {
   const sheet = getRequiredSheet_(sheetName);
   const row = objectToRow_(sheetName, object);
+  formatPhoneCells_(sheet,sheetName,rowNumber);
   sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
+  if(typeof touchHsRevision_==='function' && [APP.SHEETS.BASE,APP.SHEETS.VERIFICATION,APP.SHEETS.PHOTOS].indexOf(sheetName)>=0)touchHsRevision_();
   return object;
+}
+
+function formatPhoneCells_(sheet,sheetName,rowNumber){
+ APP.HEADERS[sheetName].forEach(function(header,index){
+  if(header==='phone'||header==='phone_number')sheet.getRange(rowNumber,index+1,1,1).setNumberFormat('@');
+ });
 }
 
 function findOne_(sheetName, field, value) {
@@ -107,6 +118,7 @@ function replaceBaseAtomically_(objects) {
     if (oldSheet) oldSheet.setName(backupName);
     stage.setName(targetName);
     if (oldSheet) spreadsheet.deleteSheet(oldSheet);
+    if(typeof touchHsRevision_==='function')touchHsRevision_();
   } catch (error) {
     const currentStage = spreadsheet.getSheetByName(stageName);
     if (currentStage) spreadsheet.deleteSheet(currentStage);
