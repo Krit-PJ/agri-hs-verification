@@ -10,9 +10,10 @@ function registerUser_(payload) {
   assert_(name && position && ['district','province'].indexOf(level)>=0 && HSNational.provinces[code],'VALIDATION_ERROR','กรุณาระบุชื่อ ตำแหน่ง และสังกัดให้ครบ');
   assert_(level!=='district'||district,'VALIDATION_ERROR','กรุณาระบุอำเภอที่สังกัด');
   return withScriptLock_(function(){
-    ensureSchema_();
+    if(typeof ensureRegistrationSheet_==='function')ensureRegistrationSheet_(APP.SHEETS.REGISTRATIONS);else ensureSchema_();
     registrationAdmission_();
-    const existing=authAccountByKey_(readAuthAccounts_(),phone);
+    const accounts=readAuthAccounts_();
+    const existing=authAccountByKey_(accounts,phone)||Object.keys(accounts).some(function(key){return canonicalStoredPhone_((accounts[key].profile||{}).phone)===phone;});
     assert_(!existing,'ACCOUNT_EXISTS','หมายเลขนี้ลงทะเบียนแล้ว กรุณาติดต่อผู้ดูแลหากเข้าสู่ระบบไม่ได้');
     const id=uuid_(),now=isoNow_(),agency=level==='district'?'สำนักงานเกษตรอำเภอ'+district:'สำนักงานเกษตรจังหวัด'+HSNational.provinces[code];
     const affiliation=cleanText_(payload.affiliationType,32);

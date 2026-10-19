@@ -1,5 +1,5 @@
 const APP = Object.freeze({
-  VERSION: '2.6.0',
+  VERSION: '2.7.0',
   PROVINCE: 'กำแพงเพชร',
   LAND_TYPE: 'พื้นที่เกษตร',
   PLANT_TYPES: Object.freeze(['นาข้าว', 'อ้อย', 'เกษตรอื่น ๆ', 'อื่น ๆ']),
@@ -26,9 +26,11 @@ const APP = Object.freeze({
     PHOTOS: 'HS_Photos',
     INSPECTORS: 'Inspector_Profile',
     LOG: 'Verification_Log',
-    REGISTRATIONS: 'User_Registration'
+    REGISTRATIONS: 'User_Registration',
+    ADMIN_REGISTRATIONS: 'Admin_Registration'
   }),
   HEADERS: Object.freeze({
+    Admin_Registration: Object.freeze(['registration_id','phone','full_name','position','work_group','work_group_other','agency','province_code','username','privacy_version','privacy_acknowledged_at','status','created_at','reviewed_at','reviewed_by']),
     User_Registration: Object.freeze(['registration_id','phone','full_name','position','agency_level','agency','province_code','district','privacy_version','privacy_acknowledged_at','status','created_at','reviewed_at','reviewed_by']),
     HS_Base: Object.freeze([
       'hs_id', 'acquired_at', 'latitude', 'longitude', 'province', 'district',
