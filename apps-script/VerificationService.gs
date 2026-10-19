@@ -506,7 +506,7 @@ function getConfig_(actor) {
     results: APP.RESULTS.slice(),
     personCategories: APP.PERSON_CATEGORIES.slice(),
     limits: {maxImportRows: APP.MAX_IMPORT_ROWS, maxPageSize: APP.MAX_PAGE_SIZE, maxPhotoBytes: APP.MAX_PHOTO_BYTES, photoMimeTypes: APP.PHOTO_MIME_TYPES.slice()},
-    profile: {agencyLevel:actor.agencyLevel||'',phone:actor.phone||'',authMethod:actor.authMethod||'',assignedProvinceCode:actor.assignedProvinceCode||'',inspectorId: actor.id, displayName: actor.displayName, district: actor.district, tambon: actor.tambon, role: actor.role, personCategory: actor.personCategory || '', personCategoryOther: actor.personCategoryOther || '', position: actor.position || '', agency: actor.agency || ''}
+    profile: {username:actor.username||'',agencyLevel:actor.agencyLevel||'',phone:actor.phone||'',authMethod:actor.authMethod||'',assignedProvinceCode:actor.assignedProvinceCode||'',inspectorId: actor.id, displayName: actor.displayName, district: actor.district, tambon: actor.tambon, role: actor.role, personCategory: actor.personCategory || '', personCategoryOther: actor.personCategoryOther || '', position: actor.position || '', agency: actor.agency || ''}
   };
   if (['admin', 'super_admin'].indexOf(actor.role) >= 0 && (typeof nationalReadActor_!=='function'||actor.role==='super_admin')) {
     const properties = PropertiesService.getScriptProperties();

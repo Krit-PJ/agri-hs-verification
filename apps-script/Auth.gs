@@ -196,9 +196,10 @@ function loginPhoneUnlocked_(payload) {
   assertLoginAllowed_(phone);
   const account=authAccountByKey_(readAuthAccounts_(),phone);
   const profile=account&&account.profile||{};
-  const registration=phone==='invalid-phone'?null:rowsAsObjects_(APP.SHEETS.REGISTRATIONS).filter(function(row){
-    return cleanText_(row.phone,20).replace(/[ -]/g,'')===phone&&cleanText_(row.status,24)==='approved';
-  })[0];
+  const registrations=phone==='invalid-phone'?[]:rowsAsObjects_(APP.SHEETS.REGISTRATIONS).filter(function(row){
+    return canonicalStoredPhone_(row.phone)===phone;
+  });
+  const registration=registrations.length===1&&registrations[0].status==='approved'?registrations[0]:null;
   const valid=Boolean(
     registration&&account&&account.active===true&&account.authMethod==='phone_only'&&
     cleanText_(account.username,64).toLowerCase()===phone&&profile.role==='inspector'&&
@@ -288,7 +289,7 @@ function setupPhoneOnlyInspectorAccount_(phone, profile) {
     username:key,
     authMethod:'phone_only',
     sessionVersion:uuid_(),
-    active:true,
+    active:false,
     profile:{
       inspectorId:cleanText_(profile.inspectorId,64)||('account:'+key),
       displayName:cleanText_(profile.displayName,120)||key,
@@ -421,4 +422,10 @@ function validatePersonCategory_(category, other) {
   assert_(!category || APP.PERSON_CATEGORIES.indexOf(category)>=0, 'VALIDATION_ERROR', 'ประเภทบุคคลไม่ถูกต้อง');
   assert_(category!=='อื่นๆ' || other, 'VALIDATION_ERROR', 'โปรดระบุประเภทบุคคลอื่นๆ');
   return {category:category,other:category==='อื่นๆ'?other:''};
+}
+
+/* Recover only the known spreadsheet loss of a leading zero, never arbitrary identifiers. */
+function canonicalStoredPhone_(value){
+ const text=cleanText_(value,20).replace(/[ -]/g,'');
+ return /^[689][0-9]{8}$/.test(text)?'0'+text:text;
 }

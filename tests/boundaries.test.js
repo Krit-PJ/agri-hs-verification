@@ -3,7 +3,7 @@ const boundary=require('../boundaries.js');
 const index=JSON.parse(fs.readFileSync('data/boundaries/index.json')).provinces;
 test('boundary visibility requires validated admin/super admin and assigned province',()=>{
  for(const role of ['public','inspector','admin','super_admin'])assert.equal(boundary.scope({role,assignedProvinceCode:'62'},false),null);
- assert.equal(boundary.scope({role:'inspector',assignedProvinceCode:'62'},true),null);
+ assert.deepEqual(boundary.scope({role:'inspector',assignedProvinceCode:'62'},true),{role:'inspector',code:'62'});
  assert.equal(boundary.scope({role:'admin'},true),null);
  assert.deepEqual(boundary.scope({role:'admin',assignedProvinceCode:'62'},true),{role:'admin',code:'62'});
  assert.deepEqual(boundary.scope({role:'super_admin'},true),{role:'super_admin',code:''});
