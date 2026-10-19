@@ -65,3 +65,14 @@ function checkRuntimeV26(){
  const policy=getRegistrationPolicy_(),result={version:APP.VERSION,registrationMode:policy.registrationMode,privacyConfigured:policy.configured,cacheScopeValidation:true,personalAdminAccounts:true,phoneRepair:repairPhoneCells_(false)};
  console.log(JSON.stringify(result));return result;
 }
+
+/** Adds only the provincial request sheet; does not create/approve accounts or change credentials. */
+function setupRuntimeV27(){
+ beginRepositoryRequest_();ensureRegistrationSheet_(APP.SHEETS.ADMIN_REGISTRATIONS);
+ return checkRuntimeV27();
+}
+function checkRuntimeV27(){
+ beginRepositoryRequest_();const policy=getRegistrationPolicy_();
+ const result={version:APP.VERSION,privacyConfigured:policy.configured,registrationMode:policy.registrationMode,provincialAdminApproval:'super_admin_only',adminRequestsSheetReady:Boolean(getSpreadsheet_().getSheetByName(APP.SHEETS.ADMIN_REGISTRATIONS)),requestLocalReadMemo:true};
+ console.log(JSON.stringify(result));return result;
+}

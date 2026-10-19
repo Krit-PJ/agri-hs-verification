@@ -12,3 +12,34 @@
 #phoneLoginForm>label.registration-check{display:flex;flex-direction:row;align-items:center;gap:12px}.phone-login-dialog .registration-check input{width:22px;min-width:22px;margin:0}
 
 .thai-month-pair{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;min-width:0}.thai-month-pair select{min-width:0;margin:0;min-height:48px}.period-range label{min-width:260px}.province-context[hidden]{display:none!important}@media(max-width:600px){.period-range label{min-width:0;flex-basis:100%}.thai-month-pair select{font-size:16px}}
+
+/* One focused access surface, shared by inspectors and managers. */
+.access-dialog{width:min(480px,calc(100vw - 24px));padding:28px 32px 24px;border:1px solid #bfd5c8;border-top:6px solid #1c5a3e;background:#fff;box-shadow:0 20px 60px #102d2230;scrollbar-color:#73877c #f4f7f5;scrollbar-width:thin}
+.access-dialog::selection,.registration-dialog::selection{background:#d7ebdf;color:#183b2b}
+.access-dialog .registration-heading{position:relative;justify-content:center;padding-right:24px;margin-bottom:20px}
+.access-dialog .registration-heading h2{font-size:1.55rem;color:#1c5a3e;text-align:center;line-height:1.5}
+.access-close{position:absolute;right:-12px;top:-12px;border:0;background:transparent;color:#42634e;font:inherit;font-size:1.5rem;min-width:44px;min-height:44px;padding:0;cursor:pointer}
+.access-tabs{display:flex;gap:4px;border-bottom:1px solid #d8e4dc;margin-bottom:20px}
+.access-tabs button{flex:1;background:transparent;border:0;border-bottom:3px solid transparent;color:#42634e;border-radius:0;padding:10px 8px;font:inherit;font-size:.95rem;cursor:pointer}
+.access-tabs button[aria-selected=true]{border-bottom-color:#1c5a3e;color:#1c5a3e;font-weight:700}
+.access-tabs button:hover,.access-link:hover{background:#f0f8f3;color:#123d2a}
+.access-dialog form>p:first-child{font-size:.95rem;line-height:1.7;color:#42634e;margin:0 0 18px}
+.access-dialog form>label{display:grid;gap:8px;font-weight:600;margin-top:16px}
+.access-dialog input{caret-color:#1c5a3e;background:#fff;color:#183b2b}
+.access-dialog input::placeholder{color:#596d60;opacity:1;letter-spacing:.03em}
+.access-dialog input[type=tel]{font-size:1.25rem;letter-spacing:.06em}
+.access-dialog .registration-check{display:flex;align-items:center;font-size:.875rem;font-weight:400;padding:0;background:transparent;border:0;border-radius:0;gap:10px}
+.access-dialog .registration-check input{width:20px;min-width:20px;height:20px;min-height:20px;margin:0;accent-color:#1c5a3e}
+.access-message{line-height:1.7;font-size:.9rem;color:#7a3025;overflow-wrap:anywhere;min-height:1.5em;margin:16px 0 12px}
+.access-dialog form>button[type=submit]{width:100%;min-height:52px;font-size:1.05rem;font-weight:700;background:#1c5a3e;border-radius:8px}
+.access-dialog form>button[type=submit]:hover{background:#123d2a}
+.access-footer{margin-top:24px;padding-top:16px;border-top:1px solid #dce5df;text-align:center;font-size:.9rem;color:#42634e}
+.access-link{font:inherit;color:#1c5a3e;border:0;background:transparent;text-decoration:underline;text-underline-offset:4px;padding:8px;cursor:pointer;font-weight:700}
+.access-registration-choices{display:grid;gap:8px;margin-top:10px}
+.access-registration-choices button{font:inherit;min-height:48px;border:1px solid #73877c;border-radius:8px;background:#fff;color:#1c5a3e;padding:8px;cursor:pointer}
+.access-registration-choices button:hover{background:#f0f8f3}
+.provincial-registration-fields{margin-top:16px;padding-top:20px;border-top:1px solid #d8e4dc}
+.registration-request p{line-height:1.8;overflow-wrap:anywhere}
+.registration-approval button:disabled{opacity:.55;cursor:wait}
+.registration-approval button:focus-visible{outline:3px solid #9b6b0c;outline-offset:3px}
+@media(max-width:600px){.access-dialog{padding:22px 20px 18px}.access-dialog .registration-heading h2{font-size:1.4rem}.access-tabs button{font-size:.875rem;padding-inline:4px}.access-dialog input{font-size:16px}.access-footer{margin-top:20px}.registration-request button{display:block;width:100%;margin:8px 0 0}}

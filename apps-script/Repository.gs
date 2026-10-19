@@ -1,7 +1,23 @@
+// Memo is reset for every API invocation; never shared across identities or requests.
+let repositoryRequestMemo_ = null;
+function beginRepositoryRequest_(){repositoryRequestMemo_={spreadsheet:null,rows:Object.create(null)};}
+function invalidateRepositoryRows_(name){if(repositoryRequestMemo_)delete repositoryRequestMemo_.rows[name];}
+function ensureRegistrationSheet_(name){
+ const headers=APP.HEADERS[name];assert_(headers,'CONFIG_ERROR','ไม่พบ schema');
+ const book=getSpreadsheet_();let sheet=book.getSheetByName(name);
+ if(!sheet)sheet=book.insertSheet(name);
+ ensureSheetColumns_(sheet,headers.length);
+ if(sheet.getLastRow()===0){sheet.getRange(1,1,1,headers.length).setValues([headers]);sheet.setFrozenRows(1);sheet.getRange(1,1,1,headers.length).setFontWeight('bold');}
+ const actual=sheet.getRange(1,1,1,Math.max(headers.length,sheet.getLastColumn())).getDisplayValues()[0].slice(0,headers.length);
+ assert_(actual.join('|')===headers.join('|'),'SCHEMA_MISMATCH','หัวคอลัมน์ชีต '+name+' ไม่ตรงกับ schema');
+}
+
 function getSpreadsheet_() {
+  if(repositoryRequestMemo_&&repositoryRequestMemo_.spreadsheet)return repositoryRequestMemo_.spreadsheet;
   const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
   const spreadsheet = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
   assert_(spreadsheet, 'CONFIG_ERROR', 'ไม่พบ Spreadsheet กรุณาตั้งค่า SPREADSHEET_ID');
+  if(repositoryRequestMemo_)repositoryRequestMemo_.spreadsheet=spreadsheet;
   return spreadsheet;
 }
 
@@ -27,11 +43,12 @@ function ensureSchema_() {
 }
 
 function rowsAsObjects_(sheetName) {
+  if(repositoryRequestMemo_&&repositoryRequestMemo_.rows[sheetName])return repositoryRequestMemo_.rows[sheetName].map(function(row){return Object.assign({},row);});
   const sheet = getRequiredSheet_(sheetName);
   const lastRow = sheet.getLastRow();
   const headers = APP.HEADERS[sheetName];
   if (lastRow < 2) return [];
-  return sheet.getRange(2, 1, lastRow - 1, headers.length).getValues().map(function (row, offset) {
+  const rows=sheet.getRange(2, 1, lastRow - 1, headers.length).getValues().map(function (row, offset) {
     const object = {_row: offset + 2};
     headers.forEach(function (header, index) {
       const value = row[index];
@@ -39,6 +56,8 @@ function rowsAsObjects_(sheetName) {
     });
     return object;
   });
+  if(repositoryRequestMemo_)repositoryRequestMemo_.rows[sheetName]=rows;
+  return rows.map(function(row){return Object.assign({},row);});
 }
 
 function objectToRow_(sheetName, object) {
@@ -49,6 +68,7 @@ function objectToRow_(sheetName, object) {
 }
 
 function appendObject_(sheetName, object) {
+  invalidateRepositoryRows_(sheetName);
   const sheet = getRequiredSheet_(sheetName);
   const row = objectToRow_(sheetName, object);
   const rowNumber=sheet.getLastRow()+1;
@@ -59,6 +79,7 @@ function appendObject_(sheetName, object) {
 }
 
 function updateObjectRow_(sheetName, rowNumber, object) {
+  invalidateRepositoryRows_(sheetName);
   const sheet = getRequiredSheet_(sheetName);
   const row = objectToRow_(sheetName, object);
   formatPhoneCells_(sheet,sheetName,rowNumber);
@@ -98,6 +119,7 @@ function appendLog_(actor, requestId, action, entityType, entityId, status, deta
 }
 
 function replaceBaseAtomically_(objects) {
+  invalidateRepositoryRows_(APP.SHEETS.BASE);
   const spreadsheet = getSpreadsheet_();
   const targetName = APP.SHEETS.BASE;
   const oldSheet = spreadsheet.getSheetByName(targetName);

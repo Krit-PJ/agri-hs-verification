@@ -3,6 +3,7 @@ function doGet() {
 }
 
 function doPost(event) {
+  if(typeof beginRepositoryRequest_==='function')beginRepositoryRequest_();
   let requestId = '';
   try {
     const raw = event && event.postData ? String(event.postData.contents || '') : '';
@@ -17,6 +18,7 @@ function doPost(event) {
     if (action === 'recordVisit') return outputJson_({ok:true,requestId:requestId,data:recordVisit_(payload)});
     if (action === 'getRegistrationPolicy') return outputJson_({ok:true,requestId:requestId,data:getRegistrationPolicy_()});
     if (action === 'register') return outputJson_({ok:true,requestId:requestId,data:registerUser_(payload)});
+    if (action === 'registerProvincialAdmin') return outputJson_({ok:true,requestId:requestId,data:registerProvincialAdmin_(payload)});
     if (action === 'getTeam') return outputJson_({ok:true,requestId:requestId,data:getTeam_()});
     if (action === 'login') {
       return outputJson_({ok: true, requestId: requestId, data: login_(payload)});
@@ -46,6 +48,9 @@ function dispatch_(actor, action, requestId, payload) {
   switch (action) {
     case 'getDatasetInfo':return getDatasetInfo_(actor);
     case 'listAdminAccounts':return listAdminAccounts_(actor);
+    case 'listProvincialAdminRequests':return listProvincialAdminRequests_(actor,payload);
+    case 'approveProvincialAdminRequest':return reviewProvincialAdminRequest_(actor,payload,true);
+    case 'rejectProvincialAdminRequest':return reviewProvincialAdminRequest_(actor,payload,false);
     case 'createProvincialAdmin':return createProvincialAdmin_(actor,payload);
     case 'changeOwnCredentials':return changeOwnCredentials_(actor,payload);
     case 'getBoundaryConfig':return getBoundaryConfig_(actor);

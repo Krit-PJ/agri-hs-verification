@@ -23,7 +23,7 @@ test('actual file preview consumes CSV and prepares canonical import payload wit
 
 test('admin surface stays locked for anonymous, unvalidated or expired sessions',()=>{
  const c=app();for(const id of ['adminLoginGate','adminProtected','adminDisplayName','adminRoleDescription','roleLabel','saveConfigButton','hsImportFile','importDatasetYear','sheetId','sourceSheet','driveId','confirmFileImport'])c.dom[id]={};
- c.applyRoleUI();assert.equal(c.dom.adminProtected.hidden,true);assert.equal(c.dom.adminLoginGate.hidden,false);
+ c.applyRoleUI();assert.equal(c.dom.adminProtected.hidden,true);assert.equal(c.dom.adminLoginGate.hidden,true); // legacy gate stays hidden; unified access owns sign-in
  c.state.profile={role:'super_admin'};c.state.token='unvalidated';c.applyRoleUI();assert.equal(c.dom.adminProtected.hidden,true);
  c.state.authValidated=true;c.state.expiresAt=new Date(Date.now()-1000).toISOString();c.applyRoleUI();assert.equal(c.dom.adminProtected.hidden,true);
  c.state.expiresAt=new Date(Date.now()+60000).toISOString();c.applyRoleUI();assert.equal(c.dom.adminProtected.hidden,false);

@@ -37,7 +37,7 @@
     bindEvents();
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:()=>{dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';populateFilters();applyFilters();}});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
-    if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onLogout:logoutAdmin,reload:loadData});
+    if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onManagerLogin:loginManagerCredentials,onLogout:logoutAdmin,reload:loadData});
     HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && ['admin','super_admin'].includes(state.profile?.role))});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     if(typeof HSUsageUI!=='undefined')HSUsageUI.init({api,live:()=>Boolean(state.endpoint&&!phoneDemoMode&&!previewMode)});
@@ -103,6 +103,7 @@
   }
 
   function switchView(name) {
+    if(name==='admin'&&!(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))&&typeof HSRegistration!=='undefined'){HSRegistration.openAccess('manager');return;}
     document.querySelectorAll('.view').forEach(view => { const active = view.id === `${name}View`; view.classList.toggle('active', active); view.hidden = !active; });
     document.querySelectorAll('.nav-item[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === name));
     dom.mainNav.classList.remove('open'); dom.menuButton.setAttribute('aria-expanded','false');
@@ -184,10 +185,11 @@
       const times=state.all.map(x=>x.acquiredAt).filter(Boolean).sort();
       dom.dataSourceLabel.textContent=`${state.endpoint ? 'ฐาน HS กลางที่เชื่อมกับระบบความเสี่ยง' : state.sourceName} · ${state.all.length.toLocaleString('th-TH')} จุด · ล่าสุด ${times.length?formatDate(times.at(-1)):'ไม่ระบุ'} · ${state.usedCache?'สำเนาในเครื่องที่ตรวจสิทธิ์แล้ว · ':''}อัปเดต ${new Date().toLocaleTimeString('th-TH',{timeZone:'Asia/Bangkok'})}`;
     } catch (error) {
+      if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
       state.all = []; state.filtered = []; renderAll();
       const prefix = state.endpoint ? 'เชื่อมระบบกลางไม่สำเร็จ ข้อมูลตัวอย่างไม่ได้ถูกนำมาใช้: ' : 'เปิดข้อมูลในเครื่องไม่สำเร็จ: ';
       dom.liveError.textContent = prefix + friendlyError(error); dom.liveError.hidden = false;
-    } finally { setLoading(false); }
+    } finally { if(loadToken===state.token&&loadRevision===state.loadRevision)setLoading(false); }
   }
 
   function extractRows(data) {
@@ -597,7 +599,7 @@
     const canManage=authenticated && ['admin','super_admin'].includes(role);
     const canConfigure=authenticated && role==='super_admin';
     if(typeof HSTeam!=='undefined')HSTeam.updateAccess();
-    dom.adminLoginGate.hidden=authenticated;
+    dom.adminLoginGate.hidden=true;
     dom.adminProtected.hidden=!canManage;
     if(typeof HSRegistration!=='undefined')HSRegistration.refresh();
     dom.roleLabel.textContent=authenticated&&!canManage?'ผู้บันทึกข้อมูล · '+(profile.agency||profile.displayName):canManage ? (role==='super_admin' ? 'Super Admin · จัดการแหล่งข้อมูลและระบบ' : 'Admin · ตรวจ QA / ส่งออก / รายงาน') : 'ยังไม่ได้เข้าสู่ระบบ';
@@ -680,34 +682,34 @@
       state.csrf=result.csrf;state.authValidated=true;state.token=result.token;state.profile=result.profile;state.expiresAt=result.expiresAt||'';
       sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
       if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
-      state.serverConfig={profile:state.profile};applyRoleUI();state.dataLoaded=false;await loadData();switchView('work');toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
+      state.serverConfig={profile:state.profile};applyRoleUI();state.dataLoaded=false;state.all=[];state.filtered=[];renderAll();switchView('work');void loadData();toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
     } catch(error){clearSession();applyRoleUI();throw error;}
   }
 
-  async function loginAdmin(event) {
-    event.preventDefault();
+  async function loginManagerCredentials({username,password}) {
     const endpoint=state.endpoint.trim().replace(/\/$/,'');
-    const username=dom.loginUsername.value.trim();
-    const password=dom.loginPassword.value;
-    if(!endpoint)return setMessage(dom.loginMessage,'ยังไม่ได้เชื่อมระบบกลาง กรุณาให้ผู้ติดตั้งกำหนดปลายทางใน site-config.js ก่อนเปิดใช้บัญชี','error');
-    if (!username || !password) return setMessage(dom.loginMessage,'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน','error');
-    let parsed;try{parsed=new URL(endpoint);}catch(_){return setMessage(dom.loginMessage,'URL ของ API ไม่ถูกต้อง','error');}
-    if(!(parsed.protocol==='https:' || (parsed.protocol==='http:' && ['localhost','127.0.0.1'].includes(parsed.hostname))))return setMessage(dom.loginMessage,'URL ของ API ต้องใช้ HTTPS','error');
-    clearSession();saveEndpoint(endpoint);dom.loginButton.disabled=true;setMessage(dom.loginMessage,'กำลังเข้าสู่ระบบ…');
-    try {
+    if(!endpoint)throw new Error('ยังไม่ได้เชื่อมระบบกลาง กรุณาติดต่อผู้ติดตั้ง');
+    if(!username?.trim()||!password)throw new Error('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+    const parsed=new URL(endpoint);
+    if(!(parsed.protocol==='https:'||(parsed.protocol==='http:'&&['localhost','127.0.0.1'].includes(parsed.hostname))))throw new Error('URL ของ API ต้องใช้ HTTPS');
+    clearSession();saveEndpoint(endpoint);
+    try{
       const result=await api('login',{username,password});
       const role=normalizedRole(result?.profile?.role);
-      if(!result?.token || !result?.profile)throw new Error('เซิร์ฟเวอร์ไม่ได้ส่งข้อมูลเข้าสู่ระบบที่ครบถ้วน');
-      state.csrf=result.csrf||'';sessionStorage.setItem('hsverify.csrf',state.csrf);state.authValidated=true;state.token=result.token;state.profile={...result.profile,role};state.expiresAt=result.expiresAt || '';
-      if(!['inspector','admin','super_admin'].includes(role)){
-        try{await api('logout',{});}catch(_){/* access is still cleared locally */}
-        clearSession();throw new Error('บัญชีนี้ไม่มีสิทธิ์ใช้งาน');
-      }
-      sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
+      if(!result?.token||!result?.csrf||!['admin','super_admin'].includes(role))throw new Error('บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ');
+      state.csrf=result.csrf;state.authValidated=true;state.token=result.token;state.profile={...result.profile,role};state.expiresAt=result.expiresAt||'';
+      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
       if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
-      state.serverConfig={profile:state.profile};dom.loginUsername.value='';setMessage(dom.loginMessage,'เข้าสู่ระบบสำเร็จ','success');applyRoleUI();
-      state.dataLoaded=false;await loadData();if(role==='inspector')switchView('work');toast(`เข้าสู่ระบบในชื่อ ${state.profile.displayName || state.profile.username}`);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
-    } catch(error){clearSession();applyRoleUI();setMessage(dom.loginMessage,friendlyError(error),'error');}
+      state.serverConfig={profile:state.profile};applyRoleUI();state.all=[];state.filtered=[];renderAll();state.dataLoaded=false;
+      switchView('admin');void loadData();toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
+      return state.profile;
+    }catch(error){clearSession();applyRoleUI();throw error;}
+  }
+
+  async function loginAdmin(event){
+    event.preventDefault();dom.loginButton.disabled=true;
+    try{await loginManagerCredentials({username:dom.loginUsername.value.trim(),password:dom.loginPassword.value});dom.loginUsername.value='';setMessage(dom.loginMessage,'เข้าสู่ระบบสำเร็จ','success');}
+    catch(error){setMessage(dom.loginMessage,friendlyError(error),'error');}
     finally{dom.loginPassword.value='';dom.loginButton.disabled=false;}
   }
 
