@@ -43,3 +43,25 @@
 .registration-approval button:disabled{opacity:.55;cursor:wait}
 .registration-approval button:focus-visible{outline:3px solid #9b6b0c;outline-offset:3px}
 @media(max-width:600px){.access-dialog{padding:22px 20px 18px}.access-dialog .registration-heading h2{font-size:1.4rem}.access-tabs button{font-size:.875rem;padding-inline:4px}.access-dialog input{font-size:16px}.access-footer{margin-top:20px}.registration-request button{display:block;width:100%;margin:8px 0 0}}
+/* v2.7.1: distinct inspector entry and a separate manager dropdown. */
+.header-actions{position:relative}
+#menuButton.admin-menu-toggle{display:grid;place-items:center;min-width:48px;min-height:48px}
+.admin-menu{position:absolute;right:0;top:calc(100% + 10px);z-index:1300;width:240px;max-width:calc(100vw - 32px);padding:8px;border:1px solid #bccdc2;border-radius:12px;background:#fff;box-shadow:0 8px 24px #102d2226}
+.admin-menu[hidden],.access-tabs[hidden]{display:none!important}
+.admin-menu button{display:block;width:100%;min-height:48px;padding:12px 16px;border:0;border-radius:8px;background:#fff;color:#17472f;text-align:left;font:inherit;font-weight:600;cursor:pointer}
+.admin-menu button:hover{background:#edf5ef}
+.admin-menu button:focus-visible,#menuButton:focus-visible{outline:3px solid #9b6b0c;outline-offset:3px}
+.main-nav .login-nav{background:#1c5a3e;color:#fff;font-weight:700;border:1px solid #1c5a3e}
+.main-nav .login-nav:hover{background:#123d2a;color:#fff}
+.header-context:has(#registrationTools[hidden]):not(:has(#managerProvinceContext:not([hidden]))){display:none}
+.team-credits{margin:28px 0 0;padding-top:20px;border-top:1px solid #d8e4dc;color:#42634e;font-size:.875rem;line-height:1.8}
+.team-credits a{color:#1c5a3e;text-underline-offset:3px}
+.site-footer{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.site-footer .site-counters{display:block;font-size:.8125rem;line-height:1.8}
+@media(max-width:700px){.header-actions{position:static;display:flex;align-items:center;justify-content:flex-end;width:100%;gap:8px;padding-right:56px}.brand{padding-right:52px}#menuButton.admin-menu-toggle{position:absolute;right:12px;top:14px}.admin-menu{right:12px;top:70px}}
+@media(max-width:600px){.site-footer{padding:20px 16px}.main-nav .login-nav{min-height:48px}}
+@media(max-width:700px){
+ #mainNav,#mainNav.open{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;overflow:visible;gap:6px;padding:8px 12px;position:static}
+ #mainNav .nav-item{min-width:0;width:100%;min-height:48px;justify-content:center;text-align:center;white-space:normal;margin:0;padding:10px 8px;font-size:.8125rem;line-height:1.5}
+ #mainNav .nav-item:last-child{grid-column:1/-1}
+}

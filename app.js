@@ -38,6 +38,7 @@
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:()=>{dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';populateFilters();applyFilters();}});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
     if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onManagerLogin:loginManagerCredentials,onLogout:logoutAdmin,reload:loadData});
+    if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.init({onInspector:()=>{if(state.authValidated&&state.token&&!sessionExpired())switchView('work');else HSRegistration.openAccess('inspector');},onManager:()=>{if(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))switchView('admin');else HSRegistration.openAccess('manager');}});
     HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && ['admin','super_admin'].includes(state.profile?.role))});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     if(typeof HSUsageUI!=='undefined')HSUsageUI.init({api,live:()=>Boolean(state.endpoint&&!phoneDemoMode&&!previewMode)});
@@ -53,10 +54,7 @@
 
   function bindEvents() {
     document.querySelectorAll('.nav-item[data-view]').forEach(button => button.addEventListener('click', () => switchView(button.dataset.view)));
-    dom.menuButton.addEventListener('click', () => {
-      const open = dom.mainNav.classList.toggle('open');
-      dom.menuButton.setAttribute('aria-expanded', String(open));
-    });
+
     document.querySelectorAll('[data-layout]').forEach(button => button.addEventListener('click', () => setLayout(button.dataset.layout)));
     ['yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter'].forEach(id => dom[id].addEventListener('change', () => {
       if (id === 'yearFilter') populateFiscalMonths();
@@ -103,6 +101,7 @@
   }
 
   function switchView(name) {
+    if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.close();
     if(name==='admin'&&!(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))&&typeof HSRegistration!=='undefined'){HSRegistration.openAccess('manager');return;}
     document.querySelectorAll('.view').forEach(view => { const active = view.id === `${name}View`; view.classList.toggle('active', active); view.hidden = !active; });
     document.querySelectorAll('.nav-item[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === name));

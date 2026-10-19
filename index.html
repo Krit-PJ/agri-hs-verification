@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="design-tokens.css?v=2.1">
   <link rel="stylesheet" href="styles.css?v=2.1">
-  <link rel="stylesheet" href="registration.css?v=2.7">
+  <link rel="stylesheet" href="registration.css?v=2.7.1">
   <link rel="stylesheet" href="boundaries.css?v=2.5">
 </head>
 <body>
@@ -25,7 +25,7 @@
     </div>
     <div class="header-actions">
       <span id="headerIdentity">ผู้ใช้ทั่วไป</span><span id="modeBadge" class="mode-badge demo">ตัวอย่างในเครื่อง</span>
-      <button id="menuButton" class="icon-button mobile-only" type="button" aria-label="เปิดเมนู" aria-expanded="false">☰</button>
+      <button id="menuButton" class="icon-button admin-menu-toggle" type="button" aria-label="เปิดเมนูเพิ่มเติม" aria-controls="adminMenu" aria-expanded="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div id="adminMenu" class="admin-menu" hidden><button id="adminMenuEntry" type="button">ผู้ดูแลระบบ</button></div>
     </div>
   </header>
 
@@ -34,7 +34,7 @@
     <button class="nav-item active" data-view="work" type="button">ตรวจสอบจุดความร้อน</button>
     <button class="nav-item" data-view="summary" type="button">สรุปผลการตรวจสอบ</button>
     <button class="nav-item" data-view="team" type="button">ทีมผู้พัฒนาและที่ปรึกษา</button>
-    <button class="nav-item" data-view="admin" type="button">ผู้ดูแลระบบ</button>
+    <button id="accessLoginNav" class="nav-item login-nav" type="button">เข้าใช้งานระบบ · Login</button>
     <a class="nav-item" href="https://krit-pj.github.io/agri-risk-map-burning/" target="_blank" rel="noopener">แผนที่ความเสี่ยง ↗</a>
   </nav>
 
@@ -166,10 +166,11 @@
         <form id="teamForm"><input id="teamEditId" type="hidden"><div class="team-fields"><label>ชื่อ - สกุล<input id="teamName" required maxlength="150"></label><label>ตำแหน่ง<input id="teamPosition" required maxlength="200"></label><label>สังกัด<input id="teamAgency" required maxlength="250"></label></div><div class="button-row"><button class="primary-button" type="submit">บันทึกข้อมูล</button><button id="teamCancel" class="secondary-button" type="button">ยกเลิกการแก้ไข</button></div></form>
       </section>
       <p id="teamLoginHint" class="field-hint">Admin และ Super Admin สามารถเข้าสู่ระบบเพื่อเพิ่มหรือแก้ไขข้อมูลทีมได้</p>
+    <p class="team-credits">ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></p>
     </section>
     <section id="inspectorAccount" class="card" hidden></section>
   </main>
-  <footer class="site-footer"><span id="visitCounter" class="site-counters" role="status">กำลังอ่านสถิติการใช้งาน…</span>Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.<small>ตราหน่วยงานและตราจังหวัดใช้ตามสิทธิ์ของแหล่งที่มา · <a href="credits.html" target="_blank" rel="noopener">ที่มาและสิทธิ์ภาพ</a></small></footer>
+  <footer class="site-footer"><span class="copyright">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.</span><span id="visitCounter" class="site-counters" role="status">กำลังอ่านสถิติการใช้งาน…</span></footer>
 
   <dialog id="verifyDialog" class="verify-dialog">
     <form id="verifyForm" method="dialog">
@@ -210,10 +211,11 @@
   <script src="report.js?v=2.4"></script>
   <script src="site-config.js?v=2.1"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
   <script src="team.js"></script>
-  <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.4"></script>
-  <script src="registration-ui.js?v=2.7"></script>
+  <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.7.1"></script>
+  <script src="registration-ui.js?v=2.7.1"></script>
   <script src="boundaries.js?v=2.6"></script>
   <script src="admin-accounts.js?v=2.6"></script><script src="thai-period-ui.js?v=2.6"></script><script src="dataset-cache.js?v=2.6"></script>
-  <script src="app.js?v=2.7" defer></script>
+  <script src="access-navigation.js?v=2.7.1"></script>
+  <script src="app.js?v=2.7.1" defer></script>
 </body>
 </html>
