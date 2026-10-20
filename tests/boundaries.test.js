@@ -101,7 +101,7 @@ function boundaryMap(options={}) {
   return {ok:true,json:async()=>data};
  };
  const L={layerGroup:()=>group,geoJSON:(data,opts)=>({features:data.features.map(feature=>({feature,style:typeof opts.style==='function'?opts.style(feature):opts.style}))})};
- const control=boundary.create({map,L,panel,fetch,profile:()=>state.profile,valid:()=>state.valid,selectedProvince:()=>state.province,activeArea:()=>state.area});
+ const control=boundary.create({map,L,panel,fetch,showControls:options.showControls,profile:()=>state.profile,valid:()=>state.valid,selectedProvince:()=>state.province,activeArea:()=>state.area});
  return {state,fields,panel,layers,fits,requests,events,control};
 }
 
@@ -160,3 +160,7 @@ test('production polygon locates a known point inside Nai Mueang and excludes a 
  const feature=JSON.parse(fs.readFileSync('data/boundaries/62/subdistrict.geojson')).features.find(f=>f.properties.areaCode==='620101');
  assert.equal(boundary.contains(feature,[99.53,16.46]),true);assert.equal(boundary.contains(feature,[99.6,16.46]),false);
 });
+
+ test('automatic tambon geometry remains active when boundary controls are removed from view',()=>inBrowser(async()=>{
+ const h=boundaryMap({showControls:false,area:{provinceCode:'62',hs:{latitude:16.5,longitude:100.5}}});await h.control.sync();assert.equal(h.panel.hidden,true);assert.ok(h.layers.flatMap(l=>l.features).some(f=>f.style.fillOpacity>0));assert.equal(h.fields.boundarySubdistrictOn.checked,true);
+ }));

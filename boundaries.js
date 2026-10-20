@@ -144,7 +144,7 @@ var HSBoundaries = (() => {
       if(nextKey===key&&nextSelectionKey===selectionKey)return;
       const accessChanged=nextKey!==key;key=nextKey;selectionKey=nextSelectionKey;const currentSelection=++selectionRevision;
       if(accessChanged)reset();else{revision++;controller?.abort();group.clearLayers();}
-      access=next;selected=nextSelected;active=nextActive;focusPending=Boolean(selected);panel.hidden=!access;if(!access)return;
+      access=next;selected=nextSelected;active=nextActive;focusPending=Boolean(selected);panel.hidden=!access||env.showControls===false;if(!access)return;
       el('boundarySubdistrictOn').checked=Boolean(selected)||el('boundarySubdistrictOn').checked;
       if(focusLevel())el('boundaryDistrictOn').checked=true;
       status('กำลังอ่านรายการพื้นที่…');

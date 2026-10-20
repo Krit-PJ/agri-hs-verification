@@ -38,7 +38,7 @@
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:provinceChanged});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
     if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onManagerLogin:loginManagerCredentials,onLogout:logoutAdmin,reload:loadData});
-    if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.init({onInspector:()=>{if(state.authValidated&&state.token&&!sessionExpired())switchView('work');else HSRegistration.openAccess('inspector');},onManager:()=>{if(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))switchView('admin');else HSRegistration.openAccess('manager');}});
+    if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.init({onLogout:logoutAdmin,onInspector:()=>{if(state.authValidated&&state.token&&!sessionExpired())switchView('work');else HSRegistration.openAccess('inspector');},onManager:()=>{if(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))switchView('admin');else HSRegistration.openAccess('manager');}});
     HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && state.profile?.role==='super_admin')});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     if(typeof HSUsageUI!=='undefined')HSUsageUI.init({api,live:()=>Boolean(state.endpoint&&!phoneDemoMode&&!previewMode)});
@@ -156,7 +156,7 @@
       const terrain=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri and contributors'});
       if(L.control?.layers)L.control.layers({'ถนน':streets,'ดาวเทียม':satellite,'ภูมิประเทศ':terrain},{},{collapsed:true}).addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
-      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),selectedProvince:()=>nationalMode?HSNationUI.selectedProvinceCode:'62',activeArea:()=>({provinceCode:nationalMode?HSNationUI.selectedProvinceCode:'62',district:dom.districtFilter.value,tambon:dom.tambonFilter.value,hs:state.boundaryHS||null})});state.boundaries.sync();}
+      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),showControls:false,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),selectedProvince:()=>nationalMode?HSNationUI.selectedProvinceCode:'62',activeArea:()=>({provinceCode:nationalMode?HSNationUI.selectedProvinceCode:'62',district:dom.districtFilter.value,tambon:dom.tambonFilter.value,hs:state.boundaryHS||null})});state.boundaries.sync();}
     } catch (error) { showMapFallback('เบราว์เซอร์นี้เปิดแผนที่ไม่ได้'); }
   }
 
@@ -294,7 +294,7 @@
         (!f.crop || x.plantType === f.crop) && (!f.status || x.status === f.status) &&
         (!f.result || result === f.result) && (!f.search || haystack.includes(f.search));
     });
-    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=source.disabled;}dom.summaryDistrict.value=dom.districtFilter.value;if(dom.summaryTambon){fillSelect(dom.summaryTambon,unique(scopedRows().filter(x=>!dom.districtFilter.value||x.district===dom.districtFilter.value).map(x=>x.tambon)).sort(locale),'ทุกตำบล');dom.summaryTambon.value=dom.tambonFilter.value;}dom.summaryYear.value=dom.yearFilter.value;}
+    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=true;}dom.summaryDistrict.value=dom.districtFilter.value;if(dom.summaryTambon){fillSelect(dom.summaryTambon,unique(scopedRows().filter(x=>!dom.districtFilter.value||x.district===dom.districtFilter.value).map(x=>x.tambon)).sort(locale),'ทุกตำบล');dom.summaryTambon.value=dom.tambonFilter.value;}dom.summaryYear.value=dom.yearFilter.value;}
     const hint=$('fiscalPeriodHint');if(hint)hint.textContent=f.year?`ปีงบประมาณ ${f.year} · ตั้งแต่ตุลาคม ${Number(f.year)-1} ถึง ${f.month?MONTHS[Number(f.month.slice(5))-1]+' '+(Number(f.month.slice(0,4))+543):'กันยายน '+f.year}${state.filtered.length?'':' · ยังไม่มีข้อมูลในช่วงและขอบเขตนี้'}`:'แสดงข้อมูลทุกปีงบประมาณ';
     if(dom.startMonthFilter){const periodHint=$('periodRangeHint');if(periodHint)periodHint.textContent=HSPeriod.error(f.startMonth,f.endMonth)||HSPeriod.label(f.startMonth,f.endMonth)+(state.filtered.length?'':' · ไม่พบข้อมูลในช่วงที่เลือก');}
     state.boundaries?.sync();renderAll();
@@ -364,7 +364,7 @@
       grouped.set(key,row);
     });
     const rows = [...grouped.entries()].sort((a,b) => b[1].total-a[1].total);
-    dom.summaryBody.innerHTML = rows.length ? rows.map(([name,row]) => { const pct = row.total ? Math.round(row.verified/row.total*100) : 0; return `<tr><td><strong>${esc(name)}</strong></td><td>${row.total.toLocaleString('th-TH')}</td><td>${row.verified.toLocaleString('th-TH')}</td><td>${row.burned.toLocaleString('th-TH')}</td><td><span class="progress"><i style="width:${pct}%"></i></span>${pct}%</td></tr>`; }).join('') : '<tr><td colspan="5">ไม่มีข้อมูล</td></tr>';
+    dom.summaryBody.innerHTML = rows.length ? rows.map(([name,row]) => { const pct = row.total ? Math.round(row.verified/row.total*100) : 0; return `<tr><td><strong>${esc(nationalMode&&level!=='province'?name.split(' · ').slice(1).join(' · '):name)}</strong></td><td>${row.total.toLocaleString('th-TH')}</td><td>${row.verified.toLocaleString('th-TH')}</td><td>${row.burned.toLocaleString('th-TH')}</td><td><span class="progress"><i style="width:${pct}%"></i></span>${pct}%</td></tr>`; }).join('') : '<tr><td colspan="5">ไม่มีข้อมูล</td></tr>';
   }
 
   async function reportPhotoData(photo){
@@ -618,6 +618,7 @@
     const profile=state.profile || state.serverConfig?.profile;
     const role=normalizedRole(profile?.role);
     const authenticated=Boolean(state.authValidated && state.token && profile && !sessionExpired());
+    if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.updateAccess(authenticated);
     const canManage=authenticated && ['admin','super_admin'].includes(role);
     const canConfigure=authenticated && role==='super_admin';
     if(typeof HSTeam!=='undefined')HSTeam.updateAccess();

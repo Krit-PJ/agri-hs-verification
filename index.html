@@ -29,12 +29,12 @@
     </div>
   </header>
 
-  <section class="header-context" aria-label="พื้นที่และบัญชีผู้ใช้"><div class="province-context" id="managerProvinceContext" hidden><label>จังหวัดที่กำลังดู<select id="provinceFilter"></select></label><details class="coverage-details"><summary>รายละเอียดชุดข้อมูล</summary><p id="provinceCoverage" class="field-hint" role="status"></p></details></div><div id="accountDock"></div></section>
+  <section hidden aria-label="พื้นที่และบัญชีผู้ใช้"><div class="province-context" id="managerProvinceContext" hidden><label>จังหวัดที่กำลังดู<select id="provinceFilter"></select></label><details class="coverage-details"><summary>รายละเอียดชุดข้อมูล</summary><p id="provinceCoverage" class="field-hint" role="status"></p></details></div><div id="accountDock"></div></section>
   <nav id="mainNav" class="main-nav" aria-label="เมนูหลัก">
     <button class="nav-item active" data-view="work" type="button">ตรวจสอบจุดความร้อน</button>
     <button class="nav-item" data-view="summary" type="button">สรุปผลการตรวจสอบ</button>
     <button class="nav-item" data-view="team" type="button">ทีมผู้พัฒนาและที่ปรึกษา</button>
-    <button id="accessLoginNav" class="nav-item login-nav" type="button">เข้าใช้งานระบบ · Login</button>
+    <button id="accessLoginNav" class="nav-item login-nav" type="button">เข้าใช้งานระบบ</button>
     <a class="nav-item" href="https://krit-pj.github.io/agri-risk-map-burning/" target="_blank" rel="noopener">แผนที่ความเสี่ยง ↗</a>
   </nav>
 
@@ -79,7 +79,7 @@
       <section class="filter-card" aria-labelledby="filterTitle">
         <div class="section-title"><div><p class="eyebrow">ค้นหาเร็ว</p><h2 id="filterTitle">ตัวกรองจุดความร้อน</h2></div><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button></div>
         <select id="yearFilter" hidden aria-hidden="true" tabindex="-1"></select><select id="monthFilter" hidden aria-hidden="true" tabindex="-1"></select><p id="fiscalPeriodHint" hidden class="field-hint" role="status"></p><p id="selectionContext" class="selection-context" hidden></p><div class="filter-grid">
-          <label>จังหวัด<select id="quickProvinceFilter"></select></label>
+          <label>จังหวัด<select id="quickProvinceFilter" disabled></select></label>
 
           <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
           <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
@@ -117,7 +117,7 @@
       </section>
 
       <div id="adminProtected" hidden>
-        <div class="admin-session-bar">
+        <div class="admin-session-bar" hidden>
           <p><strong id="adminDisplayName">ผู้ดูแลระบบ</strong><small id="adminRoleDescription"></small></p>
           <button id="logoutButton" class="secondary-button" type="button">ออกจากระบบ</button>
         </div>
@@ -216,10 +216,10 @@
   <script src="site-config.js?v=2.1"></script><script src="province-logos.js?v=2.1"></script><script src="preview-mode.js?v=2.1"></script>
   <script src="team.js"></script>
   <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.7.1"></script>
-  <script src="registration-ui.js?v=2.7.1"></script>
-  <script src="boundaries.js?v=2.8"></script>
+  <script src="registration-ui.js?v=2.8.1"></script>
+  <script src="boundaries.js?v=2.8.1"></script>
   <script src="admin-accounts.js?v=2.6"></script><script src="thai-period-ui.js?v=2.6"></script><script src="dataset-cache.js?v=2.6"></script>
-  <script src="access-navigation.js?v=2.7.1"></script>
-  <script src="app.js?v=2.8" defer></script>
+  <script src="access-navigation.js?v=2.8.1"></script>
+  <script src="app.js?v=2.8.1" defer></script>
 </body>
 </html>
