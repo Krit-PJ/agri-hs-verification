@@ -1,5 +1,5 @@
 const APP = Object.freeze({
-  VERSION: '2.7.0',
+  VERSION: '2.8.0',
   PROVINCE: 'กำแพงเพชร',
   LAND_TYPE: 'พื้นที่เกษตร',
   PLANT_TYPES: Object.freeze(['นาข้าว', 'อ้อย', 'เกษตรอื่น ๆ', 'อื่น ๆ']),

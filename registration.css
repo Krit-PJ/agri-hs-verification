@@ -65,3 +65,11 @@
  #mainNav .nav-item{min-width:0;width:100%;min-height:48px;justify-content:center;text-align:center;white-space:normal;margin:0;padding:10px 8px;font-size:.8125rem;line-height:1.5}
  #mainNav .nav-item:last-child{grid-column:1/-1}
 }
+.province-gate{margin:16px clamp(16px,3vw,42px);padding:20px 24px;background:#fff;border:1px solid #c5d7ca;border-radius:14px}
+.province-gate .province-context{display:block;padding:0;background:transparent;border:0;box-shadow:none}
+.province-gate .province-context label{display:grid;gap:8px;max-width:420px;font-weight:700}
+.province-gate select{min-height:48px;width:100%}
+.province-gate>p{margin:12px 0 0;color:#42634e;font-size:.9375rem;line-height:1.7}
+.province-gate .coverage-details{margin-top:12px}
+#summaryContent[hidden],#publicProvinceGate[hidden],#summaryProvincePrompt[hidden]{display:none!important}
+@media(max-width:600px){.province-gate{padding:16px;margin:12px}.summary-filters{display:grid;grid-template-columns:1fr}.summary-filters select{width:100%;min-height:48px}}

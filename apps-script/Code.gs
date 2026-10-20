@@ -26,8 +26,8 @@ function doPost(event) {
     if (action === 'loginPhone') {
       return outputJson_({ok: true, requestId: requestId, data: loginPhone_(payload)});
     }
-    if(action==='getDatasetInfo'&&!envelope.token)return outputJson_({ok:true,requestId:requestId,data:getDatasetInfo_({role:'public',id:'public'})});
-    if(typeof nationalPublicRead_==='function' && action==='bootstrap' && !envelope.token)return outputJson_({ok:true,requestId:requestId,data:nationalPublicRead_()});
+    if(action==='getDatasetInfo'&&!envelope.token)return outputJson_({ok:true,requestId:requestId,data:getDatasetInfo_(publicReadActor_(payload))});
+    if(typeof nationalPublicRead_==='function' && action==='bootstrap' && !envelope.token)return outputJson_({ok:true,requestId:requestId,data:nationalPublicRead_(payload)});
     const actor = authenticate_(envelope.token);
     if(typeof nationalCsrf_==='function')nationalCsrf_(envelope);
     if (action === 'recordUsage') return outputJson_({ok:true,requestId:requestId,data:recordUsage_(actor)});

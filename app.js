@@ -31,19 +31,19 @@
   document.addEventListener('DOMContentLoaded', init);
 
   async function init() {
-    ['startMonthFilter','endMonthFilter','quickProvinceFilter','resetPeriod','inspectorAccount','refreshDataButton','dataSourceLabel','selectionContext','summaryDistrict','summaryYear','summaryReset','printReportButton','roleLabel','adminLoginGate','adminLoginForm','loginUsername','loginPassword','loginButton','loginMessage','adminProtected','adminDisplayName','adminRoleDescription','logoutButton','serverSettingsCard','workspaceSettingsCard','hsImportFile','importDatasetYear','importPreview','confirmFileImport','importMessage','importPhotoInput','modeBadge','demoNotice','liveError','yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter','resetFilters','allHotspotsButton','resultCount','selectedCount','hotspotList','loadMore','mapLayout','mapFallback','summaryStats','summaryLevel','summaryBody','verifyDialog','verifyForm','verifyTitle','selectedMeta','navigateLink','locateButton','locationPanel','noGps','noGpsReasonWrap','noGpsReason','photoInput','photoPreview','noteInput','noteCount','actionInput','verifyMessage','saveDraftButton','reviewSubmitButton','confirmDialog','confirmSummary','confirmSubmit','cancelConfirm','closeDialog','retryButton','retryCount','toastRegion','menuButton','mainNav','apiEndpoint','connectButton','connectionDot','connectionMessage','sheetId','sourceSheet','driveId','saveConfigButton','configMessage','adminResult'].forEach(id => dom[id] = $(id));
+    ['startMonthFilter','endMonthFilter','quickProvinceFilter','resetPeriod','inspectorAccount','refreshDataButton','dataSourceLabel','selectionContext','summaryDistrict','summaryTambon','summaryYear','summaryReset','printReportButton','roleLabel','adminLoginGate','adminLoginForm','loginUsername','loginPassword','loginButton','loginMessage','adminProtected','adminDisplayName','adminRoleDescription','logoutButton','serverSettingsCard','workspaceSettingsCard','hsImportFile','importDatasetYear','importPreview','confirmFileImport','importMessage','importPhotoInput','modeBadge','demoNotice','liveError','yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter','resetFilters','allHotspotsButton','resultCount','selectedCount','hotspotList','loadMore','mapLayout','mapFallback','summaryStats','summaryLevel','summaryBody','verifyDialog','verifyForm','verifyTitle','selectedMeta','navigateLink','locateButton','locationPanel','noGps','noGpsReasonWrap','noGpsReason','photoInput','photoPreview','noteInput','noteCount','actionInput','verifyMessage','saveDraftButton','reviewSubmitButton','confirmDialog','confirmSummary','confirmSubmit','cancelConfirm','closeDialog','retryButton','retryCount','toastRegion','menuButton','mainNav','apiEndpoint','connectButton','connectionDot','connectionMessage','sheetId','sourceSheet','driveId','saveConfigButton','configMessage','adminResult'].forEach(id => dom[id] = $(id));
     if (sessionExpired()) clearSession();
     dom.apiEndpoint.value = state.endpoint;
     bindEvents();
-    if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:()=>{dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';populateFilters();applyFilters();}});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
+    if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:provinceChanged});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
     if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onManagerLogin:loginManagerCredentials,onLogout:logoutAdmin,reload:loadData});
     if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.init({onInspector:()=>{if(state.authValidated&&state.token&&!sessionExpired())switchView('work');else HSRegistration.openAccess('inspector');},onManager:()=>{if(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))switchView('admin');else HSRegistration.openAccess('manager');}});
-    HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && ['admin','super_admin'].includes(state.profile?.role))});
+    HSTeam.init({preview:previewMode,api,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && state.profile?.role==='super_admin')});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     if(typeof HSUsageUI!=='undefined')HSUsageUI.init({api,live:()=>Boolean(state.endpoint&&!phoneDemoMode&&!previewMode)});
     updateModeUI();
-    const managerContext=$('managerProvinceContext');if(managerContext&&dom.adminProtected)dom.adminProtected.prepend(managerContext);
+    updateProvinceGate();
     if(typeof HSAdminAccounts!=='undefined')HSAdminAccounts.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),onChanged:logoutAdmin});
     initMap();
     if(typeof HSThaiPeriod!=='undefined')HSThaiPeriod.init();
@@ -57,9 +57,10 @@
 
     document.querySelectorAll('[data-layout]').forEach(button => button.addEventListener('click', () => setLayout(button.dataset.layout)));
     ['yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter'].forEach(id => dom[id].addEventListener('change', () => {
+      state.boundaryHS=null;
       if (id === 'yearFilter') populateFiscalMonths();
-      if (id === 'districtFilter') repopulateLocationFilters('district');
-      if (id === 'tambonFilter') repopulateLocationFilters('tambon');
+      if (id === 'districtFilter'){dom.tambonFilter.value='';dom.villageFilter.value='';repopulateLocationFilters('district');}
+      if (id === 'tambonFilter'){dom.villageFilter.value='';repopulateLocationFilters('tambon');}
       applyFilters();
     }));
     dom.searchFilter.addEventListener('input', debounce(applyFilters, 180));
@@ -69,7 +70,8 @@
     dom.loadMore.addEventListener('click', () => { state.visible += PAGE_SIZE; renderList(); });
     dom.summaryLevel.addEventListener('change', renderSummary);
     if(dom.startMonthFilter){[dom.startMonthFilter,dom.endMonthFilter].forEach(input=>input.addEventListener('change',()=>{syncPeriodLegacy();applyFilters();}));dom.resetPeriod.onclick=()=>{const period=HSPeriod.defaults(scopedRows());dom.startMonthFilter.value=period.startMonth;dom.endMonthFilter.value=period.endMonth;syncPeriodLegacy();applyFilters();};dom.quickProvinceFilter.onchange=()=>{const source=$('provinceFilter');source.value=dom.quickProvinceFilter.value;source.dispatchEvent(new Event('change'));};}
-    dom.summaryDistrict.addEventListener('change',()=>{if(nationalMode){dom.districtFilter.value=dom.summaryDistrict.value;repopulateLocationFilters('district');applyFilters();}else renderSummary();}); dom.summaryYear.addEventListener('change',()=>{if(nationalMode){dom.yearFilter.value=dom.summaryYear.value;populateFiscalMonths();if(dom.startMonthFilter){dom.startMonthFilter.value=dom.summaryYear.value?HSFiscal.start(dom.summaryYear.value):'';dom.endMonthFilter.value=dom.summaryYear.value?HSFiscal.months(dom.summaryYear.value).at(-1):'';}applyFilters();}else renderSummary();});
+    dom.summaryDistrict.addEventListener('change',()=>{if(nationalMode){state.boundaryHS=null;dom.districtFilter.value=dom.summaryDistrict.value;dom.tambonFilter.value='';dom.villageFilter.value='';repopulateLocationFilters('district');if(dom.summaryTambon)dom.summaryTambon.value='';applyFilters();}else renderSummary();}); dom.summaryYear.addEventListener('change',()=>{if(nationalMode){dom.yearFilter.value=dom.summaryYear.value;populateFiscalMonths();if(dom.startMonthFilter){dom.startMonthFilter.value=dom.summaryYear.value?HSFiscal.start(dom.summaryYear.value):'';dom.endMonthFilter.value=dom.summaryYear.value?HSFiscal.months(dom.summaryYear.value).at(-1):'';}applyFilters();}else renderSummary();});
+    if(dom.summaryTambon)dom.summaryTambon.addEventListener('change',()=>{state.boundaryHS=null;dom.tambonFilter.value=dom.summaryTambon.value;dom.villageFilter.value='';repopulateLocationFilters('tambon');applyFilters();});
     dom.summaryReset.addEventListener('click',()=>{dom.summaryDistrict.value='';dom.summaryLevel.value='province';if(nationalMode)resetFilters();else renderSummary();});
     dom.printReportButton.addEventListener('click',openSummaryReport);
     dom.refreshDataButton.addEventListener('click',refreshSharedData);
@@ -98,6 +100,22 @@
     document.querySelectorAll('[data-admin-action]').forEach(button => button.addEventListener('click', () => runAdminAction(button.dataset.adminAction, button)));
     window.addEventListener('online', () => { toast('กลับมาออนไลน์แล้ว'); refreshOutboxCount(); });
     window.addEventListener('offline', () => toast('ออฟไลน์ — งานที่ส่งไม่สำเร็จจะเก็บไว้', true));
+  }
+
+  function provinceChanged(){
+    state.boundaryHS=null;state.selected=null;state.detailRequest=(state.detailRequest||0)+1;
+    dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';if(dom.summaryTambon)dom.summaryTambon.value='';
+    if(!state.authValidated||!state.token||sessionExpired()){state.loadRevision=(state.loadRevision||0)+1;state.all=[];state.filtered=[];state.dataLoaded=false;state.periodInitialized=false;populateFilters();applyFilters();applyRoleUI();void loadData();}
+    else{populateFilters();applyFilters();}
+  }
+  function updateProvinceGate(){
+    if(!nationalMode)return;const publicView=!(state.authValidated&&state.token&&!sessionExpired()),pending=publicView&&!HSNationUI.selectedProvinceCode;
+    const gate=$('publicProvinceGate'),slot=$('publicProvinceSlot'),context=$('managerProvinceContext');
+    if(gate)gate.hidden=!publicView;
+    if(context){if(publicView&&slot&&context.parentElement!==slot)slot.append(context);else if(!publicView&&dom.adminProtected&&context.parentElement!==dom.adminProtected)dom.adminProtected.prepend(context);context.hidden=!(publicView||['admin','super_admin'].includes(state.profile?.role));}
+    const content=$('summaryContent'),prompt=$('summaryProvincePrompt');if(content)content.hidden=pending;if(prompt)prompt.hidden=!pending;
+    if(dom.printReportButton)dom.printReportButton.disabled=pending;
+    const message=$('provinceSelectionMessage');if(message)message.textContent=pending?'เลือกจังหวัดก่อน ระบบจะแสดงจุดความร้อนและสรุปผลเฉพาะจังหวัดที่เลือก':'กำลังแสดงข้อมูลเฉพาะจังหวัด'+(HSNational.provinces[HSNationUI.selectedProvinceCode]||'ที่เลือก');
   }
 
   function switchView(name) {
@@ -138,7 +156,7 @@
       const terrain=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri and contributors'});
       if(L.control?.layers)L.control.layers({'ถนน':streets,'ดาวเทียม':satellite,'ภูมิประเทศ':terrain},{},{collapsed:true}).addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
-      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired())});state.boundaries.sync();}
+      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),selectedProvince:()=>nationalMode?HSNationUI.selectedProvinceCode:'62',activeArea:()=>({provinceCode:nationalMode?HSNationUI.selectedProvinceCode:'62',district:dom.districtFilter.value,tambon:dom.tambonFilter.value,hs:state.boundaryHS||null})});state.boundaries.sync();}
     } catch (error) { showMapFallback('เบราว์เซอร์นี้เปิดแผนที่ไม่ได้'); }
   }
 
@@ -152,10 +170,11 @@
     setLoading(true);
     dom.liveError.hidden = true;
     try {
+      if(typeof HSNationUI!=='undefined'&&(!state.token||sessionExpired())&&!HSNationUI.selectedProvinceCode){state.all=[];state.filtered=[];state.dataLoaded=false;state.boundaryHS=null;HSNationUI.sync();populateFilters();applyRoleUI();if(typeof applyFilters==='function')applyFilters();else renderAll();dom.dataSourceLabel.textContent='กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน';return;}
       if (state.endpoint) {
         let info=null,data=null;state.usedCache=false;
-        if(typeof HSDataCache!=='undefined'){try{info=await api('getDatasetInfo',{});if(!force){const rows=await HSDataCache.read(info);if(rows){data={hotspots:{items:rows},config:info.config};state.usedCache=true;}}}catch(error){if(error.code==='UNAUTHORIZED'||error.code==='PROVINCE_UNASSIGNED')throw error;}}
-        if(!data){data=await api('bootstrap',{filters:{}});if(loadToken!==state.token||loadRevision!==state.loadRevision)return;if(info&&typeof HSDataCache!=='undefined')await HSDataCache.write(info,extractRows(data)||[]);}
+        if(typeof HSDataCache!=='undefined'){try{info=await api('getDatasetInfo',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:''});if(!force){const rows=await HSDataCache.read(info);if(rows){data={hotspots:{items:rows},config:info.config};state.usedCache=true;}}}catch(error){if(error.code==='UNAUTHORIZED'||error.code==='PROVINCE_UNASSIGNED')throw error;}}
+        if(!data){data=await api('bootstrap',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'',filters:{}});if(loadToken!==state.token||loadRevision!==state.loadRevision)return;if(info&&typeof HSDataCache!=='undefined')await HSDataCache.write(info,extractRows(data)||[]);}
         if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
         const rows = extractRows(data);
         if (!Array.isArray(rows)) throw new Error('เซิร์ฟเวอร์ส่งรูปแบบรายการ HS ไม่ถูกต้อง');
@@ -229,7 +248,7 @@
     fillSelect(dom.summaryYear,fiscalYears,'ทุกปีงบประมาณ');
     fillSelect(dom.summaryDistrict,unique(scopedRows().map(x=>x.district)).sort(locale),'ทั้งจังหวัด · ทุกอำเภอ');
     repopulateLocationFilters('district');
-    if(nationalMode){const overview=!HSNationUI.selectedProvinceCode;[dom.districtFilter,dom.tambonFilter,dom.villageFilter,dom.summaryDistrict].forEach(e=>{e.disabled=overview;if(overview)e.value='';});}
+    if(nationalMode){const overview=!HSNationUI.selectedProvinceCode;[dom.districtFilter,dom.tambonFilter,dom.villageFilter,dom.summaryDistrict,dom.summaryTambon].filter(Boolean).forEach(e=>{e.disabled=overview;if(overview)e.value='';});}
   }
 
   function populateFiscalMonths(preferred) {
@@ -275,13 +294,14 @@
         (!f.crop || x.plantType === f.crop) && (!f.status || x.status === f.status) &&
         (!f.result || result === f.result) && (!f.search || haystack.includes(f.search));
     });
-    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=source.disabled;}dom.summaryDistrict.value=dom.districtFilter.value;dom.summaryYear.value=dom.yearFilter.value;}
+    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=source.disabled;}dom.summaryDistrict.value=dom.districtFilter.value;if(dom.summaryTambon){fillSelect(dom.summaryTambon,unique(scopedRows().filter(x=>!dom.districtFilter.value||x.district===dom.districtFilter.value).map(x=>x.tambon)).sort(locale),'ทุกตำบล');dom.summaryTambon.value=dom.tambonFilter.value;}dom.summaryYear.value=dom.yearFilter.value;}
     const hint=$('fiscalPeriodHint');if(hint)hint.textContent=f.year?`ปีงบประมาณ ${f.year} · ตั้งแต่ตุลาคม ${Number(f.year)-1} ถึง ${f.month?MONTHS[Number(f.month.slice(5))-1]+' '+(Number(f.month.slice(0,4))+543):'กันยายน '+f.year}${state.filtered.length?'':' · ยังไม่มีข้อมูลในช่วงและขอบเขตนี้'}`:'แสดงข้อมูลทุกปีงบประมาณ';
     if(dom.startMonthFilter){const periodHint=$('periodRangeHint');if(periodHint)periodHint.textContent=HSPeriod.error(f.startMonth,f.endMonth)||HSPeriod.label(f.startMonth,f.endMonth)+(state.filtered.length?'':' · ไม่พบข้อมูลในช่วงที่เลือก');}
-    renderAll();
+    state.boundaries?.sync();renderAll();
   }
 
   function resetFilters() {
+    state.boundaryHS=null;
     ['yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter'].forEach(id => dom[id].value = '');
     if(dom.startMonthFilter){dom.startMonthFilter.value='';dom.endMonthFilter.value='';}
     dom.selectionContext.hidden=true; repopulateLocationFilters('district'); applyFilters();
@@ -291,7 +311,7 @@
 
   function renderList() {
     const items = state.filtered.slice(0,state.visible);
-    if (!items.length) dom.hotspotList.innerHTML = nationalMode&&!scopedRows().length ? '<div class="empty-state"><strong>ยังไม่มีข้อมูล HS ที่อ่านได้ในจังหวัดนี้</strong><br>จังหวัดนี้อาจยังไม่นำเข้าหรือยังไม่เผยแพร่ · ไม่แสดงจุดจากจังหวัดอื่นแทน</div>' : '<div class="empty-state"><strong>ไม่พบจุดที่ตรงกับตัวกรอง</strong><br>ลองล้างหรือเปลี่ยนตัวกรอง</div>';
+    if (!items.length) dom.hotspotList.innerHTML = nationalMode&&!HSNationUI.selectedProvinceCode&&(!state.authValidated||!state.token)?'<div class="empty-state">กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน</div>':nationalMode&&!scopedRows().length ? '<div class="empty-state"><strong>ยังไม่มีข้อมูล HS ที่อ่านได้ในจังหวัดนี้</strong><br>จังหวัดนี้อาจยังไม่นำเข้าหรือยังไม่เผยแพร่ · ไม่แสดงจุดจากจังหวัดอื่นแทน</div>' : '<div class="empty-state"><strong>ไม่พบจุดที่ตรงกับตัวกรอง</strong><br>ลองล้างหรือเปลี่ยนตัวกรอง</div>';
     else dom.hotspotList.replaceChildren(...items.map(hotspotCard));
     dom.loadMore.hidden = state.visible >= state.filtered.length;
     if (!dom.loadMore.hidden) dom.loadMore.textContent = `แสดงเพิ่ม (เหลือ ${(state.filtered.length-state.visible).toLocaleString('th-TH')})`;
@@ -322,6 +342,8 @@
 
   function renderSummary() {
     if (!dom.summaryStats) return;
+    if(nationalMode)updateProvinceGate();
+    if(nationalMode&&(!state.authValidated||!state.token||sessionExpired())&&!HSNationUI.selectedProvinceCode){dom.summaryStats.innerHTML='';dom.summaryBody.innerHTML='';return;}
     if(nationalMode){const hint=document.getElementById('summaryScopeHint');if(hint)hint.textContent=[HSNationUI.scope(),dom.startMonthFilter?HSPeriod.label(dom.startMonthFilter.value,dom.endMonthFilter.value):'ปีงบประมาณ '+(dom.yearFilter.value||'ทุกปี'),dom.monthFilter.value?'ถึงเดือน '+dom.monthFilter.value:'ถึงสิ้นปีงบประมาณ',dom.districtFilter.value,dom.tambonFilter.value,dom.villageFilter.value,dom.cropFilter.value,dom.statusFilter.value,dom.resultFilter.value].filter(Boolean).join(' · ');}
     const summaryRows = nationalMode?state.filtered:state.all.filter(x=>(!dom.summaryDistrict.value || x.district===dom.summaryDistrict.value)&&(!dom.summaryYear.value || String(x.datasetYearBe)===dom.summaryYear.value));
     const isConfirmed=x=>x.status==='verified' && ['burned','not_burned'].includes(x.verification?.result);
@@ -380,10 +402,11 @@
   }
 
   function openVerify(item) {
+    if(nationalMode)HSNationUI.selectProvince(item.provinceCode);
+    state.boundaryHS=item;state.boundaries?.sync();
     if(state.usedCache&&state.endpoint&&state.authValidated&&!item.detailsLoaded){const token=state.token,request=state.detailRequest=(state.detailRequest||0)+1;toast('กำลังอ่านรายละเอียดจุดความร้อน…');api('getHS',{hsId:item.hsId}).then(data=>{if(token!==state.token||request!==state.detailRequest)return;const full=normalizeHS(data?.hotspot||data?.item||data);full.detailsLoaded=true;const index=state.all.findIndex(x=>x.hsId===full.hsId);if(index>=0)state.all[index]=full;openVerify(full);}).catch(error=>toast('ยังเปิดบันทึกไม่ได้: '+friendlyError(error),true));return;}
 
-    if(nationalMode&&(!state.authValidated||!state.token||sessionExpired()))return toast('การดูข้อมูลไม่ต้องเข้าสู่ระบบ การบันทึกผลต้องเข้าสู่ระบบก่อน',true);
-    if(nationalMode)HSNationUI.selectProvince(item.provinceCode);
+    if(nationalMode&&(!state.authValidated||!state.token||sessionExpired())){syncFiltersFromHs(item);return toast('การดูข้อมูลไม่ต้องเข้าสู่ระบบ การบันทึกผลต้องเข้าสู่ระบบก่อน',true);}
     syncFiltersFromHs(item);
     state.selected = item; state.photos = []; state.location = null; dom.importPhotoInput.value="";
     dom.verifyForm.reset(); dom.noteCount.textContent = '0/500'; dom.verifyMessage.textContent = '';
@@ -588,7 +611,7 @@
 
   function applyRoleUI() {
     if(typeof HSThaiPeriod!=='undefined')HSThaiPeriod.sync(state.all);
-    const managerArea=$('managerProvinceContext');if(managerArea)managerArea.hidden=!(state.authValidated&&state.token&&['admin','super_admin'].includes(state.profile?.role)&&!sessionExpired());
+    updateProvinceGate();
     state.boundaries?.sync();
     if(typeof HSAdminAccounts!=='undefined')HSAdminAccounts.update();
     if(nationalMode){HSNationUI.sync();document.querySelectorAll('#workspaceSettingsCard,#fileImportCard,[data-admin-action=sync]').forEach(e=>e.style.display='none');}

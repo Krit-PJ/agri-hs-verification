@@ -76,3 +76,10 @@ function checkRuntimeV27(){
  const result={version:APP.VERSION,privacyConfigured:policy.configured,registrationMode:policy.registrationMode,provincialAdminApproval:'super_admin_only',adminRequestsSheetReady:Boolean(getSpreadsheet_().getSheetByName(APP.SHEETS.ADMIN_REGISTRATIONS)),requestLocalReadMemo:true};
  console.log(JSON.stringify(result));return result;
 }
+
+/** Read-only diagnostic: no schema/account/data mutations. */
+function checkRuntimeV28(){
+ beginRepositoryRequest_();const policy=getRegistrationPolicy_(),empty=nationalPublicRead_({});
+ const result={version:APP.VERSION,privacyConfigured:policy.configured,publicRequiresProvince:true,unselectedPublicHs:empty.hotspots.items.length,teamEditorRole:'super_admin',provinceAdminScope:true};
+ console.log(JSON.stringify(result));return result;
+}

@@ -5,7 +5,7 @@ function getTeam_(){
   return {revision:0,members:[{id:'developer-kitti',name:'ดร. กิตติ  โพธิ์จวง',position:'ผู้พัฒนาระบบ',agency:'กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร'}]};
 }
 function saveTeam_(actor,payload){
-  requireAdmin_(actor);
+  requireSuperAdmin_(actor);
   const member=payload.member||{};
   const entry={id:cleanText_(member.id,80),name:cleanText_(member.name,150),position:cleanText_(member.position,200),agency:cleanText_(member.agency,250)};
   assert_(entry.id && entry.name && entry.position && entry.agency,'VALIDATION_ERROR','กรุณากรอกชื่อ ตำแหน่ง และสังกัดให้ครบ');
