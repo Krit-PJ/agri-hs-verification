@@ -54,7 +54,7 @@ function registerProvincialAdmin_(payload) {
     const props=PropertiesService.getScriptProperties(),key='AUTH_ACCOUNT_V2_'+username;
     props.setProperty(key,JSON.stringify(account));
     try {appendObject_(APP.SHEETS.ADMIN_REGISTRATIONS,row);} catch(error) {props.deleteProperty(key);throw error;}
-    return {registrationId:id,status:'pending',message:'ส่งคำขอแล้ว รอ Super Admin อนุมัติก่อนเข้าสู่ระบบ'};
+    return {registrationId:id,status:'pending',message:'ลงทะเบียนสำเร็จ รอการอนุมัติจากผู้ดูแลระบบ (Super Admin)'};
   });
 }
 

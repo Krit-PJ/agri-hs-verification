@@ -83,3 +83,10 @@ function checkRuntimeV28(){
  const result={version:APP.VERSION,privacyConfigured:policy.configured,publicRequiresProvince:true,unselectedPublicHs:empty.hotspots.items.length,teamEditorRole:'super_admin',provinceAdminScope:true};
  console.log(JSON.stringify(result));return result;
 }
+
+/** Read-only registration readiness: no identity details, account writes or approvals. */
+function diagnoseRegistrationReadinessV29(){
+ beginRepositoryRequest_();const p=PropertiesService.getScriptProperties(),a=p.getProperties(),accounts=readAuthAccounts_(),book=getSpreadsheet_();
+ const r={version:APP.VERSION,policyReady:getRegistrationPolicy_().configured,accountCount:Object.keys(accounts).length,propertyBytes:Object.keys(a).reduce(function(n,k){return n+unescape(encodeURIComponent(k+String(a[k]))).length;},0),accountLimit:Number(p.getProperty('REGISTRATION_MAX_ACCOUNTS')||200),superAdminApprovalLevels:['inspector','provincial_admin'],sheets:[]};
+ [APP.SHEETS.REGISTRATIONS,APP.SHEETS.ADMIN_REGISTRATIONS].forEach(function(name){const sheet=book.getSheetByName(name),head=APP.HEADERS[name];r.sheets.push({name:name,exists:!!sheet,rows:sheet?Math.max(0,sheet.getLastRow()-1):0,headersMatch:!!sheet&&sheet.getRange(1,1,1,head.length).getDisplayValues()[0].join('|')===head.join('|')});});console.log(JSON.stringify(r));return r;
+}

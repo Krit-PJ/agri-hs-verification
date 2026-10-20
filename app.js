@@ -668,16 +668,23 @@
     } catch(error){setMessage(dom.importMessage,friendlyError(error),'error');dom.confirmFileImport.disabled=false;}
   }
 
+  async function apiTransport(action,envelope) {
+    const bounded=['register','registerProvincialAdmin','getRegistrationPolicy'].includes(action);
+    const controller=bounded&&typeof AbortController!=='undefined'?new AbortController():null;
+    let timer;
+    const request=(async()=>{try{const response=await fetch(state.endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(envelope),redirect:'follow',...(controller?{signal:controller.signal}:{})});return {response,text:await response.text()};}catch(error){if(error?.name==='AbortError')throw error;throw new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้ โปรดตรวจอินเทอร์เน็ตและลองใหม่');}})();
+    if(!bounded)return request;
+    const timeout=new Promise((resolve,reject)=>{timer=setTimeout(()=>{const error=new Error(action==='getRegistrationPolicy'?'โหลดประกาศไม่สำเร็จภายในเวลาที่กำหนด กรุณาลองเปิดลงทะเบียนใหม่':'การเชื่อมต่อใช้เวลานาน ระบบอาจได้รับคำขอแล้ว กรุณาให้ผู้ดูแลตรวจสถานะก่อนส่งซ้ำ');error.code='REQUEST_TIMEOUT';reject(error);controller?.abort();},action==='getRegistrationPolicy'?30000:90000);});
+    try{return await Promise.race([request,timeout]);}finally{clearTimeout(timer);}
+  }
+
   async function api(action,payload={},requestId) {
     if(phoneDemoMode)throw new Error('โหมดตัวอย่างเบอร์โทรไม่เชื่อม API และไม่อนุญาตการบันทึกข้อมูลจริง');
     if(previewMode)return HSPreview.api(action,payload,requestId);
     if (!state.endpoint) throw new Error('ยังไม่ได้ตั้งค่า URL ของ API');
     const envelope = { action,payload,token:state.token || undefined,csrf:state.csrf || undefined };
     if (requestId) envelope.requestId = requestId;
-    let response;
-    try { response = await fetch(state.endpoint,{ method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(envelope),redirect:'follow' }); }
-    catch (_) { throw new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้ โปรดตรวจอินเทอร์เน็ตและ URL'); }
-    const text = await response.text();
+    const {response,text}=await apiTransport(action,envelope);
     let body; try { body = JSON.parse(text); } catch (_) { throw new Error(`เซิร์ฟเวอร์ตอบกลับไม่ใช่ JSON (${response.status})`); }
     if (!response.ok || body.ok !== true) {
       const error = new Error(body?.error?.message || `เซิร์ฟเวอร์ปฏิเสธคำขอ (${response.status})`); error.code = body?.error?.code; error.details = body?.error?.details; if(state.token&&['UNAUTHORIZED','PROVINCE_UNASSIGNED'].includes(error.code) && !['login','loginPhone','recordVisit','getCounters','getRegistrationPolicy','register','getTeam'].includes(action)){if(error.code==='UNAUTHORIZED')clearSession();state.all=[];state.filtered=[];state.serverConfig=null;applyRoleUI();renderAll();} throw error;

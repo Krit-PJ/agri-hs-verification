@@ -22,7 +22,7 @@ function registerUser_(payload) {
     const row={registration_id:id,phone:phone,full_name:name,position:position,agency_level:level,agency:savedAgency,province_code:code,district:level==='district'?district:'',privacy_version:REGISTRATION_PRIVACY_VERSION_,privacy_acknowledged_at:now,status:'pending',created_at:now,reviewed_at:'',reviewed_by:''};
     setupPhoneOnlyInspectorAccount_(phone,{displayName:name,phone:phone,assignedProvinceCode:code,agencyLevel:level,district:row.district,position:position,agency:savedAgency});
     try {appendObject_(APP.SHEETS.REGISTRATIONS,row);} catch(error) {PropertiesService.getScriptProperties().deleteProperty('AUTH_ACCOUNT_V2_'+phone);throw error;}
-    return {registrationId:id,status:'pending',message:'ลงทะเบียนสำเร็จ รอผู้ดูแลจังหวัดอนุมัติก่อนเข้าสู่ระบบ'};
+    return {registrationId:id,status:'pending',message:'ลงทะเบียนสำเร็จ รอการอนุมัติจากผู้ดูแลระบบ'};
   });
 }
 function registrationCanManage_(actor,row){return actor.role==='super_admin'||actor.role==='admin'&&nationalAuthorized_(actor).indexOf(cleanText_(row.province_code))>=0;}

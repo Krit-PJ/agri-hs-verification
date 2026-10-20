@@ -97,3 +97,22 @@ test('public registration endpoint and authenticated review routes enforce Super
  assert.equal(post('approveProvincialAdminRequest',{registrationId:r.data.registrationId},{token:s.token}).error.code,'CSRF_INVALID');
  assert.equal(post('approveProvincialAdminRequest',{registrationId:r.data.registrationId},{token:s.token,csrf:s.csrf}).data.status,'approved');
 });
+function useActualRepository(c){
+ const sheets=new Map(),formats=[];const headers=vm.runInContext('APP.HEADERS',c);
+ for(const [name,head] of Object.entries(headers))sheets.set(name,{values:[Array.from(head)],width:26});
+ const sheet=name=>{const data=sheets.get(name);if(!data)return null;return {getLastRow:()=>data.values.length,getLastColumn:()=>Math.max(...data.values.map(r=>r.length)),getMaxColumns:()=>data.width,insertColumnsAfter:(n,add)=>data.width+=add,setFrozenRows(){},getRange:(r,col,height,width)=>({getValues:()=>Array.from({length:height},(_,i)=>Array.from({length:width},(_,j)=>data.values[r-1+i]?.[col-1+j]??'')),getDisplayValues:()=>Array.from({length:height},(_,i)=>Array.from({length:width},(_,j)=>String(data.values[r-1+i]?.[col-1+j]??''))),setValues(rows){rows.forEach((row,i)=>{data.values[r-1+i]??=[];row.forEach((value,j)=>data.values[r-1+i][col-1+j]=value);});},setNumberFormat(f){formats.push({name,col,format:f});},setFontWeight(){}})};};
+ const book={getSheetByName:sheet,insertSheet(name){sheets.set(name,{values:[],width:26});return sheet(name);}};
+ c.SpreadsheetApp={openById:()=>book,getActiveSpreadsheet:()=>book};vm.runInContext(fs.readFileSync('apps-script/Repository.gs','utf8'),c);c.beginRepositoryRequest_();return{sheets,formats};
+}
+test('both registration APIs persist pending requests with actual repository and preserve phone text',()=>{
+ const {c}=setup(),repo=useActualRepository(c);const notice='2026-10-v2';
+ const inspector=c.doPost({postData:{contents:JSON.stringify({action:'register',payload:{phone:'0841157666',fullName:'Local test',position:'Officer',agencyLevel:'province',provinceCode:'50',privacyVersion:notice,privacyAcknowledged:true}})}});
+ assert.equal(inspector.ok,true,JSON.stringify(inspector.error));assert.equal(inspector.data.status,'pending');assert.match(inspector.data.message,/รอการอนุมัติจากผู้ดูแลระบบ/);assert.equal(repo.sheets.get('User_Registration').values[1][1],'0841157666');assert.ok(repo.formats.some(f=>f.name==='User_Registration'&&f.format==='@'));
+ const admin=c.doPost({postData:{contents:JSON.stringify({action:'registerProvincialAdmin',payload:input})}});assert.equal(admin.ok,true,JSON.stringify(admin.error));assert.equal(admin.data.status,'pending');assert.match(admin.data.message,/รอการอนุมัติจากผู้ดูแลระบบ/);assert.equal(repo.sheets.get('Admin_Registration').values[1][1],input.phone);
+ assert.throws(()=>c.loginPhone_({phone:'0841157666'}),e=>e.code==='UNAUTHORIZED');assert.throws(()=>c.login_({username:input.username,password:input.password}),e=>e.code==='UNAUTHORIZED');
+});
+test('Super Admin can review inspector and provincial Admin requests in any province; provincial Admin cannot expand scope',()=>{
+ const {c}=setup();useActualRepository(c);const superAdmin={id:'test-super',role:'super_admin'};
+ for(const [phone,code] of [['0841157666','50'],['0899999999','62']]){const saved=c.registerUser_({phone,fullName:'Local test',position:'Officer',agencyLevel:'province',provinceCode:code,privacyVersion:'2026-10-v2',privacyAcknowledged:true});assert.throws(()=>c.reviewRegistration_({role:'admin',assignedProvinceCode:code==='50'?'62':'50'},{registrationId:saved.registrationId},true),e=>e.code==='FORBIDDEN');c.reviewRegistration_(superAdmin,{registrationId:saved.registrationId},true);assert.equal(c.loginPhone_({phone}).profile.assignedProvinceCode,code);}
+ const admin=c.registerProvincialAdmin_(input);assert.throws(()=>c.reviewProvincialAdminRequest_({role:'admin',assignedProvinceCode:'62'},{registrationId:admin.registrationId},true),e=>e.code==='FORBIDDEN');assert.ok(c.listProvincialAdminRequests_(superAdmin,{status:'pending'}).items.length);c.reviewProvincialAdminRequest_(superAdmin,{registrationId:admin.registrationId},true);assert.equal(c.login_({username:input.username,password:input.password}).profile.role,'admin');
+});

@@ -4,13 +4,13 @@ function doGet() {
 
 function doPost(event) {
   if(typeof beginRepositoryRequest_==='function')beginRepositoryRequest_();
-  let requestId = '';
+  let requestId = '', requestAction = '';
   try {
     const raw = event && event.postData ? String(event.postData.contents || '') : '';
     assert_(raw.length > 0 && raw.length <= APP.MAX_BODY_CHARS, 'INVALID_REQUEST', 'คำขอว่างหรือมีขนาดใหญ่เกินไป');
     const envelope = parseJsonObject_(raw);
     requestId = cleanText_(envelope.requestId, 64);
-    const action = cleanText_(envelope.action, 64);
+    const action = cleanText_(envelope.action, 64);requestAction=action;
     assert_(action, 'INVALID_REQUEST', 'ต้องระบุ action');
     const payload = envelope.payload == null ? {} : envelope.payload;
     assert_(payload && typeof payload === 'object' && !Array.isArray(payload), 'INVALID_REQUEST', 'payload ต้องเป็น object');
@@ -37,6 +37,7 @@ function doPost(event) {
     const data = dispatch_(actor, action, requestId, payload);
     return outputJson_({ok: true, requestId: requestId, data: data});
   } catch (error) {
+    console.warn(JSON.stringify({event:'api_error',action:requestAction,code:error&&error.code||'INTERNAL_ERROR',version:APP.VERSION}));
     return outputJson_({ok: false, requestId: requestId, error: publicError_(error)});
   }
 }
