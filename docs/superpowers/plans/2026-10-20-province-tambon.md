@@ -8,8 +8,7 @@ Spec: User request2026-10-20 (five requirements); other UI/navigation/auth/PDPA 
 - [x] Backend: selected public actor factory; scope public bootstrap/metadata/boundary config; require Super Admin to save team; version2.8; regression tests. No live account changes.
 - [x] Boundary module: automatic province/district/tambon focus from selection/HS coordinates with stale request guards; public selected geometry visible; preserve inspector/Admin scope and bounded lazy loading. Behavioral tests.
 - [x] Frontend: mandatory public province selector, no preselected province, clear map/summary on change; payload propagation and stale data guards; district/tambon summary filters; Super-only team controls; tests.
-- [ ] Review all contracts, full tests/syntax, browser validation; deploy Apps Script+GitHub and deliver ZIP with coverage/geometry limitations stated.
+- [x] Review all contracts, full tests/syntax, browser validation; deploy Apps Script+GitHub and deliver ZIP with coverage/geometry limitations stated.
 
 Contract: API getDatasetInfo/bootstrap accept payload.provinceCode for public. Missing selection => empty HS + no boundary geometry, no default62. Invalid/unpublished province => no HS, fail closed. Server publicProvinceCodes config tells available exposure scope. Backend enforce saveTeam Super-only. Boundary create env gets selection context via env.activeArea() (provinceCode,district,tambon,hs) and existing env.selectedProvince(); parent calls sync when area/HS changes. Admin/Super authenticated UI scopes remain assigned/all.
 Review: cache cross-province mix, province changes while loading, incomplete boundaries, duplicate tambon names across districts, coordinates disagreeing with declared area, direct API team edit, mobile rendering cost.
-

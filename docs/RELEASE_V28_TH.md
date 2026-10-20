@@ -20,3 +20,4 @@ The map retains viewport/zoom controls, cache limits, lazy province loading and 
 Full Node tests, combined Apps Script syntax, direct API missing/selected province checks, and rendered browser checks of no-choice gating, district/tambon summary and actual HS boundary focus. No real accounts or approvals modified during testing.
 
 Apps Script deployed 2026-10-20: deployment version 10, runtime 2.8.0, existing endpoint retained. Read-only checkRuntimeV28 passed: privacyConfigured=true and unselectedPublicHs=0. Automated suite: 227 passed, 0 failed. Browser: Khlong Khlung / Wang Khaem summary=10 HS, coordinate-containing tambon highlighted.
+Live verification: GitHub Pages run 39443181375 succeeded for 5d5cae9. Production API bootstrap returned 0 HS without province, 593 for 62, and 0 for unpublished 50. Live summary Khlong Khlung / Wang Khaem returned 10; clicking HS highlighted its coordinate-containing tambon. No browser console errors observed.
