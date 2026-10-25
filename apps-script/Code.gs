@@ -19,6 +19,7 @@ function doPost(event) {
     if (action === 'getRegistrationPolicy') return outputJson_({ok:true,requestId:requestId,data:getRegistrationPolicy_()});
     if (action === 'register') return outputJson_({ok:true,requestId:requestId,data:registerUser_(payload)});
     if (action === 'registerProvincialAdmin') return outputJson_({ok:true,requestId:requestId,data:registerProvincialAdmin_(payload)});
+    if (action === 'getTeamPhoto') return outputJson_({ok:true,requestId:requestId,data:getTeamPhoto_(payload)});
     if (action === 'getTeam') return outputJson_({ok:true,requestId:requestId,data:getTeam_()});
     if (action === 'login') {
       return outputJson_({ok: true, requestId: requestId, data: login_(payload)});

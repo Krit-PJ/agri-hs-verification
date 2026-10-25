@@ -14,3 +14,6 @@ test-v27.log
 test-v271.log
 test-v28.log
 test-v28-focus.log
+
+# Private deployment source snapshots
+docs/AppsScript-before-*.json

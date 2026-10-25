@@ -1,21 +1,21 @@
-/* Public team directory with server-authorized edits. No credentials or private profile fields. */
-function getTeam_(){
-  const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_TEAM_V1');
-  if(raw){const value=JSON.parse(raw);assert_(Array.isArray(value.members),'CONFIG_ERROR','ข้อมูลทีมไม่ถูกต้อง');return value;}
-  return {revision:0,members:[{id:'developer-kitti',name:'ดร. กิตติ  โพธิ์จวง',position:'ผู้พัฒนาระบบ',agency:'กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร'}]};
-}
+/* Public directory; photo reads resolve only registered team portraits, never arbitrary Drive IDs. */
+function teamDirectory_(){const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_TEAM_V1');if(raw){const d=JSON.parse(raw);assert_(Array.isArray(d.members),'CONFIG_ERROR','ข้อมูลทีมไม่ถูกต้อง');return d;}return {revision:0,members:[{id:'developer-kitti',name:'ดร. กิตติ  โพธิ์จวง',position:'ผู้พัฒนาระบบ',agency:'กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร'}]};}
+function getTeam_(){const d=teamDirectory_();return {revision:d.revision,capabilities:{teamMedia:true},members:d.members.map(function(m){const item=Object.assign({},m);delete item.photoFileId;return item;})};}
+function teamLink_(value){const link=cleanText_(value);assert_(link.length<=600,'VALIDATION_ERROR','ลิงก์ต้องไม่เกิน 600 ตัวอักษร');if(!link)return '';assert_(/^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?(?:[/?#][^\s]*)?$/i.test(link)&&link.indexOf('\\')<0,'VALIDATION_ERROR','ลิงก์ภายนอกต้องเป็น HTTPS URL ที่ถูกต้องและไม่มีข้อมูลเข้าสู่ระบบ');return link;}
+function getTeamPhoto_(payload){const id=cleanText_(payload&&payload.memberId,80),photoId=cleanText_(payload&&payload.photoId,80),member=teamDirectory_().members.find(function(m){return m.id===id&&m.photoId===photoId;});assert_(member&&member.photoFileId,'NOT_FOUND','ไม่พบภาพบุคลากร');const blob=DriveApp.getFileById(member.photoFileId).getBlob(),bytes=blob.getBytes();assert_(bytes.length<=100000&&bytes.length>=4&&(bytes[0]&255)===255&&(bytes[1]&255)===216&&(bytes[2]&255)===255,'INVALID_PHOTO','ภาพไม่ถูกต้อง');return {mimeType:'image/jpeg',base64:Utilities.base64Encode(bytes),photoId:member.photoId};}
 function saveTeam_(actor,payload){
-  requireSuperAdmin_(actor);
-  const member=payload.member||{};
-  const entry={id:cleanText_(member.id,80),name:cleanText_(member.name,150),position:cleanText_(member.position,200),agency:cleanText_(member.agency,250)};
-  assert_(entry.id && entry.name && entry.position && entry.agency,'VALIDATION_ERROR','กรุณากรอกชื่อ ตำแหน่ง และสังกัดให้ครบ');
-  const lock=LockService.getScriptLock();assert_(lock.tryLock(10000),'CONFLICT','มีผู้แก้ไขข้อมูลอยู่ กรุณาลองใหม่');
-  try{
-    const directory=getTeam_();assert_(Number(payload.revision)===directory.revision,'CONFLICT','ข้อมูลทีมมีการเปลี่ยนแปลง กรุณาเปิดหน้าทีมใหม่แล้วบันทึกอีกครั้ง');
-    const index=directory.members.findIndex(function(item){return item.id===entry.id;});
-    if(index<0){assert_(directory.members.length<20,'VALIDATION_ERROR','รองรับบุคลากรไม่เกิน20รายการ');directory.members.push(entry);}else directory.members[index]=entry;
-    directory.revision+=1;
-    const json=JSON.stringify(directory);assert_(Utilities.newBlob(json).getBytes().length<8500,'VALIDATION_ERROR','ข้อมูลทีมมีขนาดใหญ่เกินพื้นที่จัดเก็บ');
-    PropertiesService.getScriptProperties().setProperty('PUBLIC_TEAM_V1',json);return directory;
-  }finally{lock.releaseLock();}
+ requireSuperAdmin_(actor);payload=payload||{};const member=payload.member||{};
+ const entry={id:cleanText_(member.id,80),name:cleanText_(member.name,150),position:cleanText_(member.position,200),agency:cleanText_(member.agency,250),role:cleanText_(member.role,120),externalUrl:teamLink_(member.externalUrl)};
+ assert_(entry.id&&entry.name&&entry.position&&entry.agency,'VALIDATION_ERROR','กรุณากรอกชื่อ ตำแหน่ง และสังกัดให้ครบ');
+ assert_(!(member.removePhoto===true&&member.photo),'VALIDATION_ERROR','เลือกแนบภาพใหม่หรือนำภาพออกอย่างใดอย่างหนึ่ง');let photoBytes=null;
+ if(member.photo){assert_(member.photo.mimeType==='image/jpeg'&&typeof member.photo.base64==='string'&&member.photo.base64.length<=133336&&/^[A-Za-z0-9+/]+={0,2}$/.test(member.photo.base64),'INVALID_PHOTO','ภาพต้องเป็น JPEG ไม่เกิน 100 KB');photoBytes=Utilities.base64Decode(member.photo.base64);assert_(photoBytes.length>=4&&photoBytes.length<=100000&&(photoBytes[0]&255)===255&&(photoBytes[1]&255)===216&&(photoBytes[2]&255)===255,'INVALID_PHOTO','ภาพ JPEG ไม่ถูกต้องหรือใหญ่เกิน 100 KB');}
+ const lock=LockService.getScriptLock();assert_(lock.tryLock(10000),'CONFLICT','มีผู้แก้ไขข้อมูลอยู่แล้ว กรุณาลองใหม่');let created=null;
+ try{const directory=teamDirectory_();assert_(Number(payload.revision)===directory.revision,'CONFLICT','ข้อมูลทีมมีการเปลี่ยนแปลง กรุณาเปิดหน้าทีมใหม่แล้วบันทึกอีกครั้ง');const index=directory.members.findIndex(function(m){return m.id===entry.id;}),old=index>=0?directory.members[index]:null;
+ if(index<0)assert_(directory.members.length<20,'VALIDATION_ERROR','รองรับบุคลากรไม่เกิน20รายการ');if(old){if(!Object.prototype.hasOwnProperty.call(member,'role'))entry.role=old.role||'';if(!Object.prototype.hasOwnProperty.call(member,'externalUrl'))entry.externalUrl=old.externalUrl||'';}
+ if(old&&old.photoFileId&&member.removePhoto!==true){entry.photoFileId=old.photoFileId;entry.photoId=old.photoId;}
+ if(photoBytes){const folder=getPhotoFolder_();assert_(folder.getSharingAccess()===DriveApp.Access.PRIVATE,'DRIVE_PRIVACY_ERROR','โฟลเดอร์รูปต้องเป็นส่วนตัวก่อนอัปโหลดภาพทีม');created=folder.createFile(Utilities.newBlob(photoBytes,'image/jpeg','team-'+uuid_()+'.jpg'));entry.photoFileId=created.getId();entry.photoId=uuid_();}
+ if(index<0)directory.members.push(entry);else directory.members[index]=entry;directory.revision+=1;const json=JSON.stringify(directory);assert_(Utilities.newBlob(json).getBytes().length<8500,'VALIDATION_ERROR','ข้อมูลทีมมีขนาดใหญ่เกินพื้นที่จัดเก็บ');PropertiesService.getScriptProperties().setProperty('PUBLIC_TEAM_V1',json);
+ // Superseded files remain private/recoverable; public reads require current directory membership.
+ return getTeam_();
+ }catch(error){if(created){try{created.setTrashed(true);}catch(_){}}throw error;}finally{lock.releaseLock();}
 }
