@@ -42,7 +42,6 @@
     HSField.init();
     if(typeof HSRegistration!=='undefined')HSRegistration.init({api,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),rows:()=>state.all,onLogin:()=>switchView('admin'),onPhoneLogin:loginPhoneInspector,onManagerLogin:loginManagerCredentials,onLogout:logoutAdmin,reload:loadData});
     if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.init({onLogout:logoutAdmin,onInspector:()=>{if(state.authValidated&&state.token&&!sessionExpired())switchView('work');else HSRegistration.openAccess('inspector');},onManager:()=>{if(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))switchView('admin');else HSRegistration.openAccess('manager');}});
-    HSTeam.init({preview:previewMode,api,identity:()=>state.token,getEndpoint:()=>previewMode?'local-preview':state.endpoint,canEdit:()=>Boolean(state.authValidated && state.token && !sessionExpired() && state.profile?.role==='super_admin')});
     if(previewMode)HSPreview.connect({filtered:()=>state.filtered,rows:()=>state.all,profile:()=>state.profile,role:p=>{state.profile=p;state.token=p.role==='public'?'':'LOCAL-PREVIEW-NO-NETWORK';state.authValidated=p.role!=='public';state.expiresAt='';applyRoleUI();if(state.dataLoaded){populateFilters();applyFilters();}}});
     if(typeof HSUsageUI!=='undefined')HSUsageUI.init({api,live:()=>Boolean(state.endpoint&&!phoneDemoMode&&!previewMode)});
     updateModeUI();
@@ -123,6 +122,7 @@
 
   function switchView(name) {
     if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.close();
+    if(name==='team'){window.open('https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/team.html','_blank','noopener,noreferrer');return;}
     if(name==='admin'&&!(state.authValidated&&state.token&&!sessionExpired()&&['admin','super_admin'].includes(state.profile?.role))&&typeof HSRegistration!=='undefined'){HSRegistration.openAccess('manager');return;}
     state.currentView=name;updateProvinceGate();
     document.querySelectorAll('.view').forEach(view => { const active = view.id === `${name}View`; view.classList.toggle('active', active); view.hidden = !active; });
@@ -130,7 +130,6 @@
     dom.mainNav.classList.remove('open'); dom.menuButton.setAttribute('aria-expanded','false');
     if (name === 'summary') renderSummary();
     if (name === 'admin') applyRoleUI();
-    if(name==='team')HSTeam.refresh();
     if (name === 'work' && state.map) setTimeout(() => state.map.invalidateSize(), 30);
   }
 

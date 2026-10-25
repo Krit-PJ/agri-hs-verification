@@ -1,3 +1,5 @@
+> Superseded by v2.11.1: use the external Team page and restored backend. Do not follow the version13 deployment steps below; see RELEASE_V2111_TH.md.
+
 # v2.11 — Team portraits, role and external profile link
 
 ## Changes

@@ -1,3 +1,5 @@
+รุ่นล่าสุด: [v2.11.1 — คืน Backend เดิม / ทีมภายนอก / Counter ชัดขึ้น](docs/RELEASE_V2111_TH.md)
+
 รุ่นล่าสุด: [v2.11 — ภาพ บทบาท และลิงก์บุคลากร; โปรดอ่านขั้นตอนเผยแพร่ Apps Script](docs/RELEASE_V211_TH.md)
 
 รุ่นล่าสุด: [v2.10 — ขอบเขตหลายจังหวัดและธีม Dashboard](docs/RELEASE_V210_TH.md)
