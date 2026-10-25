@@ -8,10 +8,11 @@
   <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="design-tokens.css?v=2.1">
-  <link rel="stylesheet" href="styles.css?v=2.9.1">
+  <link rel="stylesheet" href="design-tokens.css?v=2.10">
+  <link rel="stylesheet" href="styles.css?v=2.10">
   <link rel="stylesheet" href="registration.css?v=2.8">
   <link rel="stylesheet" href="boundaries.css?v=2.5">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600;700&amp;display=swap">
 </head>
 <body>
   <a class="skip-link" href="#main">ข้ามไปเนื้อหาหลัก</a>
@@ -29,7 +30,7 @@
     </div>
   </header>
 
-  <section hidden aria-label="พื้นที่และบัญชีผู้ใช้"><div class="province-context" id="managerProvinceContext" hidden><label>จังหวัดที่กำลังดู<select id="provinceFilter"></select></label><details class="coverage-details"><summary>รายละเอียดชุดข้อมูล</summary><p id="provinceCoverage" class="field-hint" role="status"></p></details></div><div id="accountDock"></div></section>
+  <section hidden aria-label="พื้นที่และบัญชีผู้ใช้"><div class="province-context" id="managerProvinceContext" hidden><label>จังหวัดที่กำลังดู<select id="provinceFilter"></select></label><div id="superScopeControls" class="super-scope" hidden><label>ขอบเขตการแสดงผล<select id="superScopeMode"><option value="single">จังหวัดเดียว</option><option value="multi">หลายจังหวัด</option><option value="all">ทุกจังหวัดที่มีข้อมูล</option></select></label><div id="superScopeChoices" hidden><label>จังหวัดที่ต้องการ<select id="superScopeProvinces" multiple size="5" aria-describedby="superScopeHelp"></select></label><small id="superScopeHelp">เลือกได้หลายรายการ แล้วกดใช้ขอบเขต</small></div><button id="applySuperScope" type="button" class="primary-button">ใช้ขอบเขต</button><p id="superScopeMessage" role="status" aria-live="polite"></p></div><details class="coverage-details"><summary>รายละเอียดชุดข้อมูล</summary><p id="provinceCoverage" class="field-hint" role="status"></p></details></div><div id="accountDock"></div></section>
   <nav id="mainNav" class="main-nav" aria-label="เมนูหลัก">
     <button class="nav-item active" data-view="work" type="button">ตรวจสอบจุดความร้อน</button>
     <button class="nav-item" data-view="summary" type="button">สรุปผลการตรวจสอบ</button>
@@ -211,7 +212,7 @@
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.8"></script><script src="data-source.js?v=2.1"></script>
+  <script src="national-core.js?v=2.1"></script><script src="national-ui.js?v=2.10"></script><script src="data-source.js?v=2.1"></script>
   <script src="evidence.js"></script>
   <script src="image-compression.js?v=2.4"></script>
   <script src="field-extension.js?v=2.4"></script>
@@ -220,11 +221,11 @@
   <script src="team.js"></script>
   <script src="fiscal-period.js?v=2.4"></script><script src="period-range.js?v=2.4"></script><script src="map-status.js?v=2.4"></script><script src="usage-ui.js?v=2.7.1"></script>
   <script src="registration-ui.js?v=2.9"></script>
-  <script src="boundaries.js?v=2.8.1"></script>
+  <script src="boundaries.js?v=2.10"></script>
   <script src="admin-accounts.js?v=2.6"></script><script src="thai-period-ui.js?v=2.6"></script><script src="dataset-cache.js?v=2.6"></script>
-  <script src="sheet-source.js?v=2.9.2"></script>
+  <script src="sheet-source.js?v=2.10"></script>
   <script src="site-settings.js?v=2.9.2"></script>
   <script src="access-navigation.js?v=2.8.1"></script>
-  <script src="app.js?v=2.9.2" defer></script>
+  <script src="app.js?v=2.10" defer></script>
 </body>
 </html>

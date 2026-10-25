@@ -54,9 +54,9 @@ var HSBoundaries = (() => {
     if(level==='subdistrict' && tambon && !district && found.length>1) return {features:[],source:'selection',mismatch:false,reason:'ambiguous'};
     return {features:found,source:'selection',mismatch:false,reason:found.length?'':'missing'};
   }
-  function plan(catalog, access, selected, bounds, zoom, enabled) {
+  function plan(catalog, access, selected, bounds, zoom, enabled, scopedCodes) {
     if (!access) return [];
-    const codes = access.role !== 'super_admin' ? [access.code] : selected ? [selected] : catalog.map(p => p.code);
+    const codes = access.role !== 'super_admin' ? [access.code] : selected ? [selected] : Array.isArray(scopedCodes)?scopedCodes:catalog.map(p => p.code);
     const candidates = catalog.filter(p => codes.includes(p.code));
     const jobs = enabled.province ? [{level:'province', codes}] : [];
     for (const [level, minimum, limit] of [['district',8,8], ['subdistrict',10,4]]) {
@@ -112,7 +112,7 @@ var HSBoundaries = (() => {
         await loadCatalog(signal);if(id!==revision)return;
         if(selected&&!catalog.some(p=>p.code===selected)){access=null;panel.hidden=true;return;}
         const b=map.getBounds(),bounds=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()],on=enabled();
-        const jobs=plan(catalog,access,selected,bounds,map.getZoom(),on),targetLevel=focusLevel(),code=selected||access.code;
+        const jobs=plan(catalog,access,selected,bounds,map.getZoom(),on,env.provinceCodes?.()),targetLevel=focusLevel(),code=selected||access.code;
         // A chosen area may be off screen. Resolve only its province before fitting it.
         if(code && targetLevel && on[targetLevel] && !jobs.some(j=>j.level===targetLevel&&j.code===code))jobs.push({level:targetLevel,code,focusOnly:true});
         let features=0,result=null;
@@ -134,13 +134,13 @@ var HSBoundaries = (() => {
         }
       }catch(error){if(id===revision&&!signal.aborted){group.clearLayers();status('โหลดขอบเขตไม่สำเร็จ กรุณาเลื่อนแผนที่หรือลองใหม่ ข้อมูล HS ยังใช้งานได้');}}
     }
-    async function fit(){if(!access)return;const id=++revision;controller?.abort();try{await loadCatalog();if(id!==revision||!access)return;const items=catalog.filter(p=>access.role!=='super_admin'?p.code===access.code:!selected||p.code===selected);if(!items.length)return;focusPending=false;fitBoxes(items.map(p=>p.bbox),10);await draw();}catch(_){if(id===revision)status('ยังเปิดขอบเขตไม่ได้ กรุณาลองใหม่');}}
+    async function fit(){if(!access)return;const id=++revision;controller?.abort();try{await loadCatalog();if(id!==revision||!access)return;const items=catalog.filter(p=>access.role!=='super_admin'?p.code===access.code:selected?p.code===selected:env.provinceCodes?env.provinceCodes().includes(p.code):true);if(!items.length)return;focusPending=false;fitBoxes(items.map(p=>p.bbox),10);await draw();}catch(_){if(id===revision)status('ยังเปิดขอบเขตไม่ได้ กรุณาลองใหม่');}}
     async function sync(){
       const context=env.activeArea?.()||{},province=String(env.selectedProvince?env.selectedProvince()||'':context.provinceCode||'');
       const next=scope(env.profile(),env.valid(),province),nextKey=next?next.role+':'+next.code+':'+(next.district||''):'';
       const nextSelected=next?.role==='super_admin'?(env.selectedProvince?province:selected):next?.code||'';
       const nextActive=context.provinceCode&&String(context.provinceCode)!==nextSelected?{}:{district:context.district||'',tambon:context.tambon||'',hs:context.hs?{hsId:context.hs.hsId,latitude:context.hs.latitude??context.hs.lat,longitude:context.hs.longitude??context.hs.lng,district:context.hs.district,tambon:context.hs.tambon}:null};
-      const nextSelectionKey=JSON.stringify([nextSelected,nextActive]);
+      const nextSelectionKey=JSON.stringify([nextSelected,nextActive,env.provinceCodes?.()]);
       if(nextKey===key&&nextSelectionKey===selectionKey)return;
       const accessChanged=nextKey!==key;key=nextKey;selectionKey=nextSelectionKey;const currentSelection=++selectionRevision;
       if(accessChanged)reset();else{revision++;controller?.abort();group.clearLayers();}

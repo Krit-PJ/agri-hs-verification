@@ -1,17 +1,17 @@
 /* HS Verification design system v1.2. Local Thai font fallback; no required font CDN. */
 :root{
-  --color-primary:#18583f;
-  --color-primary-hover:#10432f;
-  --color-primary-soft:#e9f3ec;
-  --color-secondary:#80591f;
-  --color-secondary-soft:#faf1df;
-  --color-bg:#f4f7f4;
+  --color-primary:#1a7f37;
+  --color-primary-hover:#116329;
+  --color-primary-soft:#dafbe1;
+  --color-secondary:#8c6300;
+  --color-secondary-soft:#fff8c5;
+  --color-bg:#f6f8fa;
   --color-surface:#ffffff;
-  --color-text:#172d24;
-  --color-text-muted:#526359;
+  --color-text:#1f2328;
+  --color-text-muted:#57606a;
   --color-text-disabled:#67776b;
-  --color-border:#cad7cd;
-  --color-control-border:#718679;
+  --color-border:#d0d7de;
+  --color-control-border:#7d8590;
   --color-focus:#005fcc;
   --color-success:#17633e;
   --color-success-soft:#e9f5ed;
@@ -21,8 +21,8 @@
   --color-error-soft:#fff0ee;
   --color-info:#175b87;
   --color-info-soft:#edf5fc;
-  --font-body:"Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
-  --font-heading:"Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
+  --font-body:"IBM Plex Sans Thai","Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
+  --font-heading:"Prompt","Noto Sans Thai","Sarabun","Leelawadee UI",Tahoma,sans-serif;
   --font-size-body:1rem; --line-height-body:1.65;
   --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-12:48px;
   --radius-control:10px; --radius-card:16px; --radius-dialog:20px;

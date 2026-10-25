@@ -134,3 +134,5 @@ test('invalid programmatic province values cannot alter a valid choice',()=>{
   assert.equal(page.ui.selectedProvinceCode,'50');
   assert.equal(page.changes,1);
 });
+
+test('Super scope supports one, multiple and all available provinces without granting other roles control',()=>{const p=setup({profile:{role:'super_admin'},valid:true,rows});p.ui.setAvailable(['50','62']);p.ui.setScope('multi',['50','62']);assert.deepEqual(Array.from(p.ui.filter(rows)).map(r=>r.id).sort(),['chiangmai','kamphaeng']);assert.equal(p.ui.selectedProvinceCode,'');p.ui.setScope('multi',['50']);assert.deepEqual(Array.from(p.ui.filter(rows)).map(r=>r.id),['chiangmai']);p.ui.setScope('all');assert.equal(p.ui.filter(rows).length,2);p.ui.selectProvince('62');assert.equal(p.ui.scopeMode,'single');assert.equal(p.ui.filter(rows).length,1);const a=setup({profile:{role:'admin',assignedProvinceCode:'62'},valid:true,rows});assert.equal(a.ui.setScope('all'),false);assert.equal(a.ui.selectedProvinceCode,'62');});

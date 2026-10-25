@@ -36,6 +36,7 @@
     if(state.token&&(sessionStorage.getItem('hsverify.sessionEndpoint')||globalThis.HS_SITE_CONFIG?.apiEndpoint)!==state.endpoint)clearSession();
     dom.apiEndpoint.value = state.endpoint;
     initSiteSettings();
+    initSuperScope();
     bindEvents();
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:provinceChanged});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
@@ -108,16 +109,16 @@
     state.boundaryHS=null;state.selected=null;state.detailRequest=(state.detailRequest||0)+1;
     dom.districtFilter.value='';dom.tambonFilter.value='';dom.villageFilter.value='';if(dom.summaryTambon)dom.summaryTambon.value='';
     if(!state.authValidated||!state.token||sessionExpired()){state.loadRevision=(state.loadRevision||0)+1;state.all=[];state.filtered=[];state.dataLoaded=false;state.periodInitialized=false;populateFilters();applyFilters();applyRoleUI();void loadData();}
-    else{populateFilters();applyFilters();}
+    else{state.loadRevision=(state.loadRevision||0)+1;state.all=[];state.filtered=[];state.dataLoaded=false;state.periodInitialized=false;populateFilters();applyFilters();void loadData();}
   }
   function updateProvinceGate(){
     if(!nationalMode)return;const publicView=!(state.authValidated&&state.token&&!sessionExpired()),pending=publicView&&!HSNationUI.selectedProvinceCode;
     const gate=$('publicProvinceGate'),slot=$('publicProvinceSlot'),context=$('managerProvinceContext');
-    if(gate)gate.hidden=!publicView;
-    if(context){if(publicView&&slot&&context.parentElement!==slot)slot.append(context);else if(!publicView&&dom.adminProtected&&context.parentElement!==dom.adminProtected)dom.adminProtected.prepend(context);context.hidden=!(publicView||['admin','super_admin'].includes(state.profile?.role));}
+    const superView=!publicView&&state.profile?.role==='super_admin';if(gate)gate.hidden=!(publicView||superView);
+    if(context){if((publicView||superView)&&slot&&context.parentElement!==slot)slot.append(context);else if(!publicView&&!superView&&dom.adminProtected&&context.parentElement!==dom.adminProtected)dom.adminProtected.prepend(context);context.hidden=!(publicView||['admin','super_admin'].includes(state.profile?.role));}
     const content=$('summaryContent'),prompt=$('summaryProvincePrompt');if(content)content.hidden=pending;if(prompt)prompt.hidden=!pending;
     if(dom.printReportButton)dom.printReportButton.disabled=pending;
-    const message=$('provinceSelectionMessage');if(message)message.textContent=pending?'เลือกจังหวัดก่อน ระบบจะแสดงจุดความร้อนและสรุปผลเฉพาะจังหวัดที่เลือก':'กำลังแสดงข้อมูลเฉพาะจังหวัด'+(HSNational.provinces[HSNationUI.selectedProvinceCode]||'ที่เลือก');
+    const message=$('provinceSelectionMessage');if(message)message.textContent=superView&&HSNationUI.scopeMode!=='single'?HSNationUI.scope():pending?'เลือกจังหวัดก่อน ระบบจะแสดงจุดความร้อนและสรุปผลเฉพาะจังหวัดที่เลือก':'กำลังแสดงข้อมูลเฉพาะจังหวัด'+(HSNational.provinces[HSNationUI.selectedProvinceCode]||'ที่เลือก');
   }
 
   function switchView(name) {
@@ -158,7 +159,7 @@
       const terrain=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri and contributors'});
       if(L.control?.layers)L.control.layers({'ถนน':streets,'ดาวเทียม':satellite,'ภูมิประเทศ':terrain},{},{collapsed:true}).addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
-      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),showControls:false,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),selectedProvince:()=>nationalMode?HSNationUI.selectedProvinceCode:'62',activeArea:()=>({provinceCode:nationalMode?HSNationUI.selectedProvinceCode:'62',district:dom.districtFilter.value,tambon:dom.tambonFilter.value,hs:state.boundaryHS||null})});state.boundaries.sync();}
+      if(typeof HSBoundaries!=='undefined' && $('boundaryPanel')){state.boundaries=HSBoundaries.create({map:state.map,L,panel:$('boundaryPanel'),showControls:false,provinceCodes:()=>nationalMode?HSNationUI.selectedProvinceCodes:[],profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),selectedProvince:()=>nationalMode?HSNationUI.selectedProvinceCode:'62',activeArea:()=>({provinceCode:nationalMode?HSNationUI.selectedProvinceCode:'62',district:dom.districtFilter.value,tambon:dom.tambonFilter.value,hs:state.boundaryHS||null})});state.boundaries.sync();}
     } catch (error) { showMapFallback('เบราว์เซอร์นี้เปิดแผนที่ไม่ได้'); }
   }
 
@@ -172,19 +173,19 @@
     setLoading(true);
     dom.liveError.hidden = true;
     try {
-      if(typeof HSNationUI!=='undefined'&&(!state.token||sessionExpired())&&!HSNationUI.selectedProvinceCode){state.all=[];state.filtered=[];state.dataLoaded=false;state.boundaryHS=null;HSNationUI.sync();populateFilters();applyRoleUI();if(typeof applyFilters==='function')applyFilters();else renderAll();dom.dataSourceLabel.textContent='กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน';return;}
+      if(typeof HSNationUI!=='undefined'&&(!state.token||sessionExpired()||state.authValidated&&state.profile?.role==='super_admin'&&HSNationUI.scopeMode==='single')&&!HSNationUI.selectedProvinceCode){state.all=[];state.filtered=[];state.dataLoaded=false;state.boundaryHS=null;HSNationUI.sync();populateFilters();applyRoleUI();if(typeof applyFilters==='function')applyFilters();else renderAll();dom.dataSourceLabel.textContent='กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน';return;}
       if (state.endpoint) {
         let info=null,data=null;state.usedCache=false;state.externalSheetActive=false;
-        const directSheet=typeof HSSheetSource!=='undefined'&&!previewMode&&!phoneDemoMode&&Boolean(typeof HSNationUI!=='undefined'&&HSNationUI.selectedProvinceCode);
+        const directSheet=typeof HSSheetSource!=='undefined'&&!previewMode&&!phoneDemoMode&&Boolean(typeof HSNationUI!=='undefined'&&(HSNationUI.selectedProvinceCode||state.authValidated&&state.profile?.role==='super_admin'&&HSNationUI.scopeMode!=='single'));
         if(directSheet){
           const province=typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'';
           if(state.token){data=await api('bootstrap',{provinceCode:province,filters:{}});}else{try{data=await api('bootstrap',{provinceCode:province,filters:{}});}catch(_){data={config:{profile:{role:'public'}}};}}
           if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
-          const loaded=await HSSheetSource.load(HSSheetSource.configured(localStorage),province,HSNational.provinces);
+          let loaded;const sourceUrl=HSSheetSource.configured(localStorage);if(state.profile?.role==='super_admin'&&HSNationUI.scopeMode!=='single'){const available=await HSSheetSource.available(sourceUrl,HSNational.provinces);if(loadToken!==state.token||loadRevision!==state.loadRevision)return;HSNationUI.setAvailable(available);const codes=HSNationUI.selectedProvinceCodes;if(codes.some(c=>!available.includes(c)))throw Error('จังหวัดที่เลือกไม่มีแท็บข้อมูลในชีตนี้');loaded=await HSSheetSource.loadMany(sourceUrl,codes,HSNational.provinces);}else loaded=await HSSheetSource.load(sourceUrl,province,HSNational.provinces);
           if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
           const verified=new Map((extractRows(data)||[]).map(r=>[String(r.hsId||r.hs_id),r]));
           data={...data,hotspots:{items:loaded.rows.map(row=>{const prior=verified.get(row.hsId);return prior?{...row,status:prior.status||row.status,verification:prior.verification||null}:row;})}};
-          state.sourceName='Google Sheets · HS_'+province+' · ตัดแถวไม่ผ่าน '+loaded.rejected+' แถว';state.externalSheetActive=true;
+          state.sourceName='Google Sheets · '+(province?'HS_'+province:HSNationUI.scopeMode==='all'?'ทุกจังหวัดที่มีข้อมูล':'หลายจังหวัด')+' · ตัดแถวไม่ผ่าน '+loaded.rejected+' แถว';state.externalSheetActive=true;
         }else{
           if(typeof HSDataCache!=='undefined'){try{info=await api('getDatasetInfo',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:''});if(!force){const rows=await HSDataCache.read(info);if(rows){data={hotspots:{items:rows},config:info.config};state.usedCache=true;}}}catch(error){if(error.code==='UNAUTHORIZED'||error.code==='PROVINCE_UNASSIGNED')throw error;}}
           if(!data){data=await api('bootstrap',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'',filters:{}});if(loadToken!==state.token||loadRevision!==state.loadRevision)return;if(info&&typeof HSDataCache!=='undefined')await HSDataCache.write(info,extractRows(data)||[]);}
@@ -262,7 +263,7 @@
     fillSelect(dom.summaryYear,fiscalYears,'ทุกปีงบประมาณ');
     fillSelect(dom.summaryDistrict,unique(scopedRows().map(x=>x.district)).sort(locale),'ทั้งจังหวัด · ทุกอำเภอ');
     repopulateLocationFilters('district');
-    if(nationalMode){const overview=!HSNationUI.selectedProvinceCode;[dom.districtFilter,dom.tambonFilter,dom.villageFilter,dom.summaryDistrict,dom.summaryTambon].filter(Boolean).forEach(e=>{e.disabled=overview;if(overview)e.value='';});}
+    if(nationalMode){const overview=!HSNationUI.selectedProvinceCode&&!(state.authValidated&&state.profile?.role==='super_admin'&&HSNationUI.scopeMode!=='single');[dom.districtFilter,dom.tambonFilter,dom.villageFilter,dom.summaryDistrict,dom.summaryTambon].filter(Boolean).forEach(e=>{e.disabled=overview;if(overview)e.value='';});}
   }
 
   function populateFiscalMonths(preferred) {
@@ -308,7 +309,7 @@
         (!f.crop || x.plantType === f.crop) && (!f.status || x.status === f.status) &&
         (!f.result || result === f.result) && (!f.search || haystack.includes(f.search));
     });
-    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=true;}dom.summaryDistrict.value=dom.districtFilter.value;if(dom.summaryTambon){fillSelect(dom.summaryTambon,unique(scopedRows().filter(x=>!dom.districtFilter.value||x.district===dom.districtFilter.value).map(x=>x.tambon)).sort(locale),'ทุกตำบล');dom.summaryTambon.value=dom.tambonFilter.value;}dom.summaryYear.value=dom.yearFilter.value;}
+    if(nationalMode){const source=$('provinceFilter');if(dom.quickProvinceFilter&&source){dom.quickProvinceFilter.innerHTML=source.innerHTML;dom.quickProvinceFilter.value=source.value;dom.quickProvinceFilter.disabled=true;if(typeof HSNationUI!=='undefined'&&state.authValidated&&state.profile?.role==='super_admin'&&HSNationUI.scopeMode!=='single'){dom.quickProvinceFilter.innerHTML='<option value="">'+esc(HSNationUI.scopeMode==='all'?'ทุกจังหวัดที่มีข้อมูล':'หลายจังหวัดที่เลือก')+'</option>';}}dom.summaryDistrict.value=dom.districtFilter.value;if(dom.summaryTambon){fillSelect(dom.summaryTambon,unique(scopedRows().filter(x=>!dom.districtFilter.value||x.district===dom.districtFilter.value).map(x=>x.tambon)).sort(locale),'ทุกตำบล');dom.summaryTambon.value=dom.tambonFilter.value;}dom.summaryYear.value=dom.yearFilter.value;}
     const hint=$('fiscalPeriodHint');if(hint)hint.textContent=f.year?`ปีงบประมาณ ${f.year} · ตั้งแต่ตุลาคม ${Number(f.year)-1} ถึง ${f.month?MONTHS[Number(f.month.slice(5))-1]+' '+(Number(f.month.slice(0,4))+543):'กันยายน '+f.year}${state.filtered.length?'':' · ยังไม่มีข้อมูลในช่วงและขอบเขตนี้'}`:'แสดงข้อมูลทุกปีงบประมาณ';
     if(dom.startMonthFilter){const periodHint=$('periodRangeHint');if(periodHint)periodHint.textContent=HSPeriod.error(f.startMonth,f.endMonth)||HSPeriod.label(f.startMonth,f.endMonth)+(state.filtered.length?'':' · ไม่พบข้อมูลในช่วงที่เลือก');}
     state.boundaries?.sync();renderAll();
@@ -770,6 +771,11 @@
   }
 
   function siteSettingsAllowed(){return Boolean(state.authValidated&&state.token&&!sessionExpired()&&state.profile?.role==='super_admin');}
+  function initSuperScope(){
+    const mode=$('superScopeMode'),apply=$('applySuperScope'),message=$('superScopeMessage');if(!mode||!apply)return;
+    mode.onchange=()=>{$('superScopeChoices').hidden=mode.value!=='multi';$('provinceFilter').disabled=mode.value!=='single';};
+    apply.onclick=async()=>{const token=state.token;try{if(!siteSettingsAllowed())throw Error('เฉพาะ Super Admin เท่านั้น');apply.disabled=true;setMessage(message,'กำลังตรวจจังหวัดที่มีข้อมูล…');const modeValue=mode.value;let codes=[];if(modeValue!=='single'){const available=await HSSheetSource.available(HSSheetSource.configured(localStorage),HSNational.provinces);if(token!==state.token||!siteSettingsAllowed())return;codes=[...$('superScopeProvinces').selectedOptions].map(o=>o.value);if(modeValue==='multi'&&!codes.length)throw Error('เลือกอย่างน้อยหนึ่งจังหวัด');HSNationUI.setAvailable(available);if(codes.some(c=>!available.includes(c)))throw Error('บางจังหวัดที่เลือกไม่มีแท็บ HS ในฐานข้อมูลนี้');}HSNationUI.setScope(modeValue,codes);setMessage(message,'ใช้ขอบเขตแล้ว กำลังอัปเดตแผนที่และสรุปผล','success');}catch(error){setMessage(message,friendlyError(error),'error');}finally{apply.disabled=false;}};
+  }
   function initSiteSettings(){
     if(typeof HSSiteSettings==='undefined')return;
     const apply=value=>{for(const [key,prefix] of [['risk','risk'],['hub','hub']]){const item=value[key],link=$(prefix+'NavLink');if(link){link.textContent=item.label+' ↗';link.href=item.url;}if($(prefix+'LinkLabel'))$(prefix+'LinkLabel').value=item.label;if($(prefix+'LinkUrl'))$(prefix+'LinkUrl').value=item.url;}};
@@ -831,6 +837,12 @@
     if(action==='sync' && role!=='super_admin'){dom.adminResult.textContent='เฉพาะ Super Admin เท่านั้นที่ซิงก์แหล่งข้อมูลได้';return;}
     if (!state.endpoint&&!previewMode) { dom.adminResult.textContent = 'กรุณาเข้าสู่ระบบก่อน'; return; }
     if(action==='export'&&dom.startMonthFilter){const rangeError=HSPeriod.error(dom.startMonthFilter.value,dom.endMonthFilter.value);if(rangeError){dom.adminResult.textContent=rangeError;return;}}
+    if(action==='export'&&role==='super_admin'&&HSNationUI.scopeMode!=='single'&&siteSettingsAllowed()){
+      const fields=['provinceCode','province','district','tambon','hsId','acquiredAt','plantType','latitude','longitude','status'];
+      const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'").replace(/"/g,'""')+'"';
+      const csv='\ufeff'+[fields.map(cell).join(','),...state.filtered.map(row=>fields.map(key=>cell(row[key])).join(','))].join('\r\n');
+      const href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=href;link.download='HS-selected-provinces.csv';link.click();setTimeout(()=>URL.revokeObjectURL(href),1000);dom.adminResult.textContent='ส่งออก HS ตามขอบเขตและตัวกรองที่แสดง '+state.filtered.length+' จุดแล้ว';return;
+    }
     const apiAction = { sync:'syncSource',qa:'qa',export:'export' }[action];
     button.disabled = true; dom.adminResult.textContent = 'กำลังทำงาน…';
     try {

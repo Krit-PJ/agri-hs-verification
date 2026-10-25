@@ -164,3 +164,5 @@ test('production polygon locates a known point inside Nai Mueang and excludes a 
  test('automatic tambon geometry remains active when boundary controls are removed from view',()=>inBrowser(async()=>{
  const h=boundaryMap({showControls:false,area:{provinceCode:'62',hs:{latitude:16.5,longitude:100.5}}});await h.control.sync();assert.equal(h.panel.hidden,true);assert.ok(h.layers.flatMap(l=>l.features).some(f=>f.style.fillOpacity>0));assert.equal(h.fields.boundarySubdistrictOn.checked,true);
  }));
+
+test('multi-province display plans only selected provinces without broadening Admin scope',()=>{const visible={province:true,district:true,subdistrict:true};const jobs=boundary.plan(index,{role:'super_admin',code:''},'',[90,0,110,25],6,visible,['56','62']);assert.deepEqual(jobs[0].codes,['56','62']);const admin=boundary.plan(index,{role:'admin',code:'62'},'',[90,0,110,25],6,visible,['56','62']);assert.deepEqual(admin[0].codes,['62']);});
