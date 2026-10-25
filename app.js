@@ -174,9 +174,21 @@
     try {
       if(typeof HSNationUI!=='undefined'&&(!state.token||sessionExpired())&&!HSNationUI.selectedProvinceCode){state.all=[];state.filtered=[];state.dataLoaded=false;state.boundaryHS=null;HSNationUI.sync();populateFilters();applyRoleUI();if(typeof applyFilters==='function')applyFilters();else renderAll();dom.dataSourceLabel.textContent='กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน';return;}
       if (state.endpoint) {
-        let info=null,data=null;state.usedCache=false;
-        if(typeof HSDataCache!=='undefined'){try{info=await api('getDatasetInfo',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:''});if(!force){const rows=await HSDataCache.read(info);if(rows){data={hotspots:{items:rows},config:info.config};state.usedCache=true;}}}catch(error){if(error.code==='UNAUTHORIZED'||error.code==='PROVINCE_UNASSIGNED')throw error;}}
-        if(!data){data=await api('bootstrap',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'',filters:{}});if(loadToken!==state.token||loadRevision!==state.loadRevision)return;if(info&&typeof HSDataCache!=='undefined')await HSDataCache.write(info,extractRows(data)||[]);}
+        let info=null,data=null;state.usedCache=false;state.externalSheetActive=false;
+        const directSheet=typeof HSSheetSource!=='undefined'&&!previewMode&&!phoneDemoMode&&Boolean(typeof HSNationUI!=='undefined'&&HSNationUI.selectedProvinceCode);
+        if(directSheet){
+          const province=typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'';
+          if(state.token){data=await api('bootstrap',{provinceCode:province,filters:{}});}else{try{data=await api('bootstrap',{provinceCode:province,filters:{}});}catch(_){data={config:{profile:{role:'public'}}};}}
+          if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
+          const loaded=await HSSheetSource.load(HSSheetSource.configured(localStorage),province,HSNational.provinces);
+          if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
+          const verified=new Map((extractRows(data)||[]).map(r=>[String(r.hsId||r.hs_id),r]));
+          data={...data,hotspots:{items:loaded.rows.map(row=>{const prior=verified.get(row.hsId);return prior?{...row,status:prior.status||row.status,verification:prior.verification||null}:row;})}};
+          state.sourceName='Google Sheets · HS_'+province+' · ตัดแถวไม่ผ่าน '+loaded.rejected+' แถว';state.externalSheetActive=true;
+        }else{
+          if(typeof HSDataCache!=='undefined'){try{info=await api('getDatasetInfo',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:''});if(!force){const rows=await HSDataCache.read(info);if(rows){data={hotspots:{items:rows},config:info.config};state.usedCache=true;}}}catch(error){if(error.code==='UNAUTHORIZED'||error.code==='PROVINCE_UNASSIGNED')throw error;}}
+          if(!data){data=await api('bootstrap',{provinceCode:typeof HSNationUI!=='undefined'?HSNationUI.selectedProvinceCode:'',filters:{}});if(loadToken!==state.token||loadRevision!==state.loadRevision)return;if(info&&typeof HSDataCache!=='undefined')await HSDataCache.write(info,extractRows(data)||[]);}
+        }
         if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
         const rows = extractRows(data);
         if (!Array.isArray(rows)) throw new Error('เซิร์ฟเวอร์ส่งรูปแบบรายการ HS ไม่ถูกต้อง');
@@ -203,7 +215,7 @@
       else { Object.entries({yearFilter:oldFilters.year,monthFilter:oldFilters.month,districtFilter:oldFilters.district,cropFilter:oldFilters.crop,statusFilter:oldFilters.status,resultFilter:oldFilters.result,searchFilter:oldFilters.search}).forEach(([id,v])=>{dom[id].value=v;});repopulateLocationFilters('district');dom.tambonFilter.value=oldFilters.tambon;repopulateLocationFilters('tambon');dom.villageFilter.value=oldFilters.village; }
       if(dom.startMonthFilter)syncPeriodLegacy();state.dataLoaded=true; applyFilters(); applyRoleUI();
       const times=state.all.map(x=>x.acquiredAt).filter(Boolean).sort();
-      dom.dataSourceLabel.textContent=`${state.endpoint ? 'ฐาน HS กลางที่เชื่อมกับระบบความเสี่ยง' : state.sourceName} · ${state.all.length.toLocaleString('th-TH')} จุด · ล่าสุด ${times.length?formatDate(times.at(-1)):'ไม่ระบุ'} · ${state.usedCache?'สำเนาในเครื่องที่ตรวจสิทธิ์แล้ว · ':''}อัปเดต ${new Date().toLocaleTimeString('th-TH',{timeZone:'Asia/Bangkok'})}`;
+      dom.dataSourceLabel.textContent=`${state.externalSheetActive?state.sourceName:state.endpoint ? 'ฐาน HS กลางที่เชื่อมกับระบบความเสี่ยง' : state.sourceName} · ${state.all.length.toLocaleString('th-TH')} จุด · ล่าสุด ${times.length?formatDate(times.at(-1)):'ไม่ระบุ'} · ${state.usedCache?'สำเนาในเครื่องที่ตรวจสิทธิ์แล้ว · ':''}อัปเดต ${new Date().toLocaleTimeString('th-TH',{timeZone:'Asia/Bangkok'})}`;
     } catch (error) {
       if(loadToken!==state.token||loadRevision!==state.loadRevision)return;
       state.all = []; state.filtered = []; renderAll();
@@ -406,7 +418,7 @@
   function openVerify(item) {
     if(nationalMode)HSNationUI.selectProvince(item.provinceCode);
     state.boundaryHS=item;state.boundaries?.sync();
-    if(state.usedCache&&state.endpoint&&state.authValidated&&!item.detailsLoaded){const token=state.token,request=state.detailRequest=(state.detailRequest||0)+1;toast('กำลังอ่านรายละเอียดจุดความร้อน…');api('getHS',{hsId:item.hsId}).then(data=>{if(token!==state.token||request!==state.detailRequest)return;const full=normalizeHS(data?.hotspot||data?.item||data);full.detailsLoaded=true;const index=state.all.findIndex(x=>x.hsId===full.hsId);if(index>=0)state.all[index]=full;openVerify(full);}).catch(error=>toast('ยังเปิดบันทึกไม่ได้: '+friendlyError(error),true));return;}
+    if((state.usedCache||item.externalSource)&&state.endpoint&&state.authValidated&&!item.detailsLoaded){const token=state.token,request=state.detailRequest=(state.detailRequest||0)+1;toast('กำลังอ่านรายละเอียดจุดความร้อน…');api('getHS',{hsId:item.hsId}).then(data=>{if(token!==state.token||request!==state.detailRequest)return;let full=normalizeHS(data?.hotspot||data?.item||data);if(item.externalSource)full={...full,...item,status:full.status,verification:full.verification};full.detailsLoaded=true;const index=state.all.findIndex(x=>x.hsId===full.hsId);if(index>=0)state.all[index]=full;openVerify(full);}).catch(error=>toast((item.externalSource?'จุดจากชีตยังไม่พร้อมบันทึกใน API เดิม ต้องนำเข้าจุดนี้ในฐานผลตรวจก่อน: ':'ยังเปิดบันทึกไม่ได้: ')+friendlyError(error),true));return;}
 
     if(nationalMode&&(!state.authValidated||!state.token||sessionExpired())){syncFiltersFromHs(item);return toast('การดูข้อมูลไม่ต้องเข้าสู่ระบบ การบันทึกผลต้องเข้าสู่ระบบก่อน',true);}
     syncFiltersFromHs(item);
@@ -760,10 +772,17 @@
   function siteSettingsAllowed(){return Boolean(state.authValidated&&state.token&&!sessionExpired()&&state.profile?.role==='super_admin');}
   function initSiteSettings(){
     if(typeof HSSiteSettings==='undefined')return;
-    const apply=value=>{for(const [key,prefix] of [['risk','risk'],['hub','hub']]){const item=value[key],link=$(prefix+'NavLink');if(link){link.textContent=item.label+' ↗';link.href=item.url;}$(prefix+'LinkLabel').value=item.label;$(prefix+'LinkUrl').value=item.url;}};
+    const apply=value=>{for(const [key,prefix] of [['risk','risk'],['hub','hub']]){const item=value[key],link=$(prefix+'NavLink');if(link){link.textContent=item.label+' ↗';link.href=item.url;}if($(prefix+'LinkLabel'))$(prefix+'LinkLabel').value=item.label;if($(prefix+'LinkUrl'))$(prefix+'LinkUrl').value=item.url;}};
     apply(HSSiteSettings.read(localStorage));
+    window.addEventListener('storage',event=>{if(event.key==='hsverify.siteSettings.v1')apply(HSSiteSettings.read(localStorage));});
+    initHsDatabaseSettings();
     $('saveNavigationButton').onclick=()=>{try{const value=HSSiteSettings.save(localStorage,{risk:{label:$('riskLinkLabel').value,url:$('riskLinkUrl').value},hub:{label:$('hubLinkLabel').value,url:$('hubLinkUrl').value}},siteSettingsAllowed());apply(value);setMessage($('navigationSettingsMessage'),'บันทึกชื่อและลิงก์บนเบราว์เซอร์เครื่องนี้แล้ว','success');}catch(error){setMessage($('navigationSettingsMessage'),friendlyError(error),'error');}};
     $('applyEndpointButton').onclick=()=>connectServer(true);
+  }
+  function initHsDatabaseSettings(){
+    const input=$('hsDatabaseUrl');if(!input||typeof HSSheetSource==='undefined')return;input.value=HSSheetSource.configured(localStorage);
+    const run=async save=>{const message=$('hsDatabaseMessage'),token=state.token;try{if(!siteSettingsAllowed())throw Error('เฉพาะ Super Admin เท่านั้น');const province=HSNationUI.selectedProvinceCode;if(!province)throw Error('กรุณาเลือกจังหวัดก่อนทดสอบฐานข้อมูล');const source=HSSheetSource.parse(input.value).url;$('testHsDatabase').disabled=true;$('saveHsDatabase').disabled=true;setMessage(message,'กำลังอ่านแท็บ HS_'+province+'…');const result=await HSSheetSource.load(source,province,HSNational.provinces);if(token!==state.token||!siteSettingsAllowed()||province!==HSNationUI.selectedProvinceCode)throw Error('บัญชีหรือจังหวัดเปลี่ยน กรุณาทดสอบใหม่');if(save){localStorage.setItem(HSSheetSource.KEY,source);input.value=source;state.all=[];state.filtered=[];state.dataLoaded=false;state.periodInitialized=false;state.boundaryHS=null;renderAll();await loadData(true);if(!dom.liveError.hidden)throw Error(dom.liveError.textContent);}setMessage(message,(save?'ใช้ฐานข้อมูลใหม่แล้ว':'อ่านข้อมูลสำเร็จ')+' · HS_'+province+' · '+result.rows.length+' จุด · ไม่ผ่าน '+result.rejected+' แถว','success');}catch(error){setMessage(message,friendlyError(error),'error');}finally{$('testHsDatabase').disabled=false;$('saveHsDatabase').disabled=false;}};
+    $('testHsDatabase').onclick=()=>run(false);$('saveHsDatabase').onclick=()=>run(true);
   }
   async function connectServer(save=false) {
     // Event listeners pass a MouseEvent; only explicit true commits the new endpoint.

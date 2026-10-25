@@ -130,8 +130,8 @@
 <details><summary>แหล่ง Google Sheets รายจังหวัด</summary><label>จังหวัดของแหล่งข้อมูล<select id="nationalSourceProvince"></select></label><label>Google Sheet URL<input id="nationalSourceUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label><div class="button-row"><button id="nationalSaveSource" type="button" class="secondary-button">บันทึกแหล่งข้อมูล (ยังไม่ตรวจสิทธิ์อ่าน)</button><button id="nationalReadSheet" type="button" class="secondary-button">อ่าน Google Sheet และตรวจ QA</button></div></details>
 <p>อ่าน AllData ก่อน หากไม่มีจะอ่านเฉพาะชีตรายจุดที่หัวตารางครบ ไม่ใช้ชีตสรุปแทนข้อมูลจุด · จำกัด 50,000 แถวต่อชุดและ 5,000 จุดต่อจังหวัด/ปี · การแทนข้อมูลมีผลเฉพาะคู่จังหวัด/ปีที่แสดงด้านล่าง</p><pre id="nationalQA" class="import-preview">ยังไม่อ่านข้อมูล</pre><button id="nationalConfirm" class="primary-button" type="button" disabled>ยืนยันแทนข้อมูลเฉพาะจังหวัด/ปีตามผล QA</button></section>
 <section id="nationalAssignment" class="settings-card" hidden><h2>มอบหมายจังหวัดให้ Admin</h2><label>ชื่อผู้ใช้ Admin ที่มีอยู่<input id="assignUsername" autocomplete="off"></label><label>จังหวัด<select id="assignProvinceCode"></select></label><button id="assignProvinceButton" type="button" class="secondary-button">บันทึกจังหวัดและยกเลิก session เดิมของบัญชี</button></section><p id="nationalStatus" class="form-message" role="status"></p><section id="serverSettingsCard" class="settings-card" data-super-admin-only hidden>
-          <div class="section-title"><div><p class="eyebrow">การเชื่อมต่อ</p><h2>เซิร์ฟเวอร์กลาง</h2></div><span id="connectionDot" class="connection-dot offline" title="ยังไม่เชื่อมต่อ"></span></div>
-          <label>URL ของ API<input id="apiEndpoint" type="url" autocomplete="url"></label>
+          <div class="section-title"><div><p class="eyebrow">การเชื่อมต่อ</p><h2>ฐานข้อมูล HS และ API</h2></div><span id="connectionDot" class="connection-dot offline" title="ยังไม่เชื่อมต่อ"></span></div>
+          <h3>ฐานข้อมูล HS รายจังหวัด</h3><label>Google Sheet URL<input id="hsDatabaseUrl" type="url" autocomplete="url"></label><p>อ่านแท็บ HS_รหัสจังหวัด ตามจังหวัดที่เลือก เช่น HS_62 · ชีตต้องอนุญาตให้อ่านผ่านลิงก์</p><div class="button-row"><button id="testHsDatabase" type="button" class="secondary-button">ทดสอบอ่าน HS</button><button id="saveHsDatabase" type="button" class="primary-button">ทดสอบและใช้ฐานข้อมูลนี้</button></div><p id="hsDatabaseMessage" role="status" aria-live="polite"></p><h3>API สำหรับบัญชีและผลตรวจ</h3><label>URL ของ API<input id="apiEndpoint" type="url" autocomplete="url"></label>
           <p class="field-hint">แก้ URL แล้วทดสอบก่อนบันทึก ใช้ Google Apps Script /exec เท่านั้น การเปลี่ยนปลายทางจะออกจากระบบเดิมและต้องเข้าสู่ระบบใหม่ ค่ามีผลเฉพาะเบราว์เซอร์เครื่องนี้</p>
           <button id="connectButton" class="secondary-button" type="button">ทดสอบ URL นี้</button>
           <button id="applyEndpointButton" class="primary-button" type="button">ทดสอบและบันทึก URL</button>
@@ -222,8 +222,9 @@
   <script src="registration-ui.js?v=2.9"></script>
   <script src="boundaries.js?v=2.8.1"></script>
   <script src="admin-accounts.js?v=2.6"></script><script src="thai-period-ui.js?v=2.6"></script><script src="dataset-cache.js?v=2.6"></script>
-  <script src="site-settings.js?v=2.9.1"></script>
+  <script src="sheet-source.js?v=2.9.2"></script>
+  <script src="site-settings.js?v=2.9.2"></script>
   <script src="access-navigation.js?v=2.8.1"></script>
-  <script src="app.js?v=2.9.1" defer></script>
+  <script src="app.js?v=2.9.2" defer></script>
 </body>
 </html>
