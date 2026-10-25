@@ -35,7 +35,7 @@ test('configured live failures do not silently load the demo seed', () => {
 });
 
 test('navigation points to the official published risk map', () => {
-  assert.match(html, /href="https:\/\/krit-pj\.github\.io\/agri-risk-map-burning\/"/);
+  assert.match(html, /href="https:\/\/krit-pj\.github\.io\/TH-Agri-Risk-Maps-Burning\/"/);
 });
 
 // Execute actual pure frontend functions against the backend wire shape.
