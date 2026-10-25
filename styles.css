@@ -118,3 +118,5 @@ p,td{font-size:1rem}.field-hint,small{font-size:.8125rem;line-height:1.6}.eyebro
 @media(max-width:700px){.brand-copy strong{font-size:1.125rem}.brand-copy small:not(.developer-credit){font-size:1rem}.brand-copy .developer-credit{font-size:.8125rem}.province-mark{width:32px;height:32px;font-size:.75rem}.preview-toolbar{padding:14px 12px}.preview-toolbar label{width:100%;min-width:0}.preview-toolbar>span{min-width:0;width:100%}}
 
 .site-footer small{display:block;margin-top:6px;color:#d8e8dd}.site-footer a{color:#f0dda3;text-underline-offset:3px}
+
+.main-nav .external-nav{border:2px solid #1c5a3e;border-radius:9px;background:#fff;color:#174f38;min-height:44px;display:inline-flex;align-items:center;justify-content:center;margin:4px;overflow-wrap:anywhere}.main-nav .external-nav:hover{background:#e8f3eb}.main-nav .external-nav:focus-visible{outline:3px solid #986500;outline-offset:3px}@media(max-width:700px){.main-nav .external-nav{margin:0;width:100%}.main-nav .external-nav:last-child{grid-column:auto}}

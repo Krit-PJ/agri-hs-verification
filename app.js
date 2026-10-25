@@ -23,7 +23,7 @@
   const state = {
     all: [], filtered: [], visible: PAGE_SIZE, selected: null, map: null,
     markers: null, mapFailed: false, photos: [], location: null,
-    endpoint: (previewMode||phoneDemoMode)?'':globalThis.HS_SITE_CONFIG?.apiEndpoint || localStorage.getItem(STORE_ENDPOINT) || '', token: phoneDemoMode?'':sessionStorage.getItem(SESSION_TOKEN) || '',
+    endpoint: (previewMode||phoneDemoMode)?'':localStorage.getItem(STORE_ENDPOINT) || globalThis.HS_SITE_CONFIG?.apiEndpoint || '', token: phoneDemoMode?'':sessionStorage.getItem(SESSION_TOKEN) || '',
     profile: phoneDemoMode?null:readSessionProfile(), expiresAt:phoneDemoMode?'':sessionStorage.getItem(SESSION_EXPIRES_AT) || '',
     csrf:phoneDemoMode?'':sessionStorage.getItem('hsverify.csrf')||'',authValidated:false, serverConfig: null, busy: false, dataLoaded:false, importCandidate:null, sourceName:"", latestYear:null
   };
@@ -33,7 +33,9 @@
   async function init() {
     ['startMonthFilter','endMonthFilter','quickProvinceFilter','resetPeriod','inspectorAccount','refreshDataButton','dataSourceLabel','selectionContext','summaryDistrict','summaryTambon','summaryYear','summaryReset','printReportButton','roleLabel','adminLoginGate','adminLoginForm','loginUsername','loginPassword','loginButton','loginMessage','adminProtected','adminDisplayName','adminRoleDescription','logoutButton','serverSettingsCard','workspaceSettingsCard','hsImportFile','importDatasetYear','importPreview','confirmFileImport','importMessage','importPhotoInput','modeBadge','demoNotice','liveError','yearFilter','monthFilter','districtFilter','tambonFilter','villageFilter','cropFilter','statusFilter','resultFilter','searchFilter','resetFilters','allHotspotsButton','resultCount','selectedCount','hotspotList','loadMore','mapLayout','mapFallback','summaryStats','summaryLevel','summaryBody','verifyDialog','verifyForm','verifyTitle','selectedMeta','navigateLink','locateButton','locationPanel','noGps','noGpsReasonWrap','noGpsReason','photoInput','photoPreview','noteInput','noteCount','actionInput','verifyMessage','saveDraftButton','reviewSubmitButton','confirmDialog','confirmSummary','confirmSubmit','cancelConfirm','closeDialog','retryButton','retryCount','toastRegion','menuButton','mainNav','apiEndpoint','connectButton','connectionDot','connectionMessage','sheetId','sourceSheet','driveId','saveConfigButton','configMessage','adminResult'].forEach(id => dom[id] = $(id));
     if (sessionExpired()) clearSession();
+    if(state.token&&(sessionStorage.getItem('hsverify.sessionEndpoint')||globalThis.HS_SITE_CONFIG?.apiEndpoint)!==state.endpoint)clearSession();
     dom.apiEndpoint.value = state.endpoint;
+    initSiteSettings();
     bindEvents();
     if(nationalMode){HSNationUI.init({api,rows:()=>state.all,profile:()=>state.profile,valid:()=>Boolean(state.authValidated&&state.token&&!sessionExpired()),reload:loadData,change:provinceChanged});setInterval(()=>{if(state.token&&sessionExpired()){clearSession();state.all=[];state.filtered=[];applyRoleUI();renderAll();loadData();}},15000);}
     HSField.init();
@@ -621,6 +623,7 @@
     if(typeof HSAccessNavigation!=='undefined')HSAccessNavigation.updateAccess(authenticated);
     const canManage=authenticated && ['admin','super_admin'].includes(role);
     const canConfigure=authenticated && role==='super_admin';
+    if(dom.apiEndpoint)dom.apiEndpoint.disabled=!canConfigure;if(dom.connectButton)dom.connectButton.disabled=!canConfigure;const endpointApply=document.getElementById('applyEndpointButton');if(endpointApply)endpointApply.disabled=!canConfigure;
     if(typeof HSTeam!=='undefined')HSTeam.updateAccess();
     dom.adminLoginGate.hidden=true;
     dom.adminProtected.hidden=!canManage;
@@ -710,7 +713,7 @@
       const result=await api('loginPhone',{phone});
       if(!result?.token||result.profile?.role!=='inspector'||!result.csrf)throw new Error('ข้อมูลสิทธิ์ผู้บันทึกไม่ถูกต้อง');
       state.csrf=result.csrf;state.authValidated=true;state.token=result.token;state.profile=result.profile;state.expiresAt=result.expiresAt||'';
-      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
+      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem('hsverify.sessionEndpoint',state.endpoint);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
       if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
       state.serverConfig={profile:state.profile};applyRoleUI();state.dataLoaded=false;state.all=[];state.filtered=[];renderAll();switchView('work');void loadData();toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
     } catch(error){clearSession();applyRoleUI();throw error;}
@@ -728,7 +731,7 @@
       const role=normalizedRole(result?.profile?.role);
       if(!result?.token||!result?.csrf||!['admin','super_admin'].includes(role))throw new Error('บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ');
       state.csrf=result.csrf;state.authValidated=true;state.token=result.token;state.profile={...result.profile,role};state.expiresAt=result.expiresAt||'';
-      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
+      sessionStorage.setItem('hsverify.csrf',state.csrf);sessionStorage.setItem('hsverify.sessionEndpoint',state.endpoint);sessionStorage.setItem(SESSION_TOKEN,state.token);sessionStorage.setItem(SESSION_PROFILE,JSON.stringify(state.profile));
       if(state.expiresAt)sessionStorage.setItem(SESSION_EXPIRES_AT,state.expiresAt);
       state.serverConfig={profile:state.profile};applyRoleUI();state.all=[];state.filtered=[];renderAll();state.dataLoaded=false;
       switchView('admin');void loadData();toast('เข้าสู่ระบบแล้ว: '+state.profile.displayName);if(typeof HSUsageUI!=='undefined')HSUsageUI.user();
@@ -754,14 +757,33 @@
     }
   }
 
-  async function connectServer() {
-    if (normalizedRole(state.profile?.role)!=='super_admin') return setMessage(dom.connectionMessage,'เฉพาะ Super Admin เท่านั้นที่ตรวจการเชื่อมต่อนี้ได้','error');
-    dom.connectButton.disabled = true; setMessage(dom.connectionMessage,'กำลังตรวจสอบ…');
-    try {
-      const config = await api('getConfig',{}); state.serverConfig = {...config,profile:state.profile}; applyConfigToForm(state.serverConfig);
-      dom.connectionDot.className = 'connection-dot online'; setMessage(dom.connectionMessage,previewMode?'โหมดทดสอบในเครื่อง · ไม่ได้เชื่อม Google จริง':'เชื่อมต่อสำเร็จ','success'); await loadData();
-    } catch (error) { dom.connectionDot.className = 'connection-dot offline'; setMessage(dom.connectionMessage,friendlyError(error),'error'); }
-    finally { dom.connectButton.disabled = false; }
+  function siteSettingsAllowed(){return Boolean(state.authValidated&&state.token&&!sessionExpired()&&state.profile?.role==='super_admin');}
+  function initSiteSettings(){
+    if(typeof HSSiteSettings==='undefined')return;
+    const apply=value=>{for(const [key,prefix] of [['risk','risk'],['hub','hub']]){const item=value[key],link=$(prefix+'NavLink');if(link){link.textContent=item.label+' ↗';link.href=item.url;}$(prefix+'LinkLabel').value=item.label;$(prefix+'LinkUrl').value=item.url;}};
+    apply(HSSiteSettings.read(localStorage));
+    $('saveNavigationButton').onclick=()=>{try{const value=HSSiteSettings.save(localStorage,{risk:{label:$('riskLinkLabel').value,url:$('riskLinkUrl').value},hub:{label:$('hubLinkLabel').value,url:$('hubLinkUrl').value}},siteSettingsAllowed());apply(value);setMessage($('navigationSettingsMessage'),'บันทึกชื่อและลิงก์บนเบราว์เซอร์เครื่องนี้แล้ว','success');}catch(error){setMessage($('navigationSettingsMessage'),friendlyError(error),'error');}};
+    $('applyEndpointButton').onclick=()=>connectServer(true);
+  }
+  async function connectServer(save=false) {
+    // Event listeners pass a MouseEvent; only explicit true commits the new endpoint.
+    save=save===true;
+    if(!siteSettingsAllowed())return setMessage(dom.connectionMessage,'เฉพาะ Super Admin เท่านั้น','error');
+    const candidate=dom.apiEndpoint.value.trim(),original=state.endpoint,token=state.token;
+    dom.connectButton.disabled=true;$('applyEndpointButton').disabled=true;setMessage(dom.connectionMessage,'กำลังทดสอบ URL ที่ระบุ…');
+    try{
+      const endpoint=HSSiteSettings.url(candidate,true),policy=await HSSiteSettings.probe(endpoint);
+      if(!siteSettingsAllowed()||state.token!==token||state.endpoint!==original)throw Error('บัญชีหรือปลายทางเปลี่ยนระหว่างทดสอบ กรุณาลองใหม่');
+      dom.connectionDot.className='connection-dot online';
+      if(save&&endpoint!==original){
+        if(state.busy||state.importCandidate||dom.verifyDialog?.open)throw Error('กรุณาปิดงานที่กำลังทำก่อนเปลี่ยนปลายทาง');
+        if((await getJobs()).length)throw Error('มีงานรอส่งในเครื่อง กรุณาส่งงานให้ครบก่อนเปลี่ยน API');
+        if(!siteSettingsAllowed()||state.token!==token||state.endpoint!==original)throw Error('บัญชีเปลี่ยน กรุณาทดสอบใหม่');
+        // Never transfer the old token/CSRF to a new server.
+        localStorage.setItem(STORE_ENDPOINT,endpoint);clearSession();state.endpoint=endpoint;state.serverConfig=null;state.all=[];state.filtered=[];state.loadRevision=(state.loadRevision||0)+1;state.dataLoaded=false;state.boundaryHS=null;dom.apiEndpoint.value=endpoint;applyRoleUI();renderAll();HSRegistration.openAccess('manager');toast('เปลี่ยน API แล้ว กรุณาเข้าสู่ระบบปลายทางใหม่');
+      }else setMessage(dom.connectionMessage,'เชื่อมต่อ API สำเร็จ · ประกาศ '+policy.version+(save?' · ใช้ URL นี้อยู่แล้ว':''),'success');
+    }catch(error){dom.connectionDot.className='connection-dot offline';setMessage(dom.connectionMessage,friendlyError(error),'error');}
+    finally{dom.connectButton.disabled=!siteSettingsAllowed();$('applyEndpointButton').disabled=!siteSettingsAllowed();}
   }
 
   function applyConfigToForm(config) {
