@@ -272,3 +272,60 @@ test('values keep their text form in the sheet (phones, dates) and the daily cou
   assert.equal(second.counter.today, 2);
   assert.equal(env.get({ action: 'counter' }).counter.today, 2);
 });
+
+test('Super Admin appoints a national Mini Super Admin who manages every province but not Super/Mini Super Admins', () => {
+  const env = boot();
+  const sup = loginSuper(env);
+  const made = env.call({ action: 'account_save', token: sup.token, phone: '0899000000', fullName: 'ผู้ดูแลประเทศ', position: 'ผอ.', affiliation: 'กรม', provinceCode: 'ALL', role: 'minisuper' });
+  assert.match(made.accountId, /^A-TH-\d{3}$/);
+  const nat = loginPhone(env, '0899000000');
+  assert.equal(nat.user.prov, '*');
+  assert.equal(nat.user.provName, 'ทุกจังหวัด');
+  // works in any province
+  addAdmin(env, nat.token, '0844444444', '51');
+  const saved = env.call(verifiedPayload(nat.token, { province: '51', hotspotId: 'VI1202401010701urvpfzzxgz' }));
+  assert.equal(saved.verification.canDelete, true);
+  const list = env.call({ action: 'accounts_list', token: nat.token });
+  assert.ok(list.accounts.some(a => a.provinceCode === '51') && list.accounts.some(a => a.provinceCode === '62'));
+  assert.equal(list.superAdmin.username, 'root');
+  // cannot touch Mini Super Admins (including the provincial one) or create national accounts
+  const provMini = list.accounts.find(a => a.role === 'minisuper' && a.provinceCode === '62');
+  expectError(() => env.call({ action: 'account_status', token: nat.token, accountId: provMini.accountId, status: 'disabled' }), /เฉพาะ Super Admin/);
+  expectError(() => env.call({ action: 'account_delete', token: nat.token, accountId: provMini.accountId }), /เฉพาะ Super Admin/);
+  expectError(() => addAdmin(env, nat.token, '0812000000', 'ALL', 'minisuper'), /เฉพาะ Super Admin/);
+  expectError(() => env.call({ action: 'settings_get', token: nat.token }), /เฉพาะ Super Admin/);
+  // logs: everything except Super Admin
+  const logs = env.call({ action: 'audit_list', token: nat.token }).logs;
+  assert.ok(logs.some(l => l.provinceCode === '51') && logs.some(l => l.action === 'verification_create'));
+  assert.ok(logs.every(l => l.role !== 'superadmin'));
+  // provincial Mini Super Admin cannot see or manage the national account
+  const pm = loginPhone(env, '0811111111');
+  assert.ok(env.call({ action: 'accounts_list', token: pm.token }).accounts.every(a => a.provinceCode === '62'));
+  assert.equal(env.call({ action: 'accounts_list', token: pm.token }).superAdmin, null);
+});
+
+test('access history: visits are logged at most every 30 minutes and summarised per person and per day', () => {
+  const env = boot();
+  const sup = loginSuper(env);
+  const mini = loginPhone(env, '0811111111');
+  expectError(() => loginPhone(env, '0800000001'), /ไม่พบ/);
+  assert.equal(env.call({ action: 'touch', token: mini.token, page: 'work' }).logged, true);
+  assert.equal(env.call({ action: 'touch', token: mini.token, page: 'work' }).logged, false);
+  const rep = env.call({ action: 'login_report', token: sup.token, days: 7 });
+  assert.equal(rep.daily.length, 7);
+  const today = rep.daily[rep.daily.length - 1];
+  assert.equal(today.success, 2);
+  assert.equal(today.failed, 1);
+  assert.equal(today.visits, 1);
+  assert.equal(today.users, 2);
+  const p = rep.people.find(x => x.key === mini.user.sub);
+  assert.equal(p.logins, 1);
+  assert.equal(p.visits, 1);
+  assert.equal(rep.unknown[0].identifier, '0800000001');
+  assert.equal(rep.stats.loginsToday, 2);
+  const own = env.call({ action: 'login_report', token: mini.token });
+  assert.ok(own.people.every(x => x.role !== 'superadmin'));
+  assert.equal(own.unknown.length, 0, 'unknown numbers are national-only');
+  const filtered = env.call({ action: 'login_report', token: sup.token, role: 'superadmin' });
+  assert.ok(filtered.attempts.every(a => a.role === 'superadmin'));
+});

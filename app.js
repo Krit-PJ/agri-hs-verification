@@ -10,6 +10,8 @@
   const LAST_PERSON = 'hsverify.v3.personCategory';
   const MAX_PHOTOS = 3;
   const mobile = () => matchMedia('(max-width: 700px)').matches;
+  const allMode = () => state.province === C.ALL;
+  const scopeName = () => allMode() ? 'ทุกจังหวัด' : 'จังหวัด' + C.provinceName(state.province);
 
   const state = {
     provinces: [], province: '', rows: [], filtered: [], visible: PAGE, source: '',
@@ -35,6 +37,7 @@
     applySessionUI();
     counter();
     await loadProvinces();
+    touch();
     refreshOutbox();
     watchBackToMap();
   }
@@ -46,11 +49,12 @@
     $('accessLoginNav').addEventListener('click', () => { toggleMenu(false); HSApi.user() ? logout() : HSAdmin.openAccess('phone'); });
     $('provinceSelect').addEventListener('change', e => loadProvince(e.target.value));
     document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
-    ['districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'startMonth', 'endMonth'].forEach(id => $(id).addEventListener('change', () => {
+    ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'startMonth', 'endMonth'].forEach(id => $(id).addEventListener('change', () => {
+      if (id === 'provinceFilter') { $('districtFilter').value = ''; $('tambonFilter').value = ''; $('villageFilter').value = ''; loadBoundaries($('provinceFilter').value); }
       if (id === 'districtFilter') { $('tambonFilter').value = ''; $('villageFilter').value = ''; }
       if (id === 'tambonFilter') $('villageFilter').value = '';
-      if (['districtFilter', 'tambonFilter', 'startMonth', 'endMonth'].includes(id)) fillLocationFilters();
-      state.fitPending = ['districtFilter', 'tambonFilter', 'villageFilter'].includes(id);
+      if (['provinceFilter', 'districtFilter', 'tambonFilter', 'startMonth', 'endMonth'].includes(id)) fillLocationFilters();
+      state.fitPending = ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter'].includes(id);
       if (id === 'startMonth' || id === 'endMonth') $('summaryYear').value = '';
       applyFilters();
       if (id === 'districtFilter' || id === 'tambonFilter') drawBoundaries();
@@ -119,7 +123,7 @@
     $('adminNav').textContent = user && C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'งานของฉัน';
     const live = HSApi.configured();
     $('modeBadge').className = 'mode-badge ' + (user ? 'live' : 'demo');
-    $('modeBadge').textContent = user ? C.ROLE_LABELS[user.role] + (user.prov && user.prov !== '*' ? ' · ' + (C.PROVINCES[user.prov] || '') : '') : live ? 'ข้อมูลสาธารณะ' : 'อ่านอย่างเดียว';
+    $('modeBadge').textContent = user ? C.ROLE_LABELS[user.role] + ' · ' + C.scopeLabel(user) : live ? 'ข้อมูลสาธารณะ' : 'อ่านอย่างเดียว';
     const notice = $('publicNotice');
     notice.hidden = live;
     if (!live) notice.innerHTML = '<strong>ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ</strong><span>แสดงจุด HS จาก Google Sheet ต้นทางได้ แต่ยังเข้าสู่ระบบและบันทึกผลไม่ได้ จนกว่าผู้ติดตั้งจะเชื่อม API</span>';
@@ -130,13 +134,16 @@
   }
 
   function sessionChanged() {
+    renderProvinceOptions();
     applySessionUI();
     counter();
+    touch();
     HSAdmin.render();
     const pending = state.pendingHs;
     state.pendingHs = null;
     const user = HSApi.user();
-    const reload = state.province ? loadProvince(user && !C.can(user, 'chooseProvince') ? user.prov : state.province, true) : Promise.resolve();
+    const target = user && !C.can(user, 'chooseProvince') ? user.prov : (state.province === C.ALL && !C.can(user, 'allProvinces') ? '' : state.province);
+    const reload = target ? loadProvince(target, target === state.province) : (state.province ? loadProvince('') : Promise.resolve());
     reload.then(() => {
       if (pending && user) { const r = state.rows.find(x => x.hsId === pending); if (r) openVerify(r); }
     });
@@ -147,6 +154,12 @@
     await HSApi.logout();
     toast('ออกจากระบบแล้ว');
     sessionChanged();
+  }
+
+  /** บันทึกการเปิดใช้งานของผู้ที่เข้าสู่ระบบค้างไว้ (เซิร์ฟเวอร์บันทึกไม่เกิน 1 ครั้ง/30 นาที) */
+  function touch() {
+    if (!HSApi.user()) return;
+    HSApi.post('touch', { page: state.province === C.ALL ? 'ทุกจังหวัด' : state.province ? 'จังหวัด' + C.provinceName(state.province) : 'หน้าแรก', device: (navigator.userAgent || '').slice(0, 120) }).catch(() => {});
   }
 
   function counter() {
@@ -173,7 +186,7 @@
     }
     const canRecord = C.can(user, 'record', { province: state.province });
     const t = C.tally(state.rows);
-    const prov = user.prov && user.prov !== '*' ? 'จังหวัด' + (C.PROVINCES[user.prov] || '') : 'ทุกจังหวัด';
+    const prov = C.scopeLabel(user);
     bar.className = 'field-bar staff';
     bar.innerHTML = '<div><strong>' + esc(user.name) + '</strong><span>' + esc(C.ROLE_LABELS[user.role]) + ' · ' + esc(prov) + (state.province ? ' · รอตรวจ ' + t.pending.toLocaleString('th-TH') + ' · ร่าง ' + t.draft.toLocaleString('th-TH') + ' · ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') : '') + '</span></div>' +
       '<div class="field-bar-actions">' + (canRecord && state.province ? '<button type="button" class="primary-button" data-fb="near">⌖ จุดรอตรวจใกล้ฉัน</button><button type="button" class="secondary-button" data-fb="pending">รายการรอตรวจ</button>' : '') +
@@ -212,19 +225,54 @@
       state.provinces = [];
     }
     state.provinces.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-    sel.innerHTML = '<option value="">— เลือกจังหวัด (' + state.provinces.length + ' จังหวัดที่มีข้อมูล HS) —</option>' +
-      state.provinces.map(p => '<option value="' + esc(p.code) + '">' + esc(p.name) + (p.hsCount ? ' · ' + Number(p.hsCount).toLocaleString('th-TH') + ' จุด' : '') + '</option>').join('');
+    renderProvinceOptions();
     HSAdmin.provincesLoaded();
     const user = HSApi.user();
     let code = user && !C.can(user, 'chooseProvince') ? user.prov : (new URLSearchParams(location.search).get('province') || '');
     if (!code) { try { code = localStorage.getItem(LAST_PROVINCE) || ''; } catch (_) {} }
-    if (code && state.provinces.some(p => p.code === code)) await loadProvince(code);
+    if (code && provinceAllowed(code)) await loadProvince(code);
     else renderAll();
+  }
+
+  function provinceAllowed(code) {
+    if (code === C.ALL) return C.can(HSApi.user(), 'allProvinces') && state.provinces.length > 0;
+    return state.provinces.some(p => p.code === code);
+  }
+  function renderProvinceOptions() {
+    const sel = $('provinceSelect'), user = HSApi.user();
+    const total = state.provinces.reduce((n, p) => n + (Number(p.hsCount) || 0), 0);
+    sel.innerHTML = '<option value="">— เลือกจังหวัด (' + state.provinces.length + ' จังหวัดที่มีข้อมูล HS) —</option>' +
+      (C.can(user, 'allProvinces') && state.provinces.length ? '<option value="' + C.ALL + '">★ ทุกจังหวัดที่มีข้อมูล' + (total ? ' · ' + total.toLocaleString('th-TH') + ' จุด' : '') + '</option>' : '') +
+      state.provinces.map(p => '<option value="' + esc(p.code) + '">' + esc(p.name) + (p.hsCount ? ' · ' + Number(p.hsCount).toLocaleString('th-TH') + ' จุด' : '') + '</option>').join('');
+    sel.value = state.province && provinceAllowed(state.province) ? state.province : '';
+    $('provinceFilter').innerHTML = '<option value="">ทุกจังหวัด</option>' + state.provinces.map(p => '<option value="' + esc(p.code) + '">' + esc(p.name) + '</option>').join('');
+  }
+
+  /** โหลด HS ทุกจังหวัดพร้อมกันครั้งละ 4 จังหวัด (ใช้แคชฝั่งเซิร์ฟเวอร์ของแต่ละจังหวัด) */
+  async function loadAllProvinces() {
+    const codes = state.provinces.map(p => p.code), out = new Array(codes.length);
+    let next = 0, done = 0;
+    const failed = [];
+    const worker = async () => {
+      while (next < codes.length) {
+        const i = next++;
+        try {
+          out[i] = HSApi.configured() ? C.fromApi(await HSApi.get('hotspots', { province: codes[i] }))
+            : C.fromSheetSource((await HSSheetSource.load(cfg.sourceSheetUrl, codes[i], C.PROVINCES)).rows);
+        } catch (err) { failed.push(C.provinceName(codes[i])); out[i] = []; }
+        done++;
+        $('dataSourceLabel').textContent = 'กำลังอ่านจุดความร้อน ' + done + '/' + codes.length + ' จังหวัด…';
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, codes.length) }, worker));
+    if (failed.length) showError('อ่านข้อมูลไม่สำเร็จบางจังหวัด: ' + failed.join(', ') + ' — กด “อัปเดตข้อมูล” เพื่อลองใหม่');
+    return out.flat();
   }
 
   async function loadProvince(code, force) {
     const user = HSApi.user();
     if (user && !C.can(user, 'chooseProvince') && code !== user.prov) code = user.prov;
+    if (code === C.ALL && !C.can(user, 'allProvinces')) code = '';
     $('provinceSelect').value = code || '';
     if (!code) { state.province = ''; state.rows = []; updateBrand(); renderAll(); return; }
     if (code !== state.province) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); state.periodSet = false; }
@@ -234,7 +282,10 @@
     setLoading(true);
     $('liveError').hidden = true;
     try {
-      if (HSApi.configured()) {
+      if (code === C.ALL) {
+        state.rows = await loadAllProvinces();
+        state.source = 'ฐานข้อมูลผลตรวจ + จุด HS ทุกจังหวัด (' + state.provinces.length + ' จังหวัด) จากระบบ Agri-Risk Map';
+      } else if (HSApi.configured()) {
         state.rows = C.fromApi(await HSApi.get('hotspots', { province: code }));
         state.source = 'ฐานข้อมูลผลตรวจ + จุด HS_' + code + ' จากระบบ Agri-Risk Map';
       } else {
@@ -250,26 +301,31 @@
       state.periodSet = true;
       fillLocationFilters();
       fillCropFilter();
-      loadBoundaries(code);
+      loadBoundaries(code === C.ALL ? $('provinceFilter').value : code);
       applyFilters();
       const p = state.provinces.find(x => x.code === code);
-      $('provinceCoverage').textContent = state.rows.length.toLocaleString('th-TH') + ' จุด' + (p && p.firstDate ? ' · ข้อมูล ' + C.thaiDate(p.firstDate) + ' – ' + C.thaiDate(p.lastDate) : '');
+      $('provinceCoverage').textContent = state.rows.length.toLocaleString('th-TH') + ' จุด' + (code === C.ALL ? ' จาก ' + state.provinces.length + ' จังหวัด' : '') + (p && p.firstDate ? ' · ข้อมูล ' + C.thaiDate(p.firstDate) + ' – ' + C.thaiDate(p.lastDate) : '');
+      $('provinceFilterWrap').hidden = code !== C.ALL;
+      const levelOpt = $('summaryLevel').querySelector('option[value=province]');
+      levelOpt.hidden = code !== C.ALL;
+      if (code === C.ALL && force !== true) $('summaryLevel').value = 'province';
+      if (code !== C.ALL && $('summaryLevel').value === 'province') $('summaryLevel').value = 'amphoe';
       $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source;
     } catch (err) {
       state.rows = [];
-      showError('อ่านจุดความร้อนของจังหวัด' + C.PROVINCES[code] + ' ไม่สำเร็จ: ' + err.message);
+      showError('อ่านจุดความร้อน' + (code === C.ALL ? 'ทุกจังหวัด' : 'ของจังหวัด' + C.provinceName(code)) + ' ไม่สำเร็จ: ' + err.message);
       renderAll();
     } finally { setLoading(false); renderFieldBar(); }
   }
 
   function updateBrand() {
     const code = state.province;
-    const logo = code && globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[code];
+    const logo = code && code !== C.ALL && globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[code];
     $('provinceLogo').hidden = !logo;
     $('provinceLogoFallback').hidden = Boolean(logo);
-    if (logo) { $('provinceLogo').src = logo.path; $('provinceLogo').alt = 'ตราประจำจังหวัด' + C.PROVINCES[code]; }
-    $('areaSubtitle').textContent = code ? 'พื้นที่การเกษตรในจังหวัด' + C.PROVINCES[code] : 'พื้นที่การเกษตรของประเทศไทย';
-    $('resultsTitle').textContent = code ? 'จุดความร้อน จังหวัด' + C.PROVINCES[code] : 'จุดความร้อน';
+    if (logo) { $('provinceLogo').src = logo.path; $('provinceLogo').alt = 'ตราประจำจังหวัด' + C.provinceName(code); }
+    $('areaSubtitle').textContent = code && code !== C.ALL ? 'พื้นที่การเกษตรในจังหวัด' + C.provinceName(code) : 'พื้นที่การเกษตรของประเทศไทย';
+    $('resultsTitle').textContent = !code ? 'จุดความร้อน' : code === C.ALL ? 'จุดความร้อน ทุกจังหวัด' : 'จุดความร้อน จังหวัด' + C.provinceName(code);
   }
 
   function setLoading(on) { $('refreshDataButton').disabled = on; $('refreshDataButton').textContent = on ? 'กำลังอ่าน…' : '↻ อัปเดตข้อมูล'; }
@@ -296,7 +352,7 @@
   function filters() {
     let start = $('startMonth').value, end = $('endMonth').value;
     if (start && end && start > end) [start, end] = [end, start];
-    return { start, end, district: $('districtFilter').value, tambon: $('tambonFilter').value, village: $('villageFilter').value, crop: $('cropFilter').value, status: $('statusFilter').value, result: $('resultFilter').value, search: $('searchFilter').value };
+    return { start, end, province: allMode() ? $('provinceFilter').value : '', district: $('districtFilter').value, tambon: $('tambonFilter').value, village: $('villageFilter').value, crop: $('cropFilter').value, status: $('statusFilter').value, result: $('resultFilter').value, search: $('searchFilter').value };
   }
   function fillSelect(id, values, allLabel) {
     const sel = $(id), current = sel.value;
@@ -305,8 +361,10 @@
   }
   function fillLocationFilters() {
     const f = filters();
-    const inPeriod = r => (!f.start || C.monthKey(r.date) >= f.start) && (!f.end || C.monthKey(r.date) <= f.end);
-    fillSelect('districtFilter', C.distinct(state.rows, 'district', inPeriod), 'ทุกอำเภอ');
+    const inPeriod = r => (!f.start || C.monthKey(r.date) >= f.start) && (!f.end || C.monthKey(r.date) <= f.end) && (!f.province || r.provinceCode === f.province);
+    const needProvince = allMode() && !f.province;
+    fillSelect('districtFilter', needProvince ? [] : C.distinct(state.rows, 'district', inPeriod), needProvince ? 'เลือกจังหวัดก่อน' : 'ทุกอำเภอ');
+    $('districtFilter').disabled = needProvince;
     const d = $('districtFilter').value;
     fillSelect('tambonFilter', d ? C.distinct(state.rows, 'tambon', r => inPeriod(r) && r.district === d) : [], d ? 'ทุกตำบล' : 'เลือกอำเภอก่อน');
     const t = $('tambonFilter').value;
@@ -315,7 +373,7 @@
   }
   function fillCropFilter() { fillSelect('cropFilter', C.distinct(state.rows, 'plantType'), 'ทุกประเภท'); }
   function resetFilterControls() {
-    ['districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'searchFilter'].forEach(id => { $(id).value = ''; });
+    ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'searchFilter'].forEach(id => { $(id).value = ''; });
   }
   function resetFilters() {
     resetFilterControls(); setDefaultPeriod(); fillLocationFilters(); state.fitPending = true; state.near = null; clearMe(); applyFilters(); drawBoundaries(); renderFieldBar();
@@ -335,6 +393,7 @@
   function renderChips() {
     const f = filters(), chips = [];
     if (f.start) chips.push(C.monthLabel(f.start) + '–' + C.monthLabel(f.end));
+    if (f.province) chips.push('จ.' + C.provinceName(f.province));
     if (f.district) chips.push('อ.' + f.district);
     if (f.tambon) chips.push('ต.' + f.tambon);
     if (f.village) chips.push(f.village);
@@ -367,7 +426,7 @@
   }
   const statusText = r => r.result ? C.RESULT_LABELS[r.result] + (r.status === 'draft' ? ' (ร่าง)' : '') : C.STATUS_LABELS[r.status] || 'รอตรวจ';
   const statusClass = r => r.status === 'verified' && r.result ? r.result : r.status;
-  const areaLabel = r => [r.village, r.tambon, r.district].filter(Boolean).join(' · ') || 'ไม่ระบุพื้นที่';
+  const areaLabel = r => [r.village, r.tambon, r.district].concat(allMode() ? ['จ.' + C.provinceName(r.provinceCode)] : []).filter(Boolean).join(' · ') || 'ไม่ระบุพื้นที่';
   function card(r, canRecord) {
     const action = canRecord ? (r.status === 'pending' ? 'บันทึกผล' : 'ดู / แก้ไขผล') : 'ดูรายละเอียด';
     return '<article class="hotspot-card' + (canRecord && r.status === 'pending' ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '">' +
@@ -413,14 +472,14 @@
     const rows = summaryRows(), t = C.tally(rows), f = filters();
     const stat = (v, label, color) => '<article class="stat-card" style="--accent:' + color + '"><strong>' + Number(v).toLocaleString('th-TH') + '</strong><span>' + label + '</span></article>';
     $('summaryStats').innerHTML = stat(t.total, 'จุดความร้อนทั้งหมด', '#174f38') + stat(t.verified, 'ตรวจแล้ว (' + t.progress + '%)', '#18845d') + stat(t.burned, 'พบการเผา', C.COLORS.burned) + stat(t.not_burned, 'ไม่พบการเผา', C.COLORS.not_burned) + stat(t.followup, 'ต้องติดตาม / ตรวจซ้ำ', C.COLORS.needs_review) + stat(t.pending + t.draft, 'รอตรวจ / งานร่าง', C.COLORS.pending);
-    $('summaryScopeHint').textContent = 'จังหวัด' + C.PROVINCES[state.province] + (f.district ? ' › อำเภอ' + f.district : '') + (f.tambon ? ' › ตำบล' + f.tambon : '') + (f.start ? ' · ' + C.monthLabel(f.start) + ' – ' + C.monthLabel(f.end) : '');
+    $('summaryScopeHint').textContent = scopeName() + (f.province ? ' › จังหวัด' + C.provinceName(f.province) : '') + (f.district ? ' › อำเภอ' + f.district : '') + (f.tambon ? ' › ตำบล' + f.tambon : '') + (f.start ? ' · ' + C.monthLabel(f.start) + ' – ' + C.monthLabel(f.end) : '');
     const groups = C.groupSummary(rows, $('summaryLevel').value);
     $('summaryBody').innerHTML = groups.length ? groups.map(g => '<tr><td data-label="พื้นที่">' + esc(g.area) + '</td><td data-label="ทั้งหมด">' + g.total + '</td><td data-label="ตรวจแล้ว">' + g.verified + '</td><td data-label="พบการเผา">' + g.burned + '</td><td data-label="ไม่พบการเผา">' + g.not_burned + '</td><td data-label="งานร่าง">' + g.draft + '</td><td data-label="ความคืบหน้า"><div class="progress" role="img" aria-label="' + g.progress + '%"><i style="width:' + g.progress + '%"></i></div><small>' + g.progress + '%</small></td></tr>').join('') : '<tr><td colspan="7" class="muted">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
   }
 
   function exportSummary() {
     const groups = C.groupSummary(summaryRows(), $('summaryLevel').value);
-    download('สรุปผลตรวจ_' + C.PROVINCES[state.province] + '.csv', C.toCsv([
+    download('สรุปผลตรวจ_' + scopeName() + '.csv', C.toCsv([
       { label: 'พื้นที่', key: 'area' }, { label: 'ทั้งหมด', key: 'total' }, { label: 'ตรวจแล้ว', key: 'verified' }, { label: 'พบการเผา', key: 'burned' },
       { label: 'ไม่พบการเผา', key: 'not_burned' }, { label: 'ติดตาม', key: 'followup' }, { label: 'งานร่าง', key: 'draft' }, { label: 'รอตรวจ', key: 'pending' }, { label: 'ความคืบหน้า %', key: 'progress' }
     ], groups));
@@ -430,11 +489,11 @@
     const rows = summaryRows(), t = C.tally(rows);
     const groups = C.groupSummary(rows, $('summaryLevel').value);
     const burned = rows.filter(r => r.status === 'verified' && r.result === 'burned').slice(0, 300);
-    const logo = globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[state.province];
+    const logo = !allMode() && globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[state.province];
     const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
-    const html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานผลตรวจสอบจุดความร้อน ' + esc(C.PROVINCES[state.province]) + '</title><base href="' + esc(base) + '">' +
+    const html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานผลตรวจสอบจุดความร้อน ' + esc(scopeName()) + '</title><base href="' + esc(base) + '">' +
       '<style>@page{size:A4 landscape;margin:12mm}body{font-family:"Sarabun","Noto Sans Thai",sans-serif;color:#1f2328;font-size:12px}header{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1a7f37;padding-bottom:8px}header img{height:56px}h1{font-size:20px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #c9d1d9;padding:4px 6px;text-align:left}th{background:#dafbe1}.stats{display:flex;gap:8px;margin:10px 0}.stats div{border:1px solid #c9d1d9;border-radius:8px;padding:6px 10px}.stats b{display:block;font-size:18px}footer{margin-top:12px;color:#57606a;font-size:10px}</style></head><body>' +
-      '<header><img src="assets/logo-doae.png" alt="">' + (logo ? '<img src="' + esc(logo.path) + '" alt="">' : '') + '<div><h1>รายงานผลการตรวจสอบจุดความร้อนในพื้นที่การเกษตร จังหวัด' + esc(C.PROVINCES[state.province]) + '</h1><div>' + esc($('summaryScopeHint').textContent) + '</div></div></header>' +
+      '<header><img src="assets/logo-doae.png" alt="">' + (logo ? '<img src="' + esc(logo.path) + '" alt="">' : '') + '<div><h1>รายงานผลการตรวจสอบจุดความร้อนในพื้นที่การเกษตร ' + esc(scopeName()) + '</h1><div>' + esc($('summaryScopeHint').textContent) + '</div></div></header>' +
       '<div class="stats"><div><b>' + t.total + '</b>จุดทั้งหมด</div><div><b>' + t.verified + '</b>ตรวจแล้ว (' + t.progress + '%)</div><div><b>' + t.burned + '</b>พบการเผา</div><div><b>' + t.not_burned + '</b>ไม่พบการเผา</div><div><b>' + t.followup + '</b>ติดตาม/ตรวจซ้ำ</div><div><b>' + (t.pending + t.draft) + '</b>รอตรวจ/ร่าง</div></div>' +
       '<table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody>' +
       groups.map(g => '<tr><td>' + esc(g.area) + '</td><td>' + g.total + '</td><td>' + g.verified + '</td><td>' + g.burned + '</td><td>' + g.not_burned + '</td><td>' + g.draft + '</td><td>' + g.progress + '%</td></tr>').join('') + '</tbody></table>' +
@@ -502,6 +561,7 @@
   }
 
   async function loadBoundaries(code) {
+    if (!code) { state.boundary = {}; return drawBoundaries(); }
     if (!state.map || state.boundary.code === code) return drawBoundaries();
     state.boundary = { code };
     const get = async level => { try { const r = await fetch('data/boundaries/' + code + '/' + level + '.geojson'); return r.ok ? await r.json() : null; } catch (_) { return null; } };
@@ -579,14 +639,14 @@
     resetForm();
     state.selected = r;
     $('verifyTitle').textContent = 'จุด HS ' + r.hsId;
-    $('selectedMeta').innerHTML = '<div class="meta-grid compact-meta"><span><small>วันที่ตรวจพบ</small><strong>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</strong></span><span><small>สถานะ</small><strong>' + esc(statusText(r)) + '</strong></span><span><small>พืช/พื้นที่</small><strong>' + esc(r.plantType) + '</strong></span><span><small>พิกัด</small><strong>' + r.lat.toFixed(5) + ', ' + r.lng.toFixed(5) + '</strong></span><span class="meta-wide"><small>ที่ตั้ง</small><strong>' + esc(areaLabel(r)) + ' จ.' + esc(C.PROVINCES[r.provinceCode] || '') + '</strong></span></div>';
+    $('selectedMeta').innerHTML = '<div class="meta-grid compact-meta"><span><small>วันที่ตรวจพบ</small><strong>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</strong></span><span><small>สถานะ</small><strong>' + esc(statusText(r)) + '</strong></span><span><small>พืช/พื้นที่</small><strong>' + esc(r.plantType) + '</strong></span><span><small>พิกัด</small><strong>' + r.lat.toFixed(5) + ', ' + r.lng.toFixed(5) + '</strong></span><span class="meta-wide"><small>ที่ตั้ง</small><strong>' + esc(areaLabel(r)) + ' จ.' + esc(C.provinceName(r.provinceCode)) + '</strong></span></div>';
     $('navigateLink').href = 'https://www.google.com/maps/dir/?api=1&destination=' + r.lat + ',' + r.lng;
     const user = HSApi.user();
     const allowed = C.can(user, 'record', { province: r.provinceCode });
     $('deleteVerificationButton').hidden = true;
     if (!HSApi.configured()) setMode('gate', 'ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ จึงดูข้อมูลจุดได้อย่างเดียว');
     else if (!user) setMode('gate', 'บันทึกผลการตรวจต้องเข้าสู่ระบบด้วยเบอร์โทร — ยังไม่มีบัญชี ลงทะเบียน Admin แล้วใช้งานได้ทันที ระบบจะเปิดจุดนี้ให้อัตโนมัติ');
-    else if (!allowed) setMode('gate', 'บัญชีของท่านบันทึกผลได้เฉพาะจังหวัด' + (C.PROVINCES[user.prov] || ''));
+    else if (!allowed) setMode('gate', 'บัญชีของท่านบันทึกผลได้เฉพาะ' + C.scopeLabel(user));
     else setMode('edit');
     $('gateLogin').hidden = $('gateRegister').hidden = Boolean(user) || !HSApi.configured();
     $('verifyDialog').showModal();

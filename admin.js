@@ -81,7 +81,7 @@ var HSAdmin = (() => {
     const t = [];
     if (C.can(user, 'manage')) t.push(['requests', 'ผู้ลงทะเบียน'], ['accounts', 'บัญชีผู้ใช้']);
     t.push(['records', C.can(user, 'manage') ? 'ผลการตรวจสอบ' : 'ผลตรวจที่บันทึก'], ['audit', C.can(user, 'manage') ? 'บันทึกการใช้งาน' : 'บันทึกการใช้งานของฉัน']);
-    if (C.can(user, 'manage')) t.push(['logins', 'รายงานการเข้าใช้']);
+    t.push(['logins', C.can(user, 'manage') ? 'ประวัติการเข้าใช้งาน' : 'ประวัติการเข้าใช้งานของฉัน']);
     if (C.can(user, 'settings')) t.push(['settings', 'ตั้งค่าระบบ']);
     return t;
   }
@@ -89,9 +89,9 @@ var HSAdmin = (() => {
   function render() {
     const user = HSApi.user();
     if (!user) { $('adminTabs').innerHTML = ''; $('adminPanels').innerHTML = ''; return; }
-    $('roleLabel').textContent = C.ROLE_LABELS[user.role] + (user.prov && user.prov !== '*' ? ' · จังหวัด' + (C.PROVINCES[user.prov] || '') : ' · ทุกจังหวัด');
+    $('roleLabel').textContent = C.ROLE_LABELS[user.role] + (user.role === 'minisuper' ? (user.prov === '*' ? ' ระดับประเทศ' : ' ระดับจังหวัด') : '') + ' · ' + C.scopeLabel(user);
     $('adminDisplayName').textContent = user.name;
-    $('adminRoleDescription').textContent = C.ROLE_DESCRIPTIONS[user.role] || '';
+    $('adminRoleDescription').textContent = user.role === 'minisuper' && user.prov === '*' ? C.ROLE_DESCRIPTIONS.minisuperNational : C.ROLE_DESCRIPTIONS[user.role] || '';
     $('adminTitle').textContent = C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'งานของฉัน';
     const tabs = tabsFor(user);
     if (!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
@@ -104,7 +104,7 @@ var HSAdmin = (() => {
   }
 
   const provinceOptions = (user, selected, allLabel) => {
-    if (!C.can(user, 'chooseProvince')) return '<option value="' + esc(user.prov) + '">' + esc(C.PROVINCES[user.prov]) + '</option>';
+    if (!C.can(user, 'chooseProvince')) return '<option value="' + esc(user.prov) + '"' + (selected === user.prov ? ' selected' : '') + '>' + esc(C.PROVINCES[user.prov]) + '</option>';
     const list = Object.entries(C.PROVINCES).sort((a, b) => a[1].localeCompare(b[1], 'th'));
     return (allLabel ? '<option value="">' + allLabel + '</option>' : '') + list.map(([c, n]) => '<option value="' + c + '"' + (c === selected ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
   };
@@ -131,7 +131,7 @@ var HSAdmin = (() => {
     const pillClass = r => r.accountStatus === 'approved' ? 'not_burned' : r.status === 'pending' ? 'pending' : 'burned';
     const pending = data.requests.filter(r => r.status === 'pending').length;
     panel.innerHTML = '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ลงทะเบียนแล้วใช้งานได้ทันที</p><h2>ผู้ลงทะเบียน ' + data.requests.length.toLocaleString('th-TH') + ' คน</h2>' +
-      '<p class="field-hint">' + (C.can(user, 'manageMini') ? 'ทุกจังหวัด' : 'จังหวัด' + esc(C.PROVINCES[user.prov])) + ' · ตรวจรายชื่อผู้ลงทะเบียนใหม่ หากไม่ใช่เจ้าหน้าที่ให้กด “ระงับ” มีผลทันที' + (pending ? ' · มีคำขอเดิมรออนุมัติ ' + pending + ' รายการ' : '') + '</p></div>' +
+      '<p class="field-hint">' + esc(C.scopeLabel(user)) + ' · ตรวจรายชื่อผู้ลงทะเบียนใหม่ หากไม่ใช่เจ้าหน้าที่ให้กด “ระงับ” มีผลทันที' + (pending ? ' · มีคำขอเดิมรออนุมัติ ' + pending + ' รายการ' : '') + '</p></div>' +
       '<label class="inline-label">ช่วงเวลา<select id="regDays"><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="0">ทั้งหมด</option></select></label></div>' +
       table(['วันที่ลงทะเบียน', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'จังหวัด', 'เบอร์โทร', 'สถานะบัญชี', ''], data.requests.map(r => '<tr>' + td(C.thaiDateTime(r.createdAt)) + td(r.fullName) + td(r.position + ' · ' + r.affiliation) + td(r.provinceName) + td(r.phone) +
         '<td><span class="status-pill ' + pillClass(r) + '">' + esc(statusText(r)) + '</span>' + (r.accountRole === 'minisuper' ? ' ' + roleChip('minisuper') : '') + '</td>' +
@@ -147,35 +147,68 @@ var HSAdmin = (() => {
     };
   }
 
-  /* บัญชีผู้ใช้ */
+  /* บัญชีผู้ใช้ — Super Admin แต่งตั้ง Mini Super Admin (ระดับประเทศหรือจังหวัด) · Mini Super Admin จัดการ Admin ในขอบเขตของตน */
   async function renderAccounts(panel, user) {
     const data = await HSApi.post('accounts_list', {});
     const prefill = cache.prefillPhone || ''; cache.prefillPhone = '';
-    const rows = data.accounts.map(a => {
-      const manageable = C.can(user, 'manageMini') || a.role === 'admin';
+    const isSuper = C.can(user, 'manageMini');
+    const scopeText = a => a.provinceCode === C.ALL ? 'ทุกจังหวัด (ทั้งระบบ)' : a.provinceName;
+    const sup = data.superAdmin;
+    const superRow = sup ? '<tr class="protected-row"><td>SUPER</td><td>' + esc(sup.username || '— ยังไม่ได้ตั้งค่า —') + '</td><td>บัญชีหลักของระบบ</td><td>ทุกจังหวัด (ทั้งระบบ)</td><td>—</td><td>' + roleChip('superadmin') + '</td><td>' + (sup.configured ? 'ใช้งาน' : 'ยังไม่ตั้งรหัสผ่าน') + '</td><td>—</td><td><small>🔒 ลบ/ระงับไม่ได้ · เปลี่ยนรหัสผ่านที่เมนู “ระบบตรวจสอบ HS” ในชีตฐานข้อมูล</small></td></tr>' : '';
+    const order = { minisuper: 0, admin: 1 };
+    const accounts = data.accounts.slice().sort((x, y) => (order[x.role] - order[y.role]) || String(x.provinceCode === C.ALL ? '' : x.provinceName).localeCompare(String(y.provinceCode === C.ALL ? '' : y.provinceName), 'th') || String(x.accountId).localeCompare(String(y.accountId)));
+    const rows = accounts.map(a => {
+      const manageable = isSuper || a.role === 'admin';
       const self = a.accountId === user.sub;
-      return '<tr' + (a.status !== 'approved' ? ' class="muted-row"' : '') + '>' + td(a.accountId) + td(a.fullName) + td(a.position + (a.affiliation ? ' · ' + a.affiliation : '')) + td(a.provinceName) + td(a.phone) + '<td>' + roleChip(a.role) + '</td>' + td(a.status === 'approved' ? 'ใช้งาน' : 'ระงับ') + td(C.thaiDateTime(a.lastLoginAt)) +
-        '<td>' + (manageable && !self ? '<div class="button-row compact-row"><button class="secondary-button compact" data-edit="' + esc(a.accountId) + '">แก้ไข</button><button class="secondary-button compact" data-status="' + esc(a.accountId) + '" data-to="' + (a.status === 'approved' ? 'disabled' : 'approved') + '">' + (a.status === 'approved' ? 'ระงับ' : 'เปิดใช้') + '</button><button class="secondary-button compact danger-button" data-del="' + esc(a.accountId) + '">ลบ</button></div>' : self ? '<small>บัญชีของท่าน</small>' : '') + '</td></tr>';
+      return '<tr' + (a.status !== 'approved' ? ' class="muted-row"' : '') + '>' + td(a.accountId) + td(a.fullName) + td(a.position + (a.affiliation ? ' · ' + a.affiliation : '')) + td(scopeText(a)) + td(a.phone) + '<td>' + roleChip(a.role) + (a.role === 'minisuper' ? '<br><small>' + (a.provinceCode === C.ALL ? 'ระดับประเทศ' : 'ระดับจังหวัด') + '</small>' : '') + '</td>' + td(a.status === 'approved' ? 'ใช้งาน' : 'ระงับ') + td(C.thaiDateTime(a.lastLoginAt)) +
+        '<td>' + (manageable && !self ? '<div class="button-row compact-row"><button class="secondary-button compact" data-edit="' + esc(a.accountId) + '">แก้ไข</button><button class="secondary-button compact" data-status="' + esc(a.accountId) + '" data-to="' + (a.status === 'approved' ? 'disabled' : 'approved') + '">' + (a.status === 'approved' ? 'ระงับ' : 'เปิดใช้') + '</button><button class="secondary-button compact danger-button" data-del="' + esc(a.accountId) + '">ลบ</button></div>' : self ? '<small>บัญชีของท่าน</small>' : '<small>จัดการได้โดย Super Admin</small>') + '</td></tr>';
     });
-    panel.innerHTML = '<details id="accDetails" class="settings-card collapsible"' + (prefill ? ' open' : '') + '><summary><span id="accFormTitle">＋ เพิ่มบัญชีผู้ใช้' + (C.can(user, 'manageMini') ? ' / แต่งตั้ง Mini Super Admin' : '') + '</span></summary>' +
-      '<form id="accountForm" class="team-fields"><input type="hidden" id="accId"><label>เบอร์โทรศัพท์<input id="accPhone" type="tel" required maxlength="15" value="' + esc(prefill) + '"></label><label>ชื่อ - สกุล<input id="accName" required maxlength="150"></label><label>ตำแหน่ง<input id="accPosition" maxlength="150"></label><label>สังกัด<input id="accAffiliation" maxlength="200"></label>' +
-      '<label>จังหวัด<select id="accProvince">' + provinceOptions(user, ctx.province() || user.prov) + '</select></label><label>บทบาท<select id="accRole"><option value="admin">Admin — ผู้บันทึกข้อมูล</option>' + (C.can(user, 'manageMini') ? '<option value="minisuper">Mini Super Admin — ผู้ดูแลจังหวัด</option>' : '') + '</select></label>' +
+    const provinceSelect = '<option value="">— เลือก —</option>' + (isSuper ? '<option value="' + C.ALL + '">ทุกจังหวัด (ทั้งระบบ) — สำหรับ Mini Super Admin ระดับประเทศ</option>' : '') + provinceOptions(user, '');
+    const miniCount = accounts.filter(a => a.role === 'minisuper').length, adminCount = accounts.length - miniCount;
+    panel.innerHTML = (isSuper ? '<section class="settings-card role-guide"><h2>แต่งตั้ง Mini Super Admin</h2><div class="role-guide-grid">' +
+        '<div><strong>ระดับประเทศ · ทุกจังหวัด</strong><span>จัดการระบบได้เหมือน Super Admin: ข้อมูล HS และผลตรวจทุกจังหวัด บัญชี Admin ทุกจังหวัด บันทึกและประวัติการเข้าใช้งาน — ยกเว้นบัญชี Super Admin, บัญชี Mini Super Admin และการตั้งค่าระบบ</span><button type="button" class="primary-button" data-new-mini="' + C.ALL + '">＋ แต่งตั้งระดับประเทศ</button></div>' +
+        '<div><strong>ระดับจังหวัด</strong><span>อนุมัติ/อนุญาตเจ้าหน้าที่ภายในจังหวัด และบันทึก แก้ไข เพิ่ม ลบ ข้อมูลระดับจังหวัด</span><button type="button" class="secondary-button" data-new-mini="province">＋ แต่งตั้งระดับจังหวัด</button></div>' +
+        '</div><p class="field-hint">บัญชี Super Admin เป็นบัญชีหลัก ไม่มีบทบาทใดลบหรือระงับได้</p></section>' : '') +
+      '<details id="accDetails" class="settings-card collapsible"' + (prefill ? ' open' : '') + '><summary><span id="accFormTitle">＋ เพิ่มบัญชี Admin (ผู้บันทึกข้อมูล)</span></summary>' +
+      '<form id="accountForm" class="team-fields"><input type="hidden" id="accId">' +
+      '<label>บทบาท<select id="accRole"><option value="admin">Admin — ผู้บันทึกข้อมูล</option>' + (isSuper ? '<option value="minisuper">Mini Super Admin — ผู้ดูแลระบบ</option>' : '') + '</select></label>' +
+      '<label>ขอบเขต / จังหวัด<select id="accProvince">' + provinceSelect + '</select></label>' +
+      '<label>เบอร์โทรศัพท์ (ใช้เข้าสู่ระบบ)<input id="accPhone" type="tel" required maxlength="15" value="' + esc(prefill) + '"></label><label>ชื่อ - สกุล<input id="accName" required maxlength="150"></label><label>ตำแหน่ง<input id="accPosition" maxlength="150"></label><label>สังกัด<input id="accAffiliation" maxlength="200"></label>' +
+      '<p id="accScopeHint" class="field-hint"></p>' +
       '<div class="button-row"><button class="primary-button" type="submit">บันทึกบัญชี</button><button id="accCancel" class="secondary-button" type="button">ล้างฟอร์ม</button></div></form></details>' +
-      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">' + (C.can(user, 'manageMini') ? 'ทุกจังหวัด' : 'จังหวัด' + esc(C.PROVINCES[user.prov])) + '</p><h2>บัญชีผู้ใช้ ' + data.accounts.length + ' บัญชี</h2></div><input id="accSearch" type="search" placeholder="ค้นหาชื่อ เบอร์ จังหวัด"></div>' +
-      table(['รหัส', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'จังหวัด', 'เบอร์โทร', 'บทบาท', 'สถานะ', 'เข้าใช้ล่าสุด', ''], rows) + '</section>';
+      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">' + esc(C.scopeLabel(user)) + '</p><h2>บัญชีผู้ใช้ ' + (accounts.length + (sup ? 1 : 0)) + ' บัญชี</h2><p class="field-hint">' + (sup ? 'Super Admin 1 · ' : '') + 'Mini Super Admin ' + miniCount + ' · Admin ' + adminCount + '</p></div><input id="accSearch" type="search" placeholder="ค้นหาชื่อ เบอร์ จังหวัด"></div>' +
+      table(['รหัส', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'ขอบเขต', 'เบอร์โทร', 'บทบาท', 'สถานะ', 'เข้าใช้ล่าสุด', ''], (superRow ? [superRow] : []).concat(rows)) + '</section>';
+    const syncScope = () => {
+      const role = $('accRole').value, all = $('accProvince').querySelector('option[value="' + C.ALL + '"]');
+      if (all) { all.hidden = role !== 'minisuper'; if (role !== 'minisuper' && $('accProvince').value === C.ALL) $('accProvince').value = ''; }
+      $('accScopeHint').textContent = role === 'admin' ? 'Admin บันทึกผลตรวจได้เฉพาะจังหวัดที่เลือก'
+        : $('accProvince').value === C.ALL ? 'Mini Super Admin ระดับประเทศ: จัดการระบบได้ทุกจังหวัด ยกเว้นบัญชี Super Admin / Mini Super Admin และการตั้งค่าระบบ'
+        : 'Mini Super Admin ระดับจังหวัด: อนุมัติเจ้าหน้าที่และจัดการข้อมูลเฉพาะจังหวัดที่เลือก';
+    };
+    $('accRole').onchange = syncScope; $('accProvince').onchange = syncScope; syncScope();
+    if (!isSuper) $('accProvince').value = user.prov !== '*' ? user.prov : (ctx.province() && ctx.province() !== C.ALL ? ctx.province() : '');
     $('accSearch').oninput = e => { const q = e.target.value.toLowerCase(); panel.querySelectorAll('tbody tr').forEach(tr => { tr.hidden = q && !tr.textContent.toLowerCase().includes(q); }); };
-    $('accCancel').onclick = () => { $('accountForm').reset(); $('accId').value = ''; $('accFormTitle').textContent = '＋ เพิ่มบัญชีผู้ใช้'; };
+    const resetForm = () => { $('accountForm').reset(); $('accId').value = ''; $('accFormTitle').textContent = '＋ เพิ่มบัญชี Admin (ผู้บันทึกข้อมูล)'; syncScope(); };
+    $('accCancel').onclick = resetForm;
     $('accountForm').onsubmit = e => {
       e.preventDefault();
       const phone = C.normalizePhone($('accPhone').value);
       if (!C.validPhone(phone)) return ctx.toast('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง', true);
-      act(() => HSApi.post('account_save', { accountId: $('accId').value, phone, fullName: $('accName').value, position: $('accPosition').value, affiliation: $('accAffiliation').value, provinceCode: $('accProvince').value, role: $('accRole').value }), 'บันทึกบัญชีแล้ว');
+      if (!$('accProvince').value) return ctx.toast('กรุณาเลือกขอบเขต / จังหวัด', true);
+      const label = $('accRole').value === 'minisuper' ? 'แต่งตั้ง Mini Super Admin แล้ว' : 'บันทึกบัญชีแล้ว';
+      act(() => HSApi.post('account_save', { accountId: $('accId').value, phone, fullName: $('accName').value, position: $('accPosition').value, affiliation: $('accAffiliation').value, provinceCode: $('accProvince').value, role: $('accRole').value }), label + ' — เข้าสู่ระบบด้วยเบอร์ ' + phone + ' ได้ทันที');
     };
     panel.onclick = e => {
-      const ed = e.target.closest('[data-edit]'), st = e.target.closest('[data-status]'), del = e.target.closest('[data-del]');
+      const ed = e.target.closest('[data-edit]'), st = e.target.closest('[data-status]'), del = e.target.closest('[data-del]'), nm = e.target.closest('[data-new-mini]');
+      if (nm) {
+        resetForm(); $('accRole').value = 'minisuper'; syncScope();
+        $('accProvince').value = nm.dataset.newMini === C.ALL ? C.ALL : ''; syncScope();
+        $('accFormTitle').textContent = nm.dataset.newMini === C.ALL ? 'แต่งตั้ง Mini Super Admin ระดับประเทศ' : 'แต่งตั้ง Mini Super Admin ระดับจังหวัด';
+        $('accDetails').open = true; $('accDetails').scrollIntoView({ behavior: 'smooth' }); $('accPhone').focus();
+      }
       if (ed) {
-        const a = data.accounts.find(x => x.accountId === ed.dataset.edit);
-        $('accId').value = a.accountId; $('accPhone').value = a.phone; $('accName').value = a.fullName; $('accPosition').value = a.position; $('accAffiliation').value = a.affiliation; $('accProvince').value = a.provinceCode; $('accRole').value = a.role;
+        const a = accounts.find(x => x.accountId === ed.dataset.edit);
+        $('accId').value = a.accountId; $('accPhone').value = a.phone; $('accName').value = a.fullName; $('accPosition').value = a.position; $('accAffiliation').value = a.affiliation; $('accRole').value = a.role; syncScope(); $('accProvince').value = a.provinceCode; syncScope();
         $('accFormTitle').textContent = 'แก้ไขบัญชี ' + a.accountId; $('accDetails').open = true; $('accDetails').scrollIntoView({ behavior: 'smooth' });
       }
       if (st) act(() => HSApi.post('account_status', { accountId: st.dataset.status, status: st.dataset.to }), st.dataset.to === 'approved' ? 'เปิดใช้บัญชีแล้ว' : 'ระงับบัญชีแล้ว (มีผลทันที)');
@@ -239,15 +272,56 @@ var HSAdmin = (() => {
     ], data.logs));
   }
 
-  /* รายงานการเข้าใช้ */
+  /* ประวัติการเข้าใช้งานระบบ */
   async function renderLogins(panel, user) {
-    const data = await HSApi.post('login_report', { limit: 500 });
+    const f = cache.hist || (cache.hist = { days: 30, from: '', to: '', role: '', result: '', q: '', province: '' });
+    const data = await HSApi.post('login_report', Object.assign({ limit: 500 }, f));
     const labels = data.labels || {};
-    panel.innerHTML = (user.role === 'superadmin' ? '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ความปลอดภัย</p><h2>หมายเลขที่ไม่มีในระบบแต่พยายามเข้าใช้ (' + data.unknown.length + ')</h2></div></div>' +
-      table(['หมายเลข', 'จำนวนครั้ง', 'ครั้งแรก', 'ล่าสุด', ''], data.unknown.sort((a, b) => b.count - a.count).map(u => '<tr>' + td(u.identifier) + td(u.count) + td(C.thaiDateTime(u.first)) + td(C.thaiDateTime(u.last)) + '<td><button class="secondary-button compact" data-add="' + esc(u.identifier) + '">เพิ่มเป็นผู้ใช้</button></td></tr>'), 'ไม่มี') + '</section>' : '') +
-      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ทุกการพยายามเข้าใช้ (ไม่บันทึกรหัสผ่าน)</p><h2>การเข้าใช้ ' + data.total.toLocaleString('th-TH') + ' ครั้ง</h2></div></div>' +
-      table(['เวลา', 'บทบาท', 'หมายเลข / ชื่อผู้ใช้', 'ผล', 'ชื่อ', 'จังหวัด', 'อุปกรณ์'], data.attempts.map(a => '<tr>' + td(C.thaiDateTime(a.time)) + '<td>' + roleChip(a.role) + '</td>' + td(a.identifier) + '<td><span class="status-pill ' + (a.result === 'success' ? 'not_burned' : 'burned') + '">' + esc(labels[a.result] || a.result) + '</span></td>' + td(a.fullName) + td(a.provinceName) + '<td class="detail-cell">' + esc(a.device) + '</td></tr>')) + '</section>';
+    const manage = C.can(user, 'manage');
+    const national = C.isNational(user);
+    const max = Math.max(1, ...data.daily.map(d => d.success + d.failed + d.visits));
+    const stat = (v, label, color) => '<article class="stat-card" style="--accent:' + color + '"><strong>' + Number(v).toLocaleString('th-TH') + '</strong><span>' + label + '</span></article>';
+    const bars = data.daily.map(d => {
+      const h = n => Math.round(n / max * 100);
+      const day = Number(d.date.slice(8, 10));
+      return '<div class="hist-day" title="' + esc(C.thaiDate(d.date) + ' · เข้าสู่ระบบ ' + d.success + ' · เปิดใช้งาน ' + d.visits + ' · ล้มเหลว ' + d.failed + ' · ผู้ใช้ ' + d.users + ' คน') + '"><div class="hist-stack"><i class="fail" style="height:' + h(d.failed) + '%"></i><i class="visit" style="height:' + h(d.visits) + '%"></i><i class="ok" style="height:' + h(d.success) + '%"></i></div><small>' + (data.daily.length <= 31 || day === 1 || day === 15 ? day : '') + '</small></div>';
+    }).join('');
+    const roleOptions = '<option value="">ทุกบทบาท</option><option value="admin">Admin</option><option value="minisuper">Mini Super Admin</option>' + (user.role === 'superadmin' ? '<option value="superadmin">Super Admin</option>' : '');
+    panel.innerHTML = '<section class="settings-card"><div class="section-title"><div><p class="eyebrow">ตรวจสอบย้อนหลัง</p><h2>' + (manage ? 'ประวัติการเข้าใช้งานระบบ' : 'ประวัติการเข้าใช้งานของฉัน') + '</h2><p class="field-hint">' +
+        (user.role === 'superadmin' ? 'ทุกบทบาท ทุกจังหวัด' : national ? 'ทุกจังหวัด (ไม่รวม Super Admin)' : user.role === 'minisuper' ? 'เจ้าหน้าที่จังหวัด' + esc(C.PROVINCES[user.prov]) : 'เฉพาะบัญชีนี้') +
+        ' · บันทึกทุกการเข้าสู่ระบบ (สำเร็จ/ล้มเหลว), การเปิดใช้งานขณะเข้าสู่ระบบค้างไว้ (ทุก 30 นาที) และการออกจากระบบ · ไม่บันทึกรหัสผ่าน</p></div></div>' +
+      '<form id="histFilter" class="filter-grid"><label>ช่วงเวลา<select name="days"><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="90">90 วันล่าสุด</option><option value="365">1 ปี</option></select></label>' +
+        '<label>ตั้งแต่วันที่<input type="date" name="from" value="' + esc(f.from) + '"></label><label>ถึงวันที่<input type="date" name="to" value="' + esc(f.to) + '"></label>' +
+        (manage ? '<label>บทบาท<select name="role">' + roleOptions + '</select></label>' : '') +
+        (national ? '<label>จังหวัด<select name="province">' + provinceOptions(user, f.province, 'ทุกจังหวัด') + '</select></label>' : '') +
+        '<label>ผลการเข้าสู่ระบบ<select name="result"><option value="">ทั้งหมด</option>' + Object.entries(labels).map(([k, v]) => '<option value="' + esc(k) + '">' + esc(v) + '</option>').join('') + '</select></label>' +
+        (manage ? '<label class="search-label">ค้นหา<input type="search" name="q" value="' + esc(f.q) + '" placeholder="ชื่อ เบอร์โทร รหัสบัญชี"></label>' : '') +
+        '<div class="button-row"><button class="primary-button" type="submit">แสดง</button><button id="histExport" class="secondary-button" type="button">ส่งออก CSV</button></div></form></section>' +
+      '<div class="stat-grid">' + stat(data.stats.loginsToday, 'เข้าสู่ระบบวันนี้ (ครั้ง)', '#18845d') + stat(data.stats.activeToday, 'ผู้ใช้งานวันนี้ (คน)', '#1d6fd1') + stat(data.stats.activePeople, 'ผู้ใช้งานในช่วงที่เลือก (คน)', '#174f38') + stat(data.stats.failed, 'เข้าสู่ระบบไม่สำเร็จ (ครั้ง)', C.COLORS.burned) + '</div>' +
+      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">รายวัน</p><h2>การเข้าใช้งาน ' + esc(C.thaiDate(data.from)) + ' – ' + esc(C.thaiDate(data.to || new Date().toISOString().slice(0, 10))) + '</h2></div><div class="hist-legend"><span><i class="ok"></i>เข้าสู่ระบบ</span><span><i class="visit"></i>เปิดใช้งาน</span><span><i class="fail"></i>ไม่สำเร็จ</span></div></div><div class="hist-chart" role="img" aria-label="กราฟการเข้าใช้งานรายวัน">' + bars + '</div></section>' +
+      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">สรุปรายบุคคล</p><h2>ผู้ใช้งาน ' + data.people.length + ' คน</h2></div></div>' +
+        table(['ชื่อ', 'บทบาท', 'จังหวัด', 'เข้าสู่ระบบ', 'เปิดใช้งาน', 'ไม่สำเร็จ', 'ครั้งแรก', 'ล่าสุด', 'อุปกรณ์ล่าสุด'], data.people.map(p => '<tr>' + td(p.name) + '<td>' + roleChip(p.role) + '</td>' + td(p.provinceCode ? C.provinceName(p.provinceCode) || '—' : '—') + td(p.logins) + td(p.visits) + td(p.failed) + td(C.thaiDateTime(p.first)) + td(C.thaiDateTime(p.last) + (p.lastAction ? ' · ' + p.lastAction : '')) + '<td class="detail-cell">' + esc(deviceLabel(p.lastDevice)) + '</td></tr>'), 'ยังไม่มีการเข้าใช้งานในช่วงนี้') + '</section>' +
+      (national && data.unknown.length ? '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ความปลอดภัย</p><h2>หมายเลขที่ไม่มีในระบบแต่พยายามเข้าใช้ (' + data.unknown.length + ')</h2></div></div>' +
+        table(['หมายเลข', 'จำนวนครั้ง', 'ครั้งแรก', 'ล่าสุด', ''], data.unknown.sort((a, b) => b.count - a.count).map(u => '<tr>' + td(u.identifier) + td(u.count) + td(C.thaiDateTime(u.first)) + td(C.thaiDateTime(u.last)) + '<td><button class="secondary-button compact" data-add="' + esc(u.identifier) + '">เพิ่มเป็นผู้ใช้</button></td></tr>')) + '</section>' : '') +
+      '<section class="table-card"><div class="section-title"><div><p class="eyebrow">รายการ</p><h2>การเข้าสู่ระบบ ' + data.total.toLocaleString('th-TH') + ' ครั้ง' + (data.total > data.attempts.length ? ' (แสดง ' + data.attempts.length + ' ล่าสุด)' : '') + '</h2></div></div>' +
+        table(['เวลา', 'บทบาท', 'หมายเลข / ชื่อผู้ใช้', 'ผล', 'ชื่อ', 'จังหวัด', 'อุปกรณ์'], data.attempts.map(a => '<tr>' + td(C.thaiDateTime(a.time)) + '<td>' + roleChip(a.role) + '</td>' + td(a.identifier) + '<td><span class="status-pill ' + (a.result === 'success' ? 'not_burned' : 'burned') + '">' + esc(labels[a.result] || a.result) + '</span></td>' + td(a.fullName) + td(a.provinceName) + '<td class="detail-cell">' + esc(deviceLabel(a.device)) + '</td></tr>')) + '</section>';
+    const form = $('histFilter');
+    ['days', 'role', 'result', 'province'].forEach(n => { if (form.elements[n]) form.elements[n].value = f[n] || (n === 'days' ? '30' : ''); });
+    form.onsubmit = e => { e.preventDefault(); ['days', 'from', 'to', 'role', 'result', 'q', 'province'].forEach(n => { f[n] = form.elements[n] ? form.elements[n].value : ''; }); render(); };
+    $('histExport').onclick = () => HSApp.download('ประวัติการเข้าใช้งาน_' + new Date().toISOString().slice(0, 10) + '.csv', C.toCsv([
+      { label: 'เวลา', key: 'time' }, { label: 'บทบาท', value: a => C.ROLE_LABELS[a.role] || a.role }, { label: 'หมายเลข/ชื่อผู้ใช้', key: 'identifier' },
+      { label: 'ผล', value: a => labels[a.result] || a.result }, { label: 'รหัสบัญชี', key: 'accountId' }, { label: 'ชื่อ', key: 'fullName' }, { label: 'จังหวัด', key: 'provinceName' }, { label: 'อุปกรณ์', key: 'device' }
+    ], data.attempts));
     panel.onclick = e => { const b = e.target.closest('[data-add]'); if (b) { cache.prefillPhone = b.dataset.add; tab = 'accounts'; render(); } };
+  }
+
+  /** ย่อ user agent ให้อ่านง่าย */
+  function deviceLabel(ua) {
+    const s = String(ua || '');
+    if (!s) return '—';
+    const os = /Android/i.test(s) ? 'Android' : /iPhone|iPad|iOS/i.test(s) ? 'iOS' : /Windows/i.test(s) ? 'Windows' : /Mac OS/i.test(s) ? 'macOS' : /Linux/i.test(s) ? 'Linux' : '';
+    const br = /Edg\//.test(s) ? 'Edge' : /SamsungBrowser/.test(s) ? 'Samsung Internet' : /Line\//i.test(s) ? 'LINE' : /FBAN|FBAV/.test(s) ? 'Facebook' : /Chrome\//.test(s) ? 'Chrome' : /Firefox\//.test(s) ? 'Firefox' : /Safari\//.test(s) ? 'Safari' : '';
+    return [br, os].filter(Boolean).join(' · ') || s.slice(0, 60);
   }
 
   /* ตั้งค่าระบบ (Super Admin) */

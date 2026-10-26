@@ -97,7 +97,7 @@ test('index.html wires every script that exists and no removed v2 module', () =>
   assert.equal(new Set(ids).size, ids.length, 'duplicate element ids');
   const js = read('app.js') + read('admin.js');
   const used = [...js.matchAll(/\$\('([A-Za-z0-9_]+)'\)/g)].map(m => m[1]);
-  const dynamic = new Set(['regDays', 'accDetails', 'boundaryDistrictOn', 'boundarySubdistrictOn', 'boundaryFit', 'mapLocate', 'reqStatus', 'accSearch', 'accCancel', 'accountForm', 'accId', 'accPhone', 'accName', 'accPosition', 'accAffiliation', 'accProvince', 'accRole', 'accFormTitle', 'recProv', 'recMine', 'recCache', 'recExport', 'auditFilter', 'auditExport', 'settingsForm']);
+  const dynamic = new Set(['accScopeHint', 'histFilter', 'histExport', 'regDays', 'accDetails', 'boundaryDistrictOn', 'boundarySubdistrictOn', 'boundaryFit', 'mapLocate', 'reqStatus', 'accSearch', 'accCancel', 'accountForm', 'accId', 'accPhone', 'accName', 'accPosition', 'accAffiliation', 'accProvince', 'accRole', 'accFormTitle', 'recProv', 'recMine', 'recCache', 'recExport', 'auditFilter', 'auditExport', 'settingsForm']);
   for (const id of used) assert.ok(ids.includes(id) || dynamic.has(id), 'app/admin reference unknown id ' + id);
 });
 
@@ -109,4 +109,19 @@ test('site-config contains no credentials', () => {
 test('the single-file Apps Script bundle is up to date', () => {
   assert.equal(fs.readFileSync(target, 'utf8'), bundle(), 'run: npm run bundle');
   for (const f of fs.readdirSync(path.join(root, 'apps-script')).filter(f => f.endsWith('.gs') && f !== 'Secrets.example.gs')) assert.ok(ORDER.includes(f), f + ' missing from bundle order');
+});
+
+test('national scope: Super Admin and national Mini Super Admin see all provinces; provincial roles do not', () => {
+  const sup = { role: 'superadmin', prov: '*' }, nat = { role: 'minisuper', prov: '*' }, pm = { role: 'minisuper', prov: '62' }, ad = { role: 'admin', prov: '62' };
+  assert.equal(C.can(sup, 'allProvinces'), true);
+  assert.equal(C.can(nat, 'allProvinces'), true);
+  assert.equal(C.can(pm, 'allProvinces'), false);
+  assert.equal(C.can(ad, 'allProvinces'), false);
+  assert.equal(C.can(nat, 'manageMini'), false, 'only Super Admin manages Mini Super Admins');
+  assert.equal(C.can(nat, 'settings'), false);
+  assert.equal(C.can(nat, 'deleteVerification', { province: '51' }), true);
+  assert.equal(C.scopeLabel(nat), 'ทุกจังหวัด');
+  const rows = C.fromApi(apiPayload).concat(C.fromApi(Object.assign({}, apiPayload, { province: '51' })));
+  assert.equal(C.applyFilters(rows, { province: '51' }).length, 4);
+  assert.equal(C.groupSummary(rows, 'province').length, 2);
 });

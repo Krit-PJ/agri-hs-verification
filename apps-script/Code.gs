@@ -47,6 +47,7 @@ function handle_(body) {
   switch (a) {
     case 'me': return { ok: true, user: user };
     case 'logout': audit_(user, 'logout', ROLE_LABELS[user.role] || '', ''); return { ok: true };
+    case 'touch': return touch_(user, body);
     // ผลตรวจ
     case 'verification_get': return verificationGet_(user, body);
     case 'verification_save': return verificationSave_(user, body);

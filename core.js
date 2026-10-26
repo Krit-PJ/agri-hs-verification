@@ -15,6 +15,7 @@
   const ROLE_DESCRIPTIONS = {
     superadmin: 'จัดการได้ทั้งระบบ ทุกจังหวัด',
     minisuper: 'อนุมัติ/อนุญาตเจ้าหน้าที่ภายในจังหวัด และบันทึก แก้ไข เพิ่ม ลบ ข้อมูลระดับจังหวัด',
+    minisuperNational: 'จัดการระบบได้ทุกจังหวัด (ข้อมูล HS ผลตรวจ บัญชี Admin บันทึกและประวัติการเข้าใช้งาน) ยกเว้นบัญชี Super Admin / Mini Super Admin และการตั้งค่าระบบ',
     admin: 'ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน'
   };
   const COLORS = { pending: '#e3651d', draft: '#2677ad', burned: '#cb2c29', not_burned: '#18845d', not_found: '#687976', needs_review: '#7a5ab5', inaccessible: '#596579' };
@@ -100,6 +101,7 @@
     const q = clean(f.search).toLowerCase();
     return rows.filter(r => (!f.start || monthKey(r.date) >= f.start)
       && (!f.end || monthKey(r.date) <= f.end)
+      && (!f.province || r.provinceCode === f.province)
       && (!f.district || r.district === f.district)
       && (!f.tambon || r.tambon === f.tambon)
       && (!f.village || r.village === f.village)
@@ -182,16 +184,23 @@
   }
 
   /** สิทธิ์ฝั่งหน้าเว็บ (ใช้แสดง/ซ่อนปุ่มเท่านั้น — เซิร์ฟเวอร์ตรวจสิทธิ์จริงทุกคำสั่ง) */
+  const ALL = 'ALL';
+  /** Super Admin หรือ Mini Super Admin ระดับประเทศ */
+  const isNational = user => Boolean(user && (user.role === 'superadmin' || (user.role === 'minisuper' && user.prov === '*')));
+  function provinceName(code) { return code === ALL ? 'ทุกจังหวัด' : PROVINCES[code] || ''; }
+  function scopeLabel(user) { return !user ? '' : isNational(user) ? 'ทุกจังหวัด' : 'จังหวัด' + (PROVINCES[user.prov] || ''); }
+
   function can(user, what, ctx) {
     if (!user) return false;
-    const role = user.role, own = p => role === 'superadmin' || String(p) === String(user.prov);
+    const role = user.role, own = p => isNational(user) || String(p) === String(user.prov);
     switch (what) {
       case 'record': return own(ctx && ctx.province);
       case 'manage': return role === 'superadmin' || role === 'minisuper';
       case 'manageMini': return role === 'superadmin';
       case 'settings': return role === 'superadmin';
-      case 'chooseProvince': return role === 'superadmin';
-      case 'deleteVerification': return role === 'superadmin' || (role === 'minisuper' && own(ctx && ctx.province));
+      case 'chooseProvince': return isNational(user);
+      case 'allProvinces': return isNational(user);
+      case 'deleteVerification': return isNational(user) || (role === 'minisuper' && own(ctx && ctx.province));
       default: return false;
     }
   }
@@ -208,6 +217,6 @@
   return {
     PROVINCES, MONTHS, MONTHS_SHORT, RESULT_LABELS, STATUS_LABELS, ROLE_LABELS, ROLE_DESCRIPTIONS, COLORS, PERSON_CATEGORIES,
     normalizePhone, validPhone, fromApi, fromSheetSource, fiscalYear, monthKey, monthLabel, thaiDate, thaiDateTime,
-    defaultPeriod, monthsBetween, byDistance, formatDistance, fiscalGroups, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid
+    defaultPeriod, monthsBetween, byDistance, formatDistance, fiscalGroups, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid, ALL, isNational, provinceName, scopeLabel
   };
 });

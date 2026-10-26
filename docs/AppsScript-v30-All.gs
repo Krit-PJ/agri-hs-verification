@@ -16,8 +16,8 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.1.0';
-const SETUP_VERSION = '3.1';
+const APP_VERSION = '3.2.0';
+const SETUP_VERSION = '3.2';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
 const DB_ID = '1LOuhCmG8nSS5Si-wHUtgyUtbWYkTw-XKaVjrYBHPxlQ';
@@ -30,6 +30,9 @@ const TOKEN_HOURS = 8;
 const HS_CACHE_SECONDS = 600;
 const MAX_PHOTOS_PER_HS = 3;
 const REGISTER_LIMIT_PER_10_MIN = 30;
+/** รหัสจังหวัดของ Mini Super Admin ระดับประเทศ (ดูแลทุกจังหวัด) */
+const ALL_PROVINCES = 'ALL';
+const VISIT_LOG_MINUTES = 30;
 const MAX_PHOTO_BYTES = 1000000;
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -75,7 +78,7 @@ const AUDIT_LABELS = {
   request_approve: 'อนุมัติคำขอ', request_reject: 'ปฏิเสธคำขอ',
   account_create: 'เพิ่มบัญชี', account_update: 'แก้ไขบัญชี', account_approved: 'เปิดใช้บัญชี', account_disabled: 'ระงับบัญชี', account_delete: 'ลบบัญชี',
   verification_create: 'บันทึกผลตรวจ', verification_update: 'แก้ไขผลตรวจ', verification_delete: 'ลบผลตรวจ',
-  photo_upload: 'แนบภาพ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
+  photo_upload: 'แนบภาพ', visit: 'เปิดใช้งานระบบ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
 };
 
 /* ===== Utils.gs ===== */
@@ -465,7 +468,7 @@ function auditList_(user, b) {
   const prov = provCode_(b.province);
   let rows = readAll_('AuditLog').filter(r => {
     if (user.role === 'admin') return r.actorId === user.sub;
-    if (user.role === 'minisuper') return r.provinceCode === user.prov && r.role !== 'superadmin' && r.role !== 'system';
+    if (user.role === 'minisuper') return (user.prov === '*' || r.provinceCode === user.prov) && r.role !== 'superadmin' && r.role !== 'system';
     return true;
   }).filter(r => (!prov || r.provinceCode === prov)
     && (!b.role || r.role === b.role)
@@ -484,26 +487,96 @@ function auditList_(user, b) {
   return { ok: true, total: rows.length, logs: rows.slice(0, limit).map(stripRow_), people: Object.keys(summary).map(k => summary[k]), labels: AUDIT_LABELS };
 }
 
-/** รายงานการพยายามเข้าใช้ */
+/** ใครเห็นประวัติของใคร: Super Admin ทั้งหมด · Mini Super Admin ระดับประเทศ ทั้งหมดยกเว้น Super Admin · Mini Super Admin จังหวัด เฉพาะจังหวัด · Admin เฉพาะตนเอง */
+function historyVisible_(user, row, actorKey) {
+  if (user.role === 'admin') return row[actorKey] === user.sub;
+  if (user.role === 'minisuper') return row.role !== 'superadmin' && row.role !== 'system' && (user.prov === '*' || row.provinceCode === user.prov);
+  return true;
+}
+
+/** บันทึกการเปิดใช้งานระบบของผู้ที่เข้าสู่ระบบค้างไว้ (ไม่เกิน 1 ครั้งต่อ 30 นาทีต่อคน) */
+function touch_(user, b) {
+  const cache = CacheService.getScriptCache();
+  const key = 'visit:' + user.sub;
+  if (cache.get(key)) return { ok: true, logged: false };
+  cache.put(key, '1', VISIT_LOG_MINUTES * 60);
+  audit_(user, 'visit', clean_(b && b.page, 60) || 'เว็บไซต์', clean_(b && b.device, 120));
+  return { ok: true, logged: true };
+}
+
+/**
+ * ประวัติการเข้าใช้งานระบบ
+ *   attempts : ทุกการพยายามเข้าสู่ระบบ (LoginAttempts)
+ *   people   : สรุปรายบุคคล — จำนวนเข้าสู่ระบบ/เปิดใช้งาน/ล้มเหลว ครั้งแรก ล่าสุด อุปกรณ์ล่าสุด
+ *   daily    : จำนวนรายวัน (เข้าสู่ระบบสำเร็จ / ล้มเหลว / เปิดใช้งาน / ผู้ใช้ไม่ซ้ำ)
+ *   unknown  : หมายเลขที่ไม่มีในระบบแต่พยายามเข้าใช้ (Super Admin / Mini Super Admin ระดับประเทศ)
+ */
 function loginReport_(user, b) {
   b = b || {};
   const limit = Math.min(Number(b.limit) || 300, 2000);
-  let rows = readAll_('LoginAttempts').filter(r => {
-    if (user.role === 'admin') return r.accountId === user.sub;
-    if (user.role === 'minisuper') return r.provinceCode === user.prov && r.role !== 'superadmin';
-    return true;
-  }).filter(r => inRange_(r.time, b) && (!b.result || r.result === b.result));
-  rows.sort((a, c) => String(c.time).localeCompare(String(a.time)));
+  const q = clean_(b.q).toLowerCase();
+  const prov = provCode_(b.province);
+  const days = Math.max(1, Math.min(Number(b.days) || 30, 366));
+  const since = Utilities.formatDate(new Date(Date.now() - (days - 1) * 86400000), 'Asia/Bangkok', 'yyyy-MM-dd');
+  const from = b.from || since, to = b.to || '';
+  const match = r => (!prov || r.provinceCode === prov) && (!b.role || r.role === b.role)
+    && (!q || [r.identifier, r.fullName, r.accountId, r.actorName, r.actorId].join(' ').toLowerCase().indexOf(q) >= 0)
+    && inRange_(r.time, { from: from, to: to });
+  const attempts = readAll_('LoginAttempts').filter(r => historyVisible_(user, r, 'accountId') && match(r) && (!b.result || r.result === b.result));
+  attempts.sort((a, c) => String(c.time).localeCompare(String(a.time)));
+  const visits = readAll_('AuditLog').filter(r => (r.action === 'visit' || r.action === 'login' || r.action === 'logout' || r.action === 'register') && historyVisible_(user, r, 'actorId') && match(r));
+
+  const people = {}, daily = {};
+  const person = (key, base) => people[key] || (people[key] = Object.assign({ logins: 0, visits: 0, failed: 0, first: '', last: '', lastDevice: '', lastAction: '' }, base));
+  const day = d => daily[d] || (daily[d] = { date: d, success: 0, failed: 0, visits: 0, users: {} });
+  const seen = (p, time, device, action) => {
+    if (!p.first || time < p.first) p.first = time;
+    if (!p.last || time > p.last) { p.last = time; p.lastDevice = device || p.lastDevice; p.lastAction = action; }
+  };
+  attempts.forEach(r => {
+    const d = day(String(r.time).slice(0, 10));
+    if (r.result === 'success') d.success++; else d.failed++;
+    if (r.result === 'not_found' || r.result === 'invalid') return;
+    const p = person(r.accountId || r.identifier, { key: r.accountId || r.identifier, name: r.fullName || r.identifier, role: r.role, provinceCode: r.provinceCode, identifier: r.identifier });
+    if (r.result === 'success') { p.logins++; d.users[p.key] = true; } else p.failed++;
+    seen(p, r.time, r.device, r.result === 'success' ? 'เข้าสู่ระบบ' : (LOGIN_RESULTS[r.result] || r.result));
+  });
+  visits.forEach(r => {
+    if (r.action === 'login') return;
+    const d = day(String(r.time).slice(0, 10));
+    const p = person(r.actorId, { key: r.actorId, name: r.actorName, role: r.role, provinceCode: r.provinceCode, identifier: '' });
+    if (r.action === 'visit' || r.action === 'register') { p.visits++; d.visits++; d.users[p.key] = true; }
+    seen(p, r.time, r.action === 'visit' ? r.detail : '', AUDIT_LABELS[r.action] || r.action);
+  });
+  const dailyList = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const key = Utilities.formatDate(new Date(Date.now() - i * 86400000), 'Asia/Bangkok', 'yyyy-MM-dd');
+    if (key < from || (to && key > to)) continue;
+    const d = daily[key] || { date: key, success: 0, failed: 0, visits: 0, users: {} };
+    dailyList.push({ date: key, success: d.success, failed: d.failed, visits: d.visits, users: Object.keys(d.users).length });
+  }
   const unknown = {};
-  if (user.role === 'superadmin') {
-    rows.filter(r => r.result === 'not_found').forEach(r => {
+  if (isNational_(user)) {
+    attempts.filter(r => r.result === 'not_found').forEach(r => {
       const u = unknown[r.identifier] || (unknown[r.identifier] = { identifier: r.identifier, count: 0, first: r.time, last: r.time });
       u.count++;
       if (r.time < u.first) u.first = r.time;
       if (r.time > u.last) u.last = r.time;
     });
   }
-  return { ok: true, total: rows.length, attempts: rows.slice(0, limit).map(stripRow_), unknown: Object.keys(unknown).map(k => unknown[k]), labels: LOGIN_RESULTS };
+  const peopleList = Object.keys(people).map(k => people[k]).sort((a, c) => String(c.last).localeCompare(String(a.last)));
+  const today = today_();
+  return {
+    ok: true, from: from, to: to, total: attempts.length, attempts: attempts.slice(0, limit).map(stripRow_), people: peopleList, daily: dailyList,
+    unknown: Object.keys(unknown).map(k => unknown[k]),
+    stats: {
+      loginsToday: attempts.filter(r => r.result === 'success' && String(r.time).slice(0, 10) === today).length,
+      activeToday: (dailyList.find(d => d.date === today) || { users: 0 }).users,
+      activePeople: peopleList.filter(p => p.logins + p.visits > 0).length,
+      failed: attempts.filter(r => r.result !== 'success').length
+    },
+    labels: LOGIN_RESULTS
+  };
 }
 
 /* ตัวนับผู้เข้าชม (สาธารณะ) */
@@ -640,11 +713,17 @@ function register_(b) {
   });
 }
 
-/** แปลงบัญชีในชีตเป็นผู้ใช้ในระบบ — ทั้ง admin และ minisuper มีขอบเขตจังหวัดของตน */
+/**
+ * แปลงบัญชีในชีตเป็นผู้ใช้ในระบบ
+ *   admin            : จังหวัดของตน
+ *   minisuper (จังหวัด): จังหวัดของตน
+ *   minisuper (ALL)  : ทั้งระบบ — จัดการได้เหมือน Super Admin ยกเว้นบัญชี Super Admin / Mini Super Admin และการตั้งค่าระบบ
+ */
 function accountUser_(acc) {
   const role = acc.role === 'minisuper' ? 'minisuper' : 'admin';
-  const prov = String(acc.provinceCode);
-  return { sub: acc.accountId, name: acc.fullName, phone: normalizePhone_(acc.phone), role: role, prov: prov, provName: PROVINCES[prov] || '', position: acc.position || '', affiliation: acc.affiliation || '' };
+  const national = role === 'minisuper' && String(acc.provinceCode) === ALL_PROVINCES;
+  const prov = national ? '*' : String(acc.provinceCode);
+  return { sub: acc.accountId, name: acc.fullName, phone: normalizePhone_(acc.phone), role: role, prov: prov, provName: national ? 'ทุกจังหวัด' : PROVINCES[prov] || '', position: acc.position || '', affiliation: acc.affiliation || '' };
 }
 
 function signToken_(user) {
@@ -668,10 +747,12 @@ function verifyToken_(token) {
 }
 
 function isSuper_(user) { return user.role === 'superadmin'; }
+/** ขอบเขตทั้งประเทศ: Super Admin และ Mini Super Admin ระดับประเทศ */
+function isNational_(user) { return user.role === 'superadmin' || (user.role === 'minisuper' && user.prov === '*'); }
 function isManager_(user) { return user.role === 'superadmin' || user.role === 'minisuper'; }
 function requireSuper_(user) { if (!isSuper_(user)) throw new Error('เฉพาะ Super Admin เท่านั้น'); }
 function requireManager_(user) { if (!isManager_(user)) throw new Error('เฉพาะ Mini Super Admin / Super Admin เท่านั้น'); }
-function inScope_(user, prov) { return isSuper_(user) || String(prov) === user.prov; }
+function inScope_(user, prov) { return isNational_(user) || String(prov) === user.prov; }
 
 /** ตรวจว่าผู้ใช้ทำงานกับจังหวัดนี้ได้ (Super Admin ทุกจังหวัด, อื่น ๆ เฉพาะจังหวัดของตน) */
 function requireProvince_(user, prov) {
@@ -684,8 +765,9 @@ function requireProvince_(user, prov) {
 /** Mini Super Admin จัดการได้เฉพาะบัญชี Admin ในจังหวัดของตน — บัญชี Mini Super Admin จัดการได้โดย Super Admin เท่านั้น */
 function requireAccountManager_(user, role, prov) {
   requireManager_(user);
-  requireProvince_(user, prov);
   if (role === 'minisuper' && !isSuper_(user)) throw new Error('การเพิ่ม/แก้ไข/ระงับ/ลบ Mini Super Admin ทำได้เฉพาะ Super Admin');
+  if (String(prov) === ALL_PROVINCES) { if (!isSuper_(user)) throw new Error('ไม่มีสิทธิ์จัดการบัญชีระดับประเทศ'); return; }
+  requireProvince_(user, prov);
 }
 
 /* ===== Accounts.gs ===== */
@@ -738,9 +820,10 @@ function requestDecide_(user, b) {
 
 function accountsList_(user) {
   requireManager_(user);
-  const rows = readAll_('Accounts').filter(r => inScope_(user, r.provinceCode));
+  const rows = readAll_('Accounts').filter(r => inScope_(user, r.provinceCode) || (isSuper_(user) && r.provinceCode === ALL_PROVINCES) || (isNational_(user) && r.provinceCode === ALL_PROVINCES));
+  const superUser = isNational_(user) ? { username: PropertiesService.getScriptProperties().getProperty('SUPER_USER') || '', configured: !!PropertiesService.getScriptProperties().getProperty('SUPER_HASH') } : null;
   rows.sort((a, c) => String(a.provinceCode).localeCompare(String(c.provinceCode)) || String(c.role).localeCompare(String(a.role)) || String(a.accountId).localeCompare(String(c.accountId)));
-  return { ok: true, accounts: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone) })) };
+  return { ok: true, superAdmin: superUser, accounts: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone), provinceName: r.provinceCode === ALL_PROVINCES ? 'ทุกจังหวัด (ทั้งระบบ)' : r.provinceName })) };
 }
 
 function accountSave_(user, b) {
@@ -748,25 +831,27 @@ function accountSave_(user, b) {
   return withLock_(() => {
     const phone = normalizePhone_(b.phone);
     if (!validPhone_(phone)) throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง');
-    const prov = provCode_(b.provinceCode);
-    if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
     const role = b.role === 'minisuper' ? 'minisuper' : 'admin';
+    const prov = role === 'minisuper' && String(b.provinceCode) === ALL_PROVINCES ? ALL_PROVINCES : provCode_(b.provinceCode);
+    if (!prov) throw new Error('กรุณาเลือกจังหวัด');
+    if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
     requireAccountManager_(user, role, prov);
     const dup = findRow_('Accounts', r => normalizePhone_(r.phone) === phone && r.accountId !== b.accountId);
     if (dup) throw new Error('เบอร์โทรศัพท์นี้มีในระบบแล้ว');
-    const data = { phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation), provinceCode: prov, provinceName: PROVINCES[prov], role: role };
+    const provName = prov === ALL_PROVINCES ? 'ทุกจังหวัด' : PROVINCES[prov];
+    const data = { phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation), provinceCode: prov, provinceName: provName, role: role };
     if (b.accountId) {
       const acc = findRow_('Accounts', r => r.accountId === b.accountId);
       if (!acc) throw new Error('ไม่พบบัญชี');
       requireAccountManager_(user, acc.role, acc.provinceCode);
       if (acc.accountId === user.sub && (role !== acc.role || prov !== acc.provinceCode)) throw new Error('ไม่สามารถเปลี่ยนบทบาทหรือจังหวัดของตนเองได้');
       updateRow_('Accounts', acc._row, data);
-      audit_(user, 'account_update', acc.accountId + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + PROVINCES[prov], prov);
+      audit_(user, 'account_update', acc.accountId + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + provName, prov === ALL_PROVINCES ? '' : prov);
       return { ok: true, accountId: acc.accountId };
     }
     const id = nextAccountId_(prov);
     appendObj_('Accounts', Object.assign(data, { accountId: id, status: 'approved', createdAt: now_(), approvedAt: now_(), approvedBy: user.name, lastLoginAt: '' }));
-    audit_(user, 'account_create', id + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + PROVINCES[prov], prov);
+    audit_(user, 'account_create', id + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + provName, prov === ALL_PROVINCES ? '' : prov);
     return { ok: true, accountId: id };
   });
 }
@@ -797,9 +882,10 @@ function accountDelete_(user, b) {
 }
 
 function nextAccountId_(prov) {
-  const nums = readAll_('Accounts').filter(r => String(r.provinceCode) === String(prov))
+  const tag = String(prov) === ALL_PROVINCES ? 'TH' : String(prov);
+  const nums = readAll_('Accounts').filter(r => String(r.accountId).indexOf('A-' + tag + '-') === 0)
     .map(r => Number(String(r.accountId).split('-').pop()) || 0);
-  return 'A-' + prov + '-' + String((nums.length ? Math.max.apply(null, nums) : 0) + 1).padStart(3, '0');
+  return 'A-' + tag + '-' + String((nums.length ? Math.max.apply(null, nums) : 0) + 1).padStart(3, '0');
 }
 
 /* ===== Hotspots.gs ===== */
@@ -944,11 +1030,11 @@ function publicHotspots_(prov) {
  */
 
 function canEdit_(user, rec) {
-  if (isSuper_(user)) return true;
+  if (isNational_(user)) return true;
   if (rec.provinceCode !== user.prov) return false;
   return user.role === 'minisuper' || rec.recordedById === user.sub;
 }
-function canDelete_(user, rec) { return isSuper_(user) || (user.role === 'minisuper' && rec.provinceCode === user.prov); }
+function canDelete_(user, rec) { return isNational_(user) || (user.role === 'minisuper' && rec.provinceCode === user.prov); }
 
 function publicVerification_(rec, user) {
   const o = stripRow_(rec);
@@ -1172,6 +1258,7 @@ function handle_(body) {
   switch (a) {
     case 'me': return { ok: true, user: user };
     case 'logout': audit_(user, 'logout', ROLE_LABELS[user.role] || '', ''); return { ok: true };
+    case 'touch': return touch_(user, body);
     // ผลตรวจ
     case 'verification_get': return verificationGet_(user, body);
     case 'verification_save': return verificationSave_(user, body);

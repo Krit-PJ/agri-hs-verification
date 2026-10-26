@@ -47,9 +47,10 @@ function requestDecide_(user, b) {
 
 function accountsList_(user) {
   requireManager_(user);
-  const rows = readAll_('Accounts').filter(r => inScope_(user, r.provinceCode));
+  const rows = readAll_('Accounts').filter(r => inScope_(user, r.provinceCode) || (isSuper_(user) && r.provinceCode === ALL_PROVINCES) || (isNational_(user) && r.provinceCode === ALL_PROVINCES));
+  const superUser = isNational_(user) ? { username: PropertiesService.getScriptProperties().getProperty('SUPER_USER') || '', configured: !!PropertiesService.getScriptProperties().getProperty('SUPER_HASH') } : null;
   rows.sort((a, c) => String(a.provinceCode).localeCompare(String(c.provinceCode)) || String(c.role).localeCompare(String(a.role)) || String(a.accountId).localeCompare(String(c.accountId)));
-  return { ok: true, accounts: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone) })) };
+  return { ok: true, superAdmin: superUser, accounts: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone), provinceName: r.provinceCode === ALL_PROVINCES ? 'ทุกจังหวัด (ทั้งระบบ)' : r.provinceName })) };
 }
 
 function accountSave_(user, b) {
@@ -57,25 +58,27 @@ function accountSave_(user, b) {
   return withLock_(() => {
     const phone = normalizePhone_(b.phone);
     if (!validPhone_(phone)) throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง');
-    const prov = provCode_(b.provinceCode);
-    if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
     const role = b.role === 'minisuper' ? 'minisuper' : 'admin';
+    const prov = role === 'minisuper' && String(b.provinceCode) === ALL_PROVINCES ? ALL_PROVINCES : provCode_(b.provinceCode);
+    if (!prov) throw new Error('กรุณาเลือกจังหวัด');
+    if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
     requireAccountManager_(user, role, prov);
     const dup = findRow_('Accounts', r => normalizePhone_(r.phone) === phone && r.accountId !== b.accountId);
     if (dup) throw new Error('เบอร์โทรศัพท์นี้มีในระบบแล้ว');
-    const data = { phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation), provinceCode: prov, provinceName: PROVINCES[prov], role: role };
+    const provName = prov === ALL_PROVINCES ? 'ทุกจังหวัด' : PROVINCES[prov];
+    const data = { phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation), provinceCode: prov, provinceName: provName, role: role };
     if (b.accountId) {
       const acc = findRow_('Accounts', r => r.accountId === b.accountId);
       if (!acc) throw new Error('ไม่พบบัญชี');
       requireAccountManager_(user, acc.role, acc.provinceCode);
       if (acc.accountId === user.sub && (role !== acc.role || prov !== acc.provinceCode)) throw new Error('ไม่สามารถเปลี่ยนบทบาทหรือจังหวัดของตนเองได้');
       updateRow_('Accounts', acc._row, data);
-      audit_(user, 'account_update', acc.accountId + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + PROVINCES[prov], prov);
+      audit_(user, 'account_update', acc.accountId + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + provName, prov === ALL_PROVINCES ? '' : prov);
       return { ok: true, accountId: acc.accountId };
     }
     const id = nextAccountId_(prov);
     appendObj_('Accounts', Object.assign(data, { accountId: id, status: 'approved', createdAt: now_(), approvedAt: now_(), approvedBy: user.name, lastLoginAt: '' }));
-    audit_(user, 'account_create', id + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + PROVINCES[prov], prov);
+    audit_(user, 'account_create', id + ' ' + data.fullName, ROLE_LABELS[role] + ' · ' + provName, prov === ALL_PROVINCES ? '' : prov);
     return { ok: true, accountId: id };
   });
 }
@@ -106,7 +109,8 @@ function accountDelete_(user, b) {
 }
 
 function nextAccountId_(prov) {
-  const nums = readAll_('Accounts').filter(r => String(r.provinceCode) === String(prov))
+  const tag = String(prov) === ALL_PROVINCES ? 'TH' : String(prov);
+  const nums = readAll_('Accounts').filter(r => String(r.accountId).indexOf('A-' + tag + '-') === 0)
     .map(r => Number(String(r.accountId).split('-').pop()) || 0);
-  return 'A-' + prov + '-' + String((nums.length ? Math.max.apply(null, nums) : 0) + 1).padStart(3, '0');
+  return 'A-' + tag + '-' + String((nums.length ? Math.max.apply(null, nums) : 0) + 1).padStart(3, '0');
 }

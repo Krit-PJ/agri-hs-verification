@@ -12,8 +12,8 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.1.0';
-const SETUP_VERSION = '3.1';
+const APP_VERSION = '3.2.0';
+const SETUP_VERSION = '3.2';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
 const DB_ID = '1LOuhCmG8nSS5Si-wHUtgyUtbWYkTw-XKaVjrYBHPxlQ';
@@ -26,6 +26,9 @@ const TOKEN_HOURS = 8;
 const HS_CACHE_SECONDS = 600;
 const MAX_PHOTOS_PER_HS = 3;
 const REGISTER_LIMIT_PER_10_MIN = 30;
+/** รหัสจังหวัดของ Mini Super Admin ระดับประเทศ (ดูแลทุกจังหวัด) */
+const ALL_PROVINCES = 'ALL';
+const VISIT_LOG_MINUTES = 30;
 const MAX_PHOTO_BYTES = 1000000;
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -71,5 +74,5 @@ const AUDIT_LABELS = {
   request_approve: 'อนุมัติคำขอ', request_reject: 'ปฏิเสธคำขอ',
   account_create: 'เพิ่มบัญชี', account_update: 'แก้ไขบัญชี', account_approved: 'เปิดใช้บัญชี', account_disabled: 'ระงับบัญชี', account_delete: 'ลบบัญชี',
   verification_create: 'บันทึกผลตรวจ', verification_update: 'แก้ไขผลตรวจ', verification_delete: 'ลบผลตรวจ',
-  photo_upload: 'แนบภาพ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
+  photo_upload: 'แนบภาพ', visit: 'เปิดใช้งานระบบ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
 };

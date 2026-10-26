@@ -99,11 +99,17 @@ function register_(b) {
   });
 }
 
-/** แปลงบัญชีในชีตเป็นผู้ใช้ในระบบ — ทั้ง admin และ minisuper มีขอบเขตจังหวัดของตน */
+/**
+ * แปลงบัญชีในชีตเป็นผู้ใช้ในระบบ
+ *   admin            : จังหวัดของตน
+ *   minisuper (จังหวัด): จังหวัดของตน
+ *   minisuper (ALL)  : ทั้งระบบ — จัดการได้เหมือน Super Admin ยกเว้นบัญชี Super Admin / Mini Super Admin และการตั้งค่าระบบ
+ */
 function accountUser_(acc) {
   const role = acc.role === 'minisuper' ? 'minisuper' : 'admin';
-  const prov = String(acc.provinceCode);
-  return { sub: acc.accountId, name: acc.fullName, phone: normalizePhone_(acc.phone), role: role, prov: prov, provName: PROVINCES[prov] || '', position: acc.position || '', affiliation: acc.affiliation || '' };
+  const national = role === 'minisuper' && String(acc.provinceCode) === ALL_PROVINCES;
+  const prov = national ? '*' : String(acc.provinceCode);
+  return { sub: acc.accountId, name: acc.fullName, phone: normalizePhone_(acc.phone), role: role, prov: prov, provName: national ? 'ทุกจังหวัด' : PROVINCES[prov] || '', position: acc.position || '', affiliation: acc.affiliation || '' };
 }
 
 function signToken_(user) {
@@ -127,10 +133,12 @@ function verifyToken_(token) {
 }
 
 function isSuper_(user) { return user.role === 'superadmin'; }
+/** ขอบเขตทั้งประเทศ: Super Admin และ Mini Super Admin ระดับประเทศ */
+function isNational_(user) { return user.role === 'superadmin' || (user.role === 'minisuper' && user.prov === '*'); }
 function isManager_(user) { return user.role === 'superadmin' || user.role === 'minisuper'; }
 function requireSuper_(user) { if (!isSuper_(user)) throw new Error('เฉพาะ Super Admin เท่านั้น'); }
 function requireManager_(user) { if (!isManager_(user)) throw new Error('เฉพาะ Mini Super Admin / Super Admin เท่านั้น'); }
-function inScope_(user, prov) { return isSuper_(user) || String(prov) === user.prov; }
+function inScope_(user, prov) { return isNational_(user) || String(prov) === user.prov; }
 
 /** ตรวจว่าผู้ใช้ทำงานกับจังหวัดนี้ได้ (Super Admin ทุกจังหวัด, อื่น ๆ เฉพาะจังหวัดของตน) */
 function requireProvince_(user, prov) {
@@ -143,6 +151,7 @@ function requireProvince_(user, prov) {
 /** Mini Super Admin จัดการได้เฉพาะบัญชี Admin ในจังหวัดของตน — บัญชี Mini Super Admin จัดการได้โดย Super Admin เท่านั้น */
 function requireAccountManager_(user, role, prov) {
   requireManager_(user);
-  requireProvince_(user, prov);
   if (role === 'minisuper' && !isSuper_(user)) throw new Error('การเพิ่ม/แก้ไข/ระงับ/ลบ Mini Super Admin ทำได้เฉพาะ Super Admin');
+  if (String(prov) === ALL_PROVINCES) { if (!isSuper_(user)) throw new Error('ไม่มีสิทธิ์จัดการบัญชีระดับประเทศ'); return; }
+  requireProvince_(user, prov);
 }

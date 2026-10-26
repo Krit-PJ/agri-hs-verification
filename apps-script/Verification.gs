@@ -8,11 +8,11 @@
  */
 
 function canEdit_(user, rec) {
-  if (isSuper_(user)) return true;
+  if (isNational_(user)) return true;
   if (rec.provinceCode !== user.prov) return false;
   return user.role === 'minisuper' || rec.recordedById === user.sub;
 }
-function canDelete_(user, rec) { return isSuper_(user) || (user.role === 'minisuper' && rec.provinceCode === user.prov); }
+function canDelete_(user, rec) { return isNational_(user) || (user.role === 'minisuper' && rec.provinceCode === user.prov); }
 
 function publicVerification_(rec, user) {
   const o = stripRow_(rec);
