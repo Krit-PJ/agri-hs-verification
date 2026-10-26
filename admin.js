@@ -276,6 +276,7 @@ var HSAdmin = (() => {
   async function renderLogins(panel, user) {
     const f = cache.hist || (cache.hist = { days: 30, from: '', to: '', role: '', result: '', q: '', province: '' });
     const data = await HSApi.post('login_report', Object.assign({ limit: 500 }, f));
+    if (!Array.isArray(data.daily)) throw new Error('Backend ยังเป็นรุ่นเก่า — ผู้ดูแลต้องอัปเดต Apps Script เป็นรุ่น 3.2 ก่อนใช้งานประวัติการเข้าใช้งาน');
     const labels = data.labels || {};
     const manage = C.can(user, 'manage');
     const national = C.isNational(user);
