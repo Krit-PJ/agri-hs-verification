@@ -8,11 +8,11 @@
   <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="design-tokens.css?v=3.2">
-  <link rel="stylesheet" href="styles.css?v=3.2">
-  <link rel="stylesheet" href="registration.css?v=3.2">
-  <link rel="stylesheet" href="boundaries.css?v=3.2">
-  <link rel="stylesheet" href="layout-v3.css?v=3.2">
+  <link rel="stylesheet" href="design-tokens.css?v=3.3">
+  <link rel="stylesheet" href="styles.css?v=3.3">
+  <link rel="stylesheet" href="registration.css?v=3.3">
+  <link rel="stylesheet" href="boundaries.css?v=3.3">
+  <link rel="stylesheet" href="layout-v3.css?v=3.3">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600;700&amp;display=swap">
 </head>
 <body>
@@ -23,10 +23,10 @@
         <img class="agency-logo doae" src="assets/logo-doae.png" alt="ตรากรมส่งเสริมการเกษตร">
         <img id="provinceLogo" class="agency-logo" src="assets/logo-kpp.png" alt="ตราประจำจังหวัด" hidden><span id="provinceLogoFallback" class="province-mark" aria-label="ประเทศไทย">TH</span>
       </div>
-      <div class="brand-copy"><strong id="systemTitle">ระบบตรวจสอบจุดความร้อน</strong><small id="areaSubtitle">พื้นที่การเกษตรของประเทศไทย</small><small class="developer-credit">พัฒนาโดย ดร. กิตติ  โพธิ์จวง กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร</small></div>
+      <div class="brand-copy"><strong id="systemTitle">ระบบตรวจสอบจุดความร้อน</strong><small id="areaSubtitle">พื้นที่การเกษตรของประเทศไทย</small></div>
     </div>
     <div class="header-actions">
-      <span id="headerIdentity">ผู้ใช้ทั่วไป</span><span id="modeBadge" class="mode-badge demo">ข้อมูลสาธารณะ</span>
+      <span id="headerIdentity" class="identity-chip" hidden></span>
       <button id="menuButton" class="icon-button admin-menu-toggle" type="button" aria-label="เปิดเมนู" aria-controls="mainNav" aria-expanded="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     </div>
   </header>
@@ -35,59 +35,54 @@
     <button class="nav-item active" data-view="work" type="button">ตรวจสอบจุดความร้อน</button>
     <button class="nav-item" data-view="summary" type="button">สรุปผลการตรวจสอบ</button>
     <button id="adminNav" class="nav-item" data-view="admin" type="button" hidden>ผู้ดูแลระบบ</button>
-    <a class="nav-item" href="https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/team.html" target="_blank" rel="noopener noreferrer">ทีมผู้พัฒนาและที่ปรึกษา</a>
     <button id="accessLoginNav" class="nav-item login-nav" type="button">เข้าใช้งานระบบ</button>
-    <a id="riskNavLink" class="nav-item external-nav" href="https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/" target="_blank" rel="noopener">ระบบ Agri-Risk Map Burning ↗</a>
-    <a id="hubNavLink" class="nav-item external-nav" href="https://krit-pj.github.io/Green_Gain_Hub-KPP/" target="_blank" rel="noopener noreferrer">Green Gain Hub ↗</a>
   </nav>
 
-  <section id="provinceGate" class="province-gate" aria-label="เลือกจังหวัด">
-    <div class="province-context">
-      <label>จังหวัดที่กำลังดู<select id="provinceSelect"><option value="">— เลือกจังหวัด —</option></select></label>
-      <p id="provinceCoverage" class="field-hint" role="status">เลือกจังหวัดก่อนแสดงจุดความร้อนและสรุปผล</p>
+  <!-- แถบเครื่องมือร่วม (หน้าตรวจสอบและหน้าสรุป): จังหวัด · ช่วงเวลา · ตัวกรอง -->
+  <section id="provinceGate" class="workbar" aria-label="เลือกพื้นที่และช่วงเวลา">
+    <div class="workbar-row">
+      <label class="wb-field wb-province"><span>จังหวัด</span><select id="provinceSelect"><option value="">— เลือกจังหวัด —</option></select></label>
+      <label class="wb-field wb-period"><span>ช่วงเวลา</span><select id="periodPreset"></select></label>
+      <button id="filterToggle" class="wb-filter" type="button" aria-expanded="false" aria-controls="filterPanel"><span class="wb-label">ตัวกรอง</span><span id="filterCount" class="wb-count" hidden>0</span></button>
+      <button id="refreshDataButton" type="button" class="wb-icon" title="อ่านข้อมูลล่าสุด" aria-label="อ่านข้อมูลล่าสุด">↻</button>
     </div>
+    <div id="filterChips" class="filter-chips" aria-live="polite"></div>
+    <div id="filterPanel" class="filter-drawer" hidden>
+      <div class="filter-grid">
+        <label id="provinceFilterWrap" hidden>จังหวัด<select id="provinceFilter"><option value="">ทุกจังหวัด</option></select></label>
+        <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
+        <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
+        <label>หมู่บ้าน<select id="villageFilter"><option value="">ทุกหมู่บ้าน</option></select></label>
+        <label>พืช/พื้นที่<select id="cropFilter"><option value="">ทุกประเภท</option></select></label>
+        <label>สถานะ<select id="statusFilter"><option value="">ทุกสถานะ</option><option value="pending">รอตรวจ</option><option value="draft">งานร่าง</option><option value="verified">ตรวจแล้ว</option></select></label>
+        <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option><option value="inaccessible">เข้าตรวจสอบไม่ได้</option></select></label>
+        <label class="search-label">ค้นหา HS<input id="searchFilter" type="search" inputmode="search" placeholder="เลข HS หรือชื่อพื้นที่"></label>
+      </div>
+      <div id="customPeriod" class="custom-period" hidden>
+        <label>ตั้งแต่<select id="startMonth"></select></label>
+        <label>ถึง<select id="endMonth"></select></label>
+      </div>
+      <div class="filter-actions"><button id="resetFilters" class="text-button" type="button">ล้างตัวกรองทั้งหมด</button><button id="applyFiltersMobile" class="primary-button" type="button">ดูผลลัพธ์</button></div>
+    </div>
+    <p id="provinceCoverage" class="sr-only" role="status"></p>
+    <p id="periodHint" class="sr-only" role="status"></p>
   </section>
 
   <main id="main">
     <section id="workView" class="view active" aria-labelledby="workTitle">
-      <div class="work-heading">
-        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนบนแผนที่หรือรายการ แล้วกด “บันทึกผล” เพื่อบันทึกผลการลงพื้นที่</p></div>
-        <button id="retryButton" class="secondary-button compact" type="button" hidden>ส่งงานค้าง <span id="retryCount">0</span> รายการ</button>
-      </div>
-
+      <h1 id="workTitle" class="sr-only">ตรวจสอบจุดความร้อน</h1>
       <aside id="publicNotice" class="notice warning" role="status" hidden></aside>
       <aside id="liveError" class="notice error" role="alert" hidden></aside>
+      <button id="retryButton" class="notice-button" type="button" hidden>มีงานที่ยังส่งไม่สำเร็จ <span id="retryCount">0</span> รายการ — แตะเพื่อส่งอีกครั้ง</button>
 
-      <!-- แถบงานภาคสนาม: ผู้ใช้ทั่วไปเห็นปุ่มลงทะเบียน/เข้าสู่ระบบ, เจ้าหน้าที่เห็นความคืบหน้าและปุ่มลัด -->
-      <section id="fieldBar" class="field-bar" aria-live="polite"></section>
-
-      <details id="filterPanel" class="filter-card filter-panel" open>
-        <summary><span class="filter-summary-title">ตัวกรองจุดความร้อน</span><span id="filterChips" class="filter-chips"></span></summary>
-        <div class="period-range" role="group" aria-label="ช่วงเวลาจุดความร้อน">
-          <label>เดือน–ปี เริ่มต้น<select id="startMonth"></select></label><span aria-hidden="true">ถึง</span>
-          <label>เดือน–ปี สิ้นสุด<select id="endMonth"></select></label>
-          <button id="resetPeriod" type="button" class="secondary-button">ช่วงข้อมูลล่าสุด</button>
-        </div>
-        <p id="periodHint" class="field-hint" role="status"></p>
-        <div class="filter-grid">
-          <label id="provinceFilterWrap" hidden>จังหวัด<select id="provinceFilter"><option value="">ทุกจังหวัด</option></select></label>
-          <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
-          <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
-          <label>หมู่บ้าน<select id="villageFilter"><option value="">ทุกหมู่บ้าน</option></select></label>
-          <label>พืช/พื้นที่<select id="cropFilter"><option value="">ทุกประเภท</option></select></label>
-          <label>สถานะ<select id="statusFilter"><option value="">ทุกสถานะ</option><option value="pending">รอตรวจ</option><option value="draft">งานร่าง</option><option value="verified">ตรวจแล้ว</option></select></label>
-          <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option><option value="inaccessible">เข้าตรวจสอบไม่ได้</option></select></label>
-          <label class="search-label">ค้นหา HS<input id="searchFilter" type="search" inputmode="search" placeholder="เลข HS หรือชื่อพื้นที่"></label>
-        </div>
-        <div class="filter-actions"><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button><button id="applyFiltersMobile" class="primary-button mobile-only-flex" type="button">ดูผลลัพธ์</button></div>
-      </details>
-
-      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map Burning</p><h2 id="resultsTitle">จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กรุณาเลือกจังหวัด</p></div><button id="refreshDataButton" type="button" class="secondary-button">↻ อัปเดตข้อมูล</button></div>
       <div class="result-toolbar">
-        <p><strong id="resultCount">0</strong> จุดที่พบ <span id="selectedCount" class="muted"></span></p>
-        <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
-          <button class="active" data-layout="map" type="button">แผนที่</button>
-          <button data-layout="list" type="button">รายการ</button>
+        <p class="result-summary"><strong id="resultCount">0</strong> จุด <span id="selectedCount" class="muted"></span></p>
+        <div class="result-actions">
+          <div id="fieldBar" class="field-actions"></div>
+          <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
+            <button class="active" data-layout="map" type="button">แผนที่</button>
+            <button data-layout="list" type="button">รายการ</button>
+          </div>
         </div>
       </div>
 
@@ -95,44 +90,54 @@
         <div class="map-wrap">
           <div id="map" aria-label="แผนที่จุดความร้อน"></div>
           <div id="mapFallback" class="map-fallback" hidden><strong>เปิดแผนที่ไม่ได้</strong><span>ยังเลือกรายการและนำทางด้วย Google Maps ได้</span></div>
-          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot" style="background:#2677ad"></i>งานร่าง</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบการเผา</span><span><i class="dot blocked"></i>ติดตาม</span><span><i class="dot me"></i>ตำแหน่งฉัน</span></div>
+          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot" style="background:#2677ad"></i>งานร่าง</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบการเผา</span><span><i class="dot blocked"></i>ติดตาม</span></div>
         </div>
         <section class="result-panel" aria-labelledby="resultTitle">
-          <div class="panel-heading"><h2 id="resultTitle">รายการจุด</h2><button id="allHotspotsButton" class="secondary-button all-hotspots" type="button">ล้างตัวกรอง</button></div>
+          <h2 id="resultTitle" class="sr-only">รายการจุด</h2>
           <p id="sortHint" class="field-hint" hidden></p>
           <div id="hotspotList" class="hotspot-list" aria-live="polite"></div>
           <button id="loadMore" class="secondary-button full" type="button" hidden>แสดงเพิ่ม</button>
         </section>
       </div>
+      <p id="dataSourceLabel" class="data-source"></p>
       <button id="backToMap" class="back-to-map" type="button" hidden>↑ แผนที่</button>
     </section>
 
     <section id="summaryView" class="view" aria-labelledby="summaryTitle" hidden>
-      <div class="page-heading"><p class="eyebrow">ภาพรวมการทำงาน</p><h1 id="summaryTitle">สรุปผลการตรวจสอบ</h1><p class="muted">สรุปในขอบเขตเดียวกับแผนที่ (จังหวัด ช่วงเวลา และตัวกรองพื้นที่)</p></div>
-      <p id="summaryPrompt" class="empty-state">กรุณาเลือกจังหวัดด้านบนก่อนแสดงสรุปผลการตรวจสอบ</p>
+      <h1 id="summaryTitle" class="sr-only">สรุปผลการตรวจสอบ</h1>
+      <p id="summaryPrompt" class="empty-state">เลือกจังหวัดด้านบนเพื่อดูสรุปผลการตรวจสอบ</p>
       <div id="summaryContent" hidden>
-        <p id="summaryScopeHint" class="field-hint" role="status"></p>
-        <div class="summary-filters">
-          <label>ปีงบประมาณ<select id="summaryYear"><option value="">ตามช่วงเวลาที่เลือก</option></select></label>
-          <button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / บันทึก PDF</button>
-          <button id="exportSummaryButton" class="secondary-button" type="button">ส่งออกตาราง CSV</button>
+        <div class="summary-head">
+          <p id="summaryScopeHint" class="summary-scope" role="status"></p>
+          <div class="summary-actions"><button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / PDF</button><button id="exportSummaryButton" class="secondary-button" type="button">ส่งออก CSV</button></div>
         </div>
         <div id="summaryStats" class="stat-grid"></div>
-        <section class="table-card"><div class="section-title"><div><p class="eyebrow">ความคืบหน้า</p><h2>แยกตามพื้นที่</h2></div><label class="inline-label">ระดับ<select id="summaryLevel"><option value="province" hidden>จังหวัด</option><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div>
+        <section class="table-card"><div class="section-title"><h2>ความคืบหน้าแยกตามพื้นที่</h2><label class="inline-label">ระดับ<select id="summaryLevel"><option value="province" hidden>จังหวัด</option><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div>
           <div class="table-scroll" tabindex="0" role="region" aria-label="ตารางสรุปผล"><table class="card-table"><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody id="summaryBody"></tbody></table></div>
         </section>
       </div>
     </section>
 
     <section id="adminView" class="view" aria-labelledby="adminTitle" hidden>
-      <div class="page-heading"><p class="eyebrow">พื้นที่ควบคุม</p><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p id="roleLabel" class="role-chip">ยังไม่ได้เข้าสู่ระบบ</p></div>
-      <div class="admin-session-bar"><p><strong id="adminDisplayName">—</strong><small id="adminRoleDescription"></small></p><button id="logoutButton" class="secondary-button" type="button">ออกจากระบบ</button></div>
+      <div class="admin-head">
+        <div><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p><strong id="adminDisplayName">—</strong> <span id="roleLabel" class="role-chip"></span></p><small id="adminRoleDescription" class="muted"></small></div>
+        <button id="logoutButton" class="secondary-button" type="button" hidden>ออกจากระบบ</button>
+      </div>
       <div id="adminTabs" class="admin-tabs" role="tablist" aria-label="เมนูผู้ดูแล"></div>
       <div id="adminPanels"></div>
     </section>
   </main>
 
-  <footer class="site-footer"><span class="copyright">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.</span><span id="visitCounter" class="site-counters" role="status"></span></footer>
+  <footer class="site-footer">
+    <nav class="footer-links" aria-label="ลิงก์ที่เกี่ยวข้อง">
+      <a id="riskNavLink" href="https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/" target="_blank" rel="noopener">ระบบ Agri-Risk Map Burning ↗</a>
+      <a id="hubNavLink" href="https://krit-pj.github.io/Green_Gain_Hub-KPP/" target="_blank" rel="noopener noreferrer">Green Gain Hub ↗</a>
+      <a href="https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/team.html" target="_blank" rel="noopener noreferrer">ทีมผู้พัฒนาและที่ปรึกษา ↗</a>
+      <a href="privacy.html" target="_blank" rel="noopener">ความเป็นส่วนตัว</a>
+    </nav>
+    <span id="visitCounter" class="site-counters" role="status"></span>
+    <span class="copyright">พัฒนาโดย ดร. กิตติ โพธิ์จวง กลุ่มอารักขาพืช สำนักงานเกษตรจังหวัดกำแพงเพชร · Copyright © 2026 Dr. Kitti Phojuang</span>
+  </footer>
 
   <!-- เข้าใช้งานระบบ: เจ้าหน้าที่ (Admin / Mini Super Admin) ใช้เบอร์โทร · Super Admin ใช้ชื่อผู้ใช้ · ลงทะเบียน Admin ใช้งานได้ทันที -->
   <dialog id="accessDialog" class="access-dialog" aria-labelledby="accessTitle">
@@ -225,15 +230,15 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="site-config.js?v=3.2"></script>
-  <script src="core.js?v=3.2"></script>
-  <script src="api.js?v=3.2"></script>
-  <script src="sheet-source.js?v=3.2"></script>
-  <script src="province-logos.js?v=3.2"></script>
-  <script src="evidence.js?v=3.2"></script>
-  <script src="image-compression.js?v=3.2"></script>
-  <script src="outbox.js?v=3.2"></script>
-  <script src="admin.js?v=3.2"></script>
-  <script src="app.js?v=3.2" defer></script>
+  <script src="site-config.js?v=3.3"></script>
+  <script src="core.js?v=3.3"></script>
+  <script src="api.js?v=3.3"></script>
+  <script src="sheet-source.js?v=3.3"></script>
+  <script src="province-logos.js?v=3.3"></script>
+  <script src="evidence.js?v=3.3"></script>
+  <script src="image-compression.js?v=3.3"></script>
+  <script src="outbox.js?v=3.3"></script>
+  <script src="admin.js?v=3.3"></script>
+  <script src="app.js?v=3.3" defer></script>
 </body>
 </html>

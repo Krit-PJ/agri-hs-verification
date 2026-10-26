@@ -33,7 +33,6 @@
     HSAdmin.init({ provinces: () => state.provinces, province: () => state.province, onSession: sessionChanged, toast, reloadHotspots: () => loadProvince(state.province, true) });
     $('accessDialog').addEventListener('close', () => setTimeout(() => { if (!HSApi.user()) state.pendingHs = null; }, 0));
     window.addEventListener('hs:session-expired', e => { toast(String((e.detail || '').replace(/^AUTH:\s*/, '')) || 'หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่', true); closeVerify(); sessionChanged(); });
-    if (mobile()) $('filterPanel').open = false;
     applySessionUI();
     counter();
     await loadProvinces();
@@ -55,15 +54,16 @@
       if (id === 'tambonFilter') $('villageFilter').value = '';
       if (['provinceFilter', 'districtFilter', 'tambonFilter', 'startMonth', 'endMonth'].includes(id)) fillLocationFilters();
       state.fitPending = ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter'].includes(id);
-      if (id === 'startMonth' || id === 'endMonth') $('summaryYear').value = '';
       applyFilters();
       if (id === 'districtFilter' || id === 'tambonFilter') drawBoundaries();
+      if (id === 'startMonth' || id === 'endMonth') $('periodPreset').value = 'custom';
     }));
     let t; $('searchFilter').addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 180); });
     $('resetFilters').addEventListener('click', resetFilters);
-    $('allHotspotsButton').addEventListener('click', resetFilters);
-    $('applyFiltersMobile').addEventListener('click', () => { $('filterPanel').open = false; $('resultCount').closest('.result-toolbar').scrollIntoView({ behavior: 'smooth' }); });
-    $('resetPeriod').addEventListener('click', () => { setDefaultPeriod(); fillLocationFilters(); applyFilters(); });
+    $('applyFiltersMobile').addEventListener('click', () => { toggleFilters(false); if (mobile()) document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth' }); });
+    $('filterToggle').addEventListener('click', () => toggleFilters());
+    $('filterChips').addEventListener('click', e => { const c = e.target.closest('[data-clear]'); if (c) clearFilter(c.dataset.clear); });
+    $('periodPreset').addEventListener('change', () => { applyPreset($('periodPreset').value); fillLocationFilters(); applyFilters(); });
     $('refreshDataButton').addEventListener('click', () => loadProvince(state.province, true));
     $('loadMore').addEventListener('click', () => { state.visible += PAGE; renderList(); });
     $('hotspotList').addEventListener('click', e => {
@@ -73,15 +73,10 @@
       if (e.target.closest('[data-show-map]')) return showOnMap(r);
       openVerify(r);
     });
+    $('hotspotList').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.hotspot-card')) { e.preventDefault(); e.target.click(); } });
     $('fieldBar').addEventListener('click', fieldBarAction);
     $('backToMap').addEventListener('click', () => document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth' }));
     $('summaryLevel').addEventListener('change', renderSummary);
-    $('summaryYear').addEventListener('change', () => {
-      const y = Number($('summaryYear').value);
-      if (y) { const ce = y - 543; $('startMonth').value = pickMonth((ce - 1) + '-10', 'start'); $('endMonth').value = pickMonth(ce + '-09', 'end'); }
-      else setDefaultPeriod();
-      fillLocationFilters(); applyFilters();
-    });
     $('printReportButton').addEventListener('click', printReport);
     $('exportSummaryButton').addEventListener('click', exportSummary);
     // ฟอร์มบันทึกผล
@@ -117,16 +112,15 @@
   /* ================================================================ บัญชีผู้ใช้ */
   function applySessionUI() {
     const user = HSApi.user();
-    $('headerIdentity').textContent = user ? user.name + ' · ' + C.ROLE_LABELS[user.role] : 'ผู้ใช้ทั่วไป';
+    $('headerIdentity').hidden = !user;
+    $('headerIdentity').textContent = user ? identityText(user) : '';
     $('accessLoginNav').textContent = user ? 'ออกจากระบบ' : 'เข้าใช้งานระบบ';
     $('adminNav').hidden = !user;
     $('adminNav').textContent = user && C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'งานของฉัน';
     const live = HSApi.configured();
-    $('modeBadge').className = 'mode-badge ' + (user ? 'live' : 'demo');
-    $('modeBadge').textContent = user ? C.ROLE_LABELS[user.role] + ' · ' + C.scopeLabel(user) : live ? 'ข้อมูลสาธารณะ' : 'อ่านอย่างเดียว';
     const notice = $('publicNotice');
     notice.hidden = live;
-    if (!live) notice.innerHTML = '<strong>ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ</strong><span>แสดงจุด HS จาก Google Sheet ต้นทางได้ แต่ยังเข้าสู่ระบบและบันทึกผลไม่ได้ จนกว่าผู้ติดตั้งจะเชื่อม API</span>';
+    if (!live) notice.textContent = 'ดูข้อมูลได้อย่างเดียว — ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ';
     const locked = user && !C.can(user, 'chooseProvince');
     $('provinceSelect').disabled = Boolean(locked);
     if (locked && state.provinces.length && state.province !== user.prov) loadProvince(user.prov);
@@ -174,23 +168,13 @@
   }
 
   /* ================================================================ แถบงานภาคสนาม */
+  /** ปุ่มงานภาคสนามในแถบผลลัพธ์ — แสดงเฉพาะเจ้าหน้าที่ที่บันทึกผลในพื้นที่นี้ได้ */
   function renderFieldBar() {
     const bar = $('fieldBar'), user = HSApi.user();
-    if (!HSApi.configured()) { bar.hidden = true; return; }
-    bar.hidden = false;
-    if (!user) {
-      bar.className = 'field-bar guest';
-      bar.innerHTML = '<div><strong>เจ้าหน้าที่ภาคสนาม</strong><span>ลงทะเบียนด้วยเบอร์โทรครั้งเดียว แล้วบันทึกผลตรวจจุดความร้อนได้ทันที</span></div>' +
-        '<div class="field-bar-actions"><button type="button" class="primary-button" data-fb="register">ลงทะเบียน Admin</button><button type="button" class="secondary-button" data-fb="login">เข้าสู่ระบบ</button></div>';
-      return;
-    }
-    const canRecord = C.can(user, 'record', { province: state.province });
-    const t = C.tally(state.rows);
-    const prov = C.scopeLabel(user);
-    bar.className = 'field-bar staff';
-    bar.innerHTML = '<div><strong>' + esc(user.name) + '</strong><span>' + esc(C.ROLE_LABELS[user.role]) + ' · ' + esc(prov) + (state.province ? ' · รอตรวจ ' + t.pending.toLocaleString('th-TH') + ' · ร่าง ' + t.draft.toLocaleString('th-TH') + ' · ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') : '') + '</span></div>' +
-      '<div class="field-bar-actions">' + (canRecord && state.province ? '<button type="button" class="primary-button" data-fb="near">⌖ จุดรอตรวจใกล้ฉัน</button><button type="button" class="secondary-button" data-fb="pending">รายการรอตรวจ</button>' : '') +
-      (state.near ? '<button type="button" class="secondary-button" data-fb="clearnear">เลิกเรียงตามระยะ</button>' : '') + '</div>';
+    const canRecord = HSApi.configured() && user && state.province && C.can(user, 'record', { province: state.province === C.ALL ? user.prov : state.province });
+    bar.innerHTML = !canRecord ? '' : state.near
+      ? '<button type="button" class="secondary-button compact" data-fb="clearnear">✕ เลิกเรียงตามระยะ</button>'
+      : '<button type="button" class="primary-button compact" data-fb="near">⌖ จุดรอตรวจใกล้ฉัน</button>';
   }
 
   function fieldBarAction(e) {
@@ -198,7 +182,6 @@
     if (!b) return;
     const a = b.dataset.fb;
     if (a === 'register' || a === 'login') return HSAdmin.openAccess(a === 'register' ? 'register' : 'phone');
-    if (a === 'pending') { $('statusFilter').value = 'pending'; state.near = null; applyFilters(); setLayout('list'); scrollToResults(); }
     if (a === 'clearnear') { state.near = null; clearMe(); applyFilters(); renderFieldBar(); }
     if (a === 'near') {
       b.disabled = true; b.textContent = 'กำลังหาตำแหน่ง…';
@@ -295,8 +278,9 @@
       }
       if (state.province !== code) return;
       const period = force === true && state.periodSet ? [$('startMonth').value, $('endMonth').value] : null;
+      const preset = force === true && state.periodSet ? $('periodPreset').value : '';
       buildPeriodOptions();
-      if (period) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; }
+      if (period) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; $('periodPreset').value = [...$('periodPreset').options].some(o => o.value === preset) ? preset : 'custom'; }
       if (!period || !$('startMonth').value) setDefaultPeriod();
       state.periodSet = true;
       fillLocationFilters();
@@ -309,8 +293,9 @@
       const levelOpt = $('summaryLevel').querySelector('option[value=province]');
       levelOpt.hidden = code !== C.ALL;
       if (code === C.ALL && force !== true) $('summaryLevel').value = 'province';
+      $('periodPreset').disabled = !state.rows.length;
       if (code !== C.ALL && $('summaryLevel').value === 'province') $('summaryLevel').value = 'amphoe';
-      $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source;
+      $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source + ' · ' + ($('provinceCoverage').textContent || '');
     } catch (err) {
       state.rows = [];
       showError('อ่านจุดความร้อน' + (code === C.ALL ? 'ทุกจังหวัด' : 'ของจังหวัด' + C.provinceName(code)) + ' ไม่สำเร็จ: ' + err.message);
@@ -325,18 +310,56 @@
     $('provinceLogoFallback').hidden = Boolean(logo);
     if (logo) { $('provinceLogo').src = logo.path; $('provinceLogo').alt = 'ตราประจำจังหวัด' + C.provinceName(code); }
     $('areaSubtitle').textContent = code && code !== C.ALL ? 'พื้นที่การเกษตรในจังหวัด' + C.provinceName(code) : 'พื้นที่การเกษตรของประเทศไทย';
-    $('resultsTitle').textContent = !code ? 'จุดความร้อน' : code === C.ALL ? 'จุดความร้อน ทุกจังหวัด' : 'จุดความร้อน จังหวัด' + C.provinceName(code);
   }
 
-  function setLoading(on) { $('refreshDataButton').disabled = on; $('refreshDataButton').textContent = on ? 'กำลังอ่าน…' : '↻ อัปเดตข้อมูล'; }
+  function setLoading(on) {
+    $('refreshDataButton').disabled = on; $('refreshDataButton').classList.toggle('spin', on);
+    $('resultCount').closest('.result-toolbar').classList.toggle('loading', on);
+  }
   function showError(msg) { $('liveError').hidden = false; $('liveError').textContent = msg; }
 
   /* ================================================================ ตัวกรอง */
+  /** ช่วงเวลา: เลือกปีงบประมาณ (ต.ค.–ก.ย.) ได้ในคลิกเดียว หรือ “ทั้งหมด” / “กำหนดเอง” */
+  function identityText(u) {
+    const role = C.ROLE_LABELS[u.role] || '';
+    const parts = [u.name];
+    if (role && String(u.name).indexOf(role) < 0) parts.push(role);
+    if (u.role !== 'superadmin') parts.push(C.scopeLabel(u));
+    return parts.join(' · ');
+  }
+  const shortMonth = m => C.monthLabel(m).replace(/(\d{2})(\d{2})$/, '$2');
   function buildPeriodOptions() {
     const groups = C.fiscalGroups(C.monthsBetween(state.rows));
     const opts = groups.map(g => '<optgroup label="ปีงบประมาณ ' + g.year + '">' + g.months.map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('') + '</optgroup>').join('');
     $('startMonth').innerHTML = opts; $('endMonth').innerHTML = opts;
-    $('summaryYear').innerHTML = '<option value="">ตามช่วงเวลาที่เลือก</option>' + groups.map(g => '<option value="' + g.year + '">ปีงบประมาณ ' + g.year + ' (ต.ค. ' + (g.year - 1) + ' – ก.ย. ' + g.year + ')</option>').join('');
+    $('periodPreset').innerHTML = groups.map(g => '<option value="fy:' + g.year + '">ปีงบ ' + g.year + ' (' + esc(shortMonth(g.months[0])) + '–' + esc(shortMonth(g.months[g.months.length - 1])) + ')</option>').join('') +
+      (groups.length > 1 ? '<option value="all">ทุกช่วงเวลา</option>' : '') + '<option value="custom">กำหนดเอง…</option>';
+  }
+  function applyPreset(v) {
+    const months = C.monthsBetween(state.rows);
+    $('customPeriod').hidden = v !== 'custom';
+    if (v === 'custom') { toggleFilters(true); return; }
+    if (v === 'all') { $('startMonth').value = months[0] || ''; $('endMonth').value = months[months.length - 1] || ''; return; }
+    const y = Number(String(v).slice(3)), ce = y - 543;
+    $('startMonth').value = pickMonth((ce - 1) + '-10', 'start'); $('endMonth').value = pickMonth(ce + '-09', 'end');
+  }
+  function toggleFilters(force) {
+    const open = typeof force === 'boolean' ? force : $('filterPanel').hidden;
+    $('filterPanel').hidden = !open;
+    $('filterToggle').setAttribute('aria-expanded', String(open));
+    $('filterToggle').classList.toggle('open', open);
+  }
+  function clearFilter(key) {
+    if (key === 'province') { $('provinceFilter').value = ''; loadBoundaries(''); }
+    if (key === 'province' || key === 'district') $('districtFilter').value = '';
+    if (key === 'province' || key === 'district' || key === 'tambon') $('tambonFilter').value = '';
+    if (['province', 'district', 'tambon', 'village'].includes(key)) $('villageFilter').value = '';
+    if (key === 'crop') $('cropFilter').value = '';
+    if (key === 'status') $('statusFilter').value = '';
+    if (key === 'result') $('resultFilter').value = '';
+    if (key === 'search') $('searchFilter').value = '';
+    if (key === 'all') return resetFilters();
+    fillLocationFilters(); state.fitPending = true; applyFilters(); drawBoundaries();
   }
   function pickMonth(target, edge) {
     const months = C.monthsBetween(state.rows);
@@ -347,7 +370,8 @@
   function setDefaultPeriod() {
     const p = C.defaultPeriod(state.rows);
     $('startMonth').value = p.start ? pickMonth(p.start, 'start') : ''; $('endMonth').value = p.end ? pickMonth(p.end, 'end') : '';
-    $('summaryYear').value = '';
+    const first = $('periodPreset').options[0];
+    if (first) { $('periodPreset').value = first.value; applyPreset(first.value); }
   }
   function filters() {
     let start = $('startMonth').value, end = $('endMonth').value;
@@ -390,25 +414,27 @@
     renderChips();
     renderAll();
   }
+  /** ตัวกรองที่ใช้อยู่แสดงเป็นป้าย กด × เพื่อนำออก */
   function renderChips() {
     const f = filters(), chips = [];
-    if (f.start) chips.push(C.monthLabel(f.start) + '–' + C.monthLabel(f.end));
-    if (f.province) chips.push('จ.' + C.provinceName(f.province));
-    if (f.district) chips.push('อ.' + f.district);
-    if (f.tambon) chips.push('ต.' + f.tambon);
-    if (f.village) chips.push(f.village);
-    if (f.crop) chips.push(f.crop);
-    if (f.status) chips.push(C.STATUS_LABELS[f.status]);
-    if (f.result) chips.push(C.RESULT_LABELS[f.result]);
-    if (f.search) chips.push('“' + f.search + '”');
-    $('filterChips').innerHTML = chips.map(c => '<span>' + esc(c) + '</span>').join('');
+    if (f.province) chips.push(['province', 'จ.' + C.provinceName(f.province)]);
+    if (f.district) chips.push(['district', 'อ.' + f.district]);
+    if (f.tambon) chips.push(['tambon', 'ต.' + f.tambon]);
+    if (f.village) chips.push(['village', f.village]);
+    if (f.crop) chips.push(['crop', f.crop]);
+    if (f.status) chips.push(['status', C.STATUS_LABELS[f.status]]);
+    if (f.result) chips.push(['result', C.RESULT_LABELS[f.result]]);
+    if (f.search) chips.push(['search', '“' + f.search + '”']);
+    $('filterCount').hidden = !chips.length;
+    $('filterCount').textContent = chips.length;
+    $('filterChips').innerHTML = chips.length ? chips.map(([k, label]) => '<button type="button" class="chip" data-clear="' + k + '" aria-label="นำตัวกรอง ' + esc(label) + ' ออก">' + esc(label) + ' <span aria-hidden="true">×</span></button>').join('') + (chips.length > 1 ? '<button type="button" class="chip clear" data-clear="all">ล้างทั้งหมด</button>' : '') : '';
   }
 
   /* ================================================================ แสดงผล */
   function renderAll() {
     $('resultCount').textContent = state.filtered.length.toLocaleString('th-TH');
     const t = C.tally(state.filtered);
-    $('selectedCount').textContent = state.filtered.length ? '· ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') + ' · รอตรวจ ' + t.pending.toLocaleString('th-TH') : '';
+    $('selectedCount').innerHTML = state.filtered.length ? '<span class="tally ok">ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') + '</span><span class="tally wait">รอตรวจ ' + t.pending.toLocaleString('th-TH') + '</span>' + (t.burned ? '<span class="tally fire">พบการเผา ' + t.burned.toLocaleString('th-TH') + '</span>' : '') : state.province ? '' : '<span class="muted">เลือกจังหวัดเพื่อเริ่ม</span>';
     renderList(); renderMarkers(); renderSummary(); renderFieldBar();
   }
 
@@ -428,13 +454,12 @@
   const statusClass = r => r.status === 'verified' && r.result ? r.result : r.status;
   const areaLabel = r => [r.village, r.tambon, r.district].concat(allMode() ? ['จ.' + C.provinceName(r.provinceCode)] : []).filter(Boolean).join(' · ') || 'ไม่ระบุพื้นที่';
   function card(r, canRecord) {
-    const action = canRecord ? (r.status === 'pending' ? 'บันทึกผล' : 'ดู / แก้ไขผล') : 'ดูรายละเอียด';
-    return '<article class="hotspot-card' + (canRecord && r.status === 'pending' ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '">' +
-      '<div class="row"><span class="hotspot-id">' + esc(r.hsId) + '</span><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div>' +
-      '<h3>' + esc(areaLabel(r)) + '</h3><p>' + esc(r.plantType) + ' · ' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + (r.photoCount ? ' · ภาพ ' + r.photoCount : '') + '</p>' +
-      '<div class="card-actions">' + (r.distance != null ? '<span class="distance">⌖ ' + esc(C.formatDistance(r.distance)) + '</span>' : '') +
-      '<button type="button" class="text-button" data-show-map aria-label="แสดงจุด ' + esc(r.hsId) + ' บนแผนที่">แผนที่</button>' +
-      '<button type="button" class="' + (canRecord && r.status === 'pending' ? 'primary-button' : 'secondary-button') + ' compact">' + action + ' ›</button></div></article>';
+    const todo = canRecord && r.status === 'pending';
+    return '<article class="hotspot-card' + (todo ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '" tabindex="0" role="button" aria-label="' + esc('จุด ' + r.hsId + ' ' + areaLabel(r) + ' ' + statusText(r)) + '">' +
+      '<div class="row"><h3>' + esc(areaLabel(r)) + '</h3><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div>' +
+      '<p>' + esc(r.plantType) + ' · ' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + (r.photoCount ? ' · ภาพ ' + r.photoCount : '') + (r.distance != null ? ' · <span class="distance">ห่าง ' + esc(C.formatDistance(r.distance)) + '</span>' : '') + '</p>' +
+      '<div class="card-actions"><span class="hotspot-id">' + esc(r.hsId) + '</span><button type="button" class="icon-text" data-show-map aria-label="แสดงจุด ' + esc(r.hsId) + ' บนแผนที่">⌖ แผนที่</button>' +
+      (canRecord ? '<span class="card-cta' + (todo ? ' todo' : '') + '">' + (todo ? 'บันทึกผล ›' : 'ดู / แก้ไข ›') + '</span>' : '') + '</div></article>';
   }
   const markerColor = r => r.status === 'draft' ? C.COLORS.draft : r.status === 'verified' ? (C.COLORS[r.result] || C.COLORS.not_found) : C.COLORS.pending;
 
