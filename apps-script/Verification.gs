@@ -185,3 +185,35 @@ function verificationsList_(user, b) {
   if (b.export) audit_(user, 'export', 'ผลตรวจจังหวัด' + PROVINCES[prov], rows.length + ' รายการ', prov);
   return { ok: true, province: prov, verifications: rows };
 }
+
+/**
+ * ภาพหลักฐานสำหรับรายงานพิมพ์: รับรายการ {province, hotspotId} ครั้งละไม่เกิน REPORT_BATCH จุด
+ * คืนเฉพาะผลตรวจ "ตรวจแล้ว" ที่มีภาพ และอยู่ในขอบเขตสิทธิ์ของผู้ใช้ (นอกขอบเขตนับเป็น skipped)
+ */
+function reportPhotos_(user, b) {
+  const items = Array.isArray(b.items) ? b.items : [];
+  if (items.length > REPORT_BATCH) throw new Error('ขอภาพได้ครั้งละไม่เกิน ' + REPORT_BATCH + ' จุด');
+  const out = []; let skipped = 0;
+  const verifs = readAll_('Verifications'), photos = readAll_('Photos');
+  items.forEach(it => {
+    const prov = provCode_(it && it.province), id = clean_(it && it.hotspotId, 80);
+    if (!prov || !inScope_(user, prov)) { skipped++; return; }
+    const rec = verifs.find(r => r.provinceCode === prov && r.hotspotId === id && r.status === 'verified');
+    if (!rec) return;
+    const list = photos.filter(p => p.verificationId === rec.verificationId).slice(0, MAX_PHOTOS_PER_HS);
+    if (!list.length) return;
+    const v = stripRow_(rec);
+    out.push({
+      province: prov, hotspotId: id,
+      verification: { result: v.result, fireState: v.fireState, inspectedAt: v.inspectedAt, obsLat: v.obsLat, obsLng: v.obsLng, distanceM: v.distanceM,
+        fieldInspectorName: v.fieldInspectorName, personCategory: v.personCategory, recordedByName: v.recordedByName, notes: v.notes, followUpAction: v.followUpAction },
+      photos: list.map(p => {
+        let base64 = '';
+        try { base64 = Utilities.base64Encode(DriveApp.getFileById(p.driveFileId).getBlob().getBytes()); } catch (e) { base64 = ''; }
+        return { photoId: p.photoId, mimeType: p.mimeType, base64: base64, takenAt: cellText_(p.takenAt), photoLat: p.photoLat, photoLng: p.photoLng };
+      }).filter(p => p.base64)
+    });
+  });
+  if (b.audit) audit_(user, 'report', 'รายงานพร้อมภาพหลักฐาน', String(b.total || items.length) + ' จุด', isNational_(user) ? '' : user.prov);
+  return { ok: true, items: out, skipped: skipped };
+}

@@ -376,3 +376,23 @@ details.table-card>summary{cursor:pointer;font-weight:800;color:var(--teal-950)}
 .accounts-bar button,.accounts-bar input{font-size:.92rem}
 .accounts-bar .segmented button{font-size:.88rem}
 @media (min-width:801px){#adminPanels td.nowrap{white-space:nowrap}}
+
+/* v3.4 — ปุ่มกลับหน้าหลัก และตัวเลือกแนบภาพในรายงาน */
+.back-link{display:inline-flex;align-items:center;gap:4px;min-height:40px;border:1px solid var(--line);background:#fff;color:var(--teal-900);border-radius:999px;padding:0 14px;font:700 .88rem var(--font-body);cursor:pointer;margin-bottom:8px}
+.back-link:hover{border-color:var(--color-primary);background:var(--teal-50)}
+.back-link:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
+.summary-title{display:grid;gap:4px;justify-items:start}
+.summary-actions{align-items:center}
+.check-option{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.9rem;color:var(--teal-950);background:#fff;border:1px solid var(--line);border-radius:var(--radius-control);padding:8px 12px;min-height:44px;cursor:pointer}
+.check-option[hidden]{display:none}
+.check-option input{width:18px;height:18px;accent-color:var(--color-primary)}
+.check-option small{font-weight:600}
+#printReportButton:disabled{opacity:.75;cursor:progress}
+@media screen and (max-width:700px){
+  .summary-actions{width:100%}
+  .summary-actions>*{flex:1 1 100%}
+  .check-option{flex-wrap:wrap}
+}
+.summary-actions .check-option{align-self:center;height:auto;margin:0}
+#adminPanels td.row-actions{white-space:nowrap}
+#adminPanels td.row-actions .compact+.compact{margin-left:6px}

@@ -16,7 +16,7 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.4.0';
 const SETUP_VERSION = '3.2';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
@@ -34,6 +34,7 @@ const REGISTER_LIMIT_PER_10_MIN = 30;
 const ALL_PROVINCES = 'ALL';
 const VISIT_LOG_MINUTES = 30;
 const MAX_PHOTO_BYTES = 1000000;
+const REPORT_BATCH = 10;   // จุด HS ต่อคำขอภาพสำหรับรายงาน (≤30 ภาพ ≈ ไม่เกิน ~10 MB)
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const PROVINCES = {"10":"กรุงเทพมหานคร","11":"สมุทรปราการ","12":"นนทบุรี","13":"ปทุมธานี","14":"พระนครศรีอยุธยา","15":"อ่างทอง","16":"ลพบุรี","17":"สิงห์บุรี","18":"ชัยนาท","19":"สระบุรี","20":"ชลบุรี","21":"ระยอง","22":"จันทบุรี","23":"ตราด","24":"ฉะเชิงเทรา","25":"ปราจีนบุรี","26":"นครนายก","27":"สระแก้ว","30":"นครราชสีมา","31":"บุรีรัมย์","32":"สุรินทร์","33":"ศรีสะเกษ","34":"อุบลราชธานี","35":"ยโสธร","36":"ชัยภูมิ","37":"อำนาจเจริญ","38":"บึงกาฬ","39":"หนองบัวลำภู","40":"ขอนแก่น","41":"อุดรธานี","42":"เลย","43":"หนองคาย","44":"มหาสารคาม","45":"ร้อยเอ็ด","46":"กาฬสินธุ์","47":"สกลนคร","48":"นครพนม","49":"มุกดาหาร","50":"เชียงใหม่","51":"ลำพูน","52":"ลำปาง","53":"อุตรดิตถ์","54":"แพร่","55":"น่าน","56":"พะเยา","57":"เชียงราย","58":"แม่ฮ่องสอน","60":"นครสวรรค์","61":"อุทัยธานี","62":"กำแพงเพชร","63":"ตาก","64":"สุโขทัย","65":"พิษณุโลก","66":"พิจิตร","67":"เพชรบูรณ์","70":"ราชบุรี","71":"กาญจนบุรี","72":"สุพรรณบุรี","73":"นครปฐม","74":"สมุทรสาคร","75":"สมุทรสงคราม","76":"เพชรบุรี","77":"ประจวบคีรีขันธ์","80":"นครศรีธรรมราช","81":"กระบี่","82":"พังงา","83":"ภูเก็ต","84":"สุราษฎร์ธานี","85":"ระนอง","86":"ชุมพร","90":"สงขลา","91":"สตูล","92":"ตรัง","93":"พัทลุง","94":"ปัตตานี","95":"ยะลา","96":"นราธิวาส"};
@@ -78,7 +79,7 @@ const AUDIT_LABELS = {
   request_approve: 'อนุมัติคำขอ', request_reject: 'ปฏิเสธคำขอ',
   account_create: 'เพิ่มบัญชี', account_update: 'แก้ไขบัญชี', account_approved: 'เปิดใช้บัญชี', account_disabled: 'ระงับบัญชี', account_delete: 'ลบบัญชี',
   verification_create: 'บันทึกผลตรวจ', verification_update: 'แก้ไขผลตรวจ', verification_delete: 'ลบผลตรวจ',
-  photo_upload: 'แนบภาพ', visit: 'เปิดใช้งานระบบ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
+  photo_upload: 'แนบภาพ', visit: 'เปิดใช้งานระบบ', photo_delete: 'ลบภาพ', export: 'ส่งออกข้อมูล', report: 'พิมพ์รายงาน', settings_save: 'ตั้งค่าระบบ', cache_clear: 'ล้างแคช HS'
 };
 
 /* ===== Utils.gs ===== */
@@ -1208,6 +1209,38 @@ function verificationsList_(user, b) {
   return { ok: true, province: prov, verifications: rows };
 }
 
+/**
+ * ภาพหลักฐานสำหรับรายงานพิมพ์: รับรายการ {province, hotspotId} ครั้งละไม่เกิน REPORT_BATCH จุด
+ * คืนเฉพาะผลตรวจ "ตรวจแล้ว" ที่มีภาพ และอยู่ในขอบเขตสิทธิ์ของผู้ใช้ (นอกขอบเขตนับเป็น skipped)
+ */
+function reportPhotos_(user, b) {
+  const items = Array.isArray(b.items) ? b.items : [];
+  if (items.length > REPORT_BATCH) throw new Error('ขอภาพได้ครั้งละไม่เกิน ' + REPORT_BATCH + ' จุด');
+  const out = []; let skipped = 0;
+  const verifs = readAll_('Verifications'), photos = readAll_('Photos');
+  items.forEach(it => {
+    const prov = provCode_(it && it.province), id = clean_(it && it.hotspotId, 80);
+    if (!prov || !inScope_(user, prov)) { skipped++; return; }
+    const rec = verifs.find(r => r.provinceCode === prov && r.hotspotId === id && r.status === 'verified');
+    if (!rec) return;
+    const list = photos.filter(p => p.verificationId === rec.verificationId).slice(0, MAX_PHOTOS_PER_HS);
+    if (!list.length) return;
+    const v = stripRow_(rec);
+    out.push({
+      province: prov, hotspotId: id,
+      verification: { result: v.result, fireState: v.fireState, inspectedAt: v.inspectedAt, obsLat: v.obsLat, obsLng: v.obsLng, distanceM: v.distanceM,
+        fieldInspectorName: v.fieldInspectorName, personCategory: v.personCategory, recordedByName: v.recordedByName, notes: v.notes, followUpAction: v.followUpAction },
+      photos: list.map(p => {
+        let base64 = '';
+        try { base64 = Utilities.base64Encode(DriveApp.getFileById(p.driveFileId).getBlob().getBytes()); } catch (e) { base64 = ''; }
+        return { photoId: p.photoId, mimeType: p.mimeType, base64: base64, takenAt: cellText_(p.takenAt), photoLat: p.photoLat, photoLng: p.photoLng };
+      }).filter(p => p.base64)
+    });
+  });
+  if (b.audit) audit_(user, 'report', 'รายงานพร้อมภาพหลักฐาน', String(b.total || items.length) + ' จุด', isNational_(user) ? '' : user.prov);
+  return { ok: true, items: out, skipped: skipped };
+}
+
 /* ===== Code.gs ===== */
 /**
  * Router ของ Web App
@@ -1267,6 +1300,7 @@ function handle_(body) {
     case 'photo_upload': return photoUpload_(user, body);
     case 'photo_get': return photoGet_(user, body);
     case 'photo_delete': return photoDelete_(user, body);
+    case 'report_photos': return reportPhotos_(user, body);
     // คำขอและบัญชี
     case 'requests_list': return requestsList_(user, body);
     case 'request_decide': return requestDecide_(user, body);

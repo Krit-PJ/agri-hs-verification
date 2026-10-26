@@ -218,9 +218,9 @@ var HSAdmin = (() => {
       (C.can(user, 'chooseProvince') ? '<label class="inline-label">จังหวัด<select id="recProv">' + provinceOptions(user, prov, '— เลือกจังหวัด —') + '</select></label>' : '') +
       (user.role === 'admin' ? '<label class="check-label inline"><input id="recMine" type="checkbox"' + (mine ? ' checked' : '') + '>เฉพาะที่ฉันบันทึก</label>' : '') +
       '<button id="recExport" class="secondary-button" type="button"' + (shown.length ? '' : ' disabled') + '>ส่งออก CSV</button>' + (C.can(user, 'manage') && prov ? '<button id="recCache" class="secondary-button" type="button">ดึง HS ต้นทางใหม่</button>' : '') + '</div></div>' +
-      '<p class="field-hint">' + (C.can(user, 'deleteVerification', { province: prov }) ? 'ท่านแก้ไขและลบผลตรวจได้ทุกรายการในจังหวัด · ' : 'Admin แก้ไขได้เฉพาะรายการที่ตนบันทึก · ') + 'เปิดแก้ไขจากแผนที่หรือรายการจุดในหน้า “ตรวจสอบจุดความร้อน”</p>' +
+      '<p class="field-hint">' + (C.can(user, 'deleteVerification', { province: prov }) ? 'ท่านแก้ไขและลบผลตรวจได้ทุกรายการในจังหวัด · ' : 'Admin แก้ไขได้เฉพาะรายการที่ตนบันทึก · ') + 'กด “ดู / แก้ไข” เพื่อเปิดฟอร์มผลตรวจและภาพหลักฐาน</p>' +
       table(['HS', 'วันที่ HS', 'อำเภอ / ตำบล', 'สถานะ', 'ผลตรวจ', 'ภาพ', 'ระยะจากจุด HS', 'ผู้บันทึก', 'แก้ไขล่าสุด', ''], shown.slice(0, 500).map(v => '<tr>' + td(v.hotspotId) + td(C.thaiDate(v.hsDate)) + td(v.districtName + ' / ' + v.subdistrictName) + td(C.STATUS_LABELS[v.status]) + td(C.RESULT_LABELS[v.result] || '—') + td(v.photoCount || 0) + td(v.distanceM === '' ? '—' : C.formatDistance(Number(v.distanceM))) + td(v.recordedByName + ' (' + (C.ROLE_LABELS[v.recordedByRole] || '') + ')') + td(C.thaiDateTime(v.updatedAt) + (v.updatedByName && v.updatedByName !== v.recordedByName ? ' · ' + v.updatedByName : '')) +
-        '<td>' + (v.canDelete ? '<button class="secondary-button compact danger-button" data-del-v="' + esc(v.verificationId) + '" data-hs="' + esc(v.hotspotId) + '">ลบ</button>' : '') + '</td></tr>'), prov ? 'ยังไม่มีผลตรวจ' : 'เลือกจังหวัดก่อน') +
+        '<td class="row-actions"><button class="secondary-button compact" type="button" data-open-v="' + esc(v.hotspotId) + '">' + (v.canEdit ? 'ดู / แก้ไข' : 'ดู') + '</button>' + (v.canDelete ? '<button class="secondary-button compact danger-button" data-del-v="' + esc(v.verificationId) + '" data-hs="' + esc(v.hotspotId) + '">ลบ</button>' : '') + '</td></tr>'), prov ? 'ยังไม่มีผลตรวจ' : 'เลือกจังหวัดก่อน') +
       (shown.length > 500 ? '<p class="field-hint">แสดง 500 รายการล่าสุด · ส่งออก CSV เพื่อดูทั้งหมด</p>' : '') + '</section>';
     if ($('recProv')) $('recProv').onchange = e => { cache.recProv = e.target.value; render(); };
     if ($('recMine')) $('recMine').onchange = e => { cache.recMine = e.target.checked; render(); };
@@ -233,6 +233,8 @@ var HSAdmin = (() => {
       } catch (err) { ctx.toast(err.message, true); }
     };
     panel.onclick = e => {
+      const o = e.target.closest('[data-open-v]');
+      if (o) return HSApp.openHotspot(prov, o.dataset.openV);
       const d = e.target.closest('[data-del-v]');
       if (d) { const reason = prompt('ลบผลตรวจจุด ' + d.dataset.hs + ' (รวมภาพ) — ระบุเหตุผล'); if (reason !== null) act(async () => { await HSApi.post('verification_delete', { verificationId: d.dataset.delV, reason }); if (prov === ctx.province()) await ctx.reloadHotspots(); }, 'ลบผลตรวจแล้ว'); }
     };

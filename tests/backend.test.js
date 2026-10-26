@@ -202,6 +202,29 @@ test('photos: upload, private read in scope, max 3, deletion trashes Drive files
   assert.equal([...env.files.values()].every(f => f.trashed), true);
 });
 
+test('report_photos: verified records with photos for the printed report, scope-checked and batched', () => {
+  const env = boot();
+  const mini = loginPhone(env, '0811111111');
+  const v = env.call(verifiedPayload(mini.token, { plannedPhotos: 2, photoMissingReason: '' })).verification;
+  const base64 = Buffer.from('fake-jpeg-bytes').toString('base64');
+  for (let i = 0; i < 2; i++) env.call({ action: 'photo_upload', token: mini.token, clientRequestId: uuid(), verificationId: v.verificationId, mimeType: 'image/jpeg', base64 });
+  const res = env.call({ action: 'report_photos', token: mini.token, audit: true, items: [{ province: '62', hotspotId: v.hotspotId }, { province: '62', hotspotId: 'NOPE' }] });
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].photos.length, 2);
+  assert.equal(res.items[0].photos[0].base64, base64);
+  assert.equal(res.items[0].verification.result, 'burned');
+  assert.ok(!('driveFileId' in res.items[0].photos[0]));
+  assert.ok(env.rows('AuditLog').some(r => r.action === 'report'));
+  const sup = loginSuper(env);
+  addAdmin(env, sup.token, '0877777777', '51');
+  const other = loginPhone(env, '0877777777');
+  const none = env.call({ action: 'report_photos', token: other.token, items: [{ province: '62', hotspotId: v.hotspotId }] });
+  assert.equal(none.items.length, 0, 'other province cannot read photos');
+  assert.equal(none.skipped, 1);
+  expectError(() => env.call({ action: 'report_photos', token: mini.token, items: Array.from({ length: 11 }, () => ({ province: '62', hotspotId: 'X' })) }), /10/);
+  expectError(() => env.call({ action: 'report_photos', items: [] }), /เข้าสู่ระบบ|token|สิทธิ์/);
+});
+
 test('usage log visibility: Super sees all, Mini Super sees province (no Super), Admin sees own', () => {
   const env = boot();
   const sup = loginSuper(env);

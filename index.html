@@ -8,11 +8,11 @@
   <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="design-tokens.css?v=3.3">
-  <link rel="stylesheet" href="styles.css?v=3.3">
-  <link rel="stylesheet" href="registration.css?v=3.3">
-  <link rel="stylesheet" href="boundaries.css?v=3.3">
-  <link rel="stylesheet" href="layout-v3.css?v=3.3">
+  <link rel="stylesheet" href="design-tokens.css?v=3.4">
+  <link rel="stylesheet" href="styles.css?v=3.4">
+  <link rel="stylesheet" href="registration.css?v=3.4">
+  <link rel="stylesheet" href="boundaries.css?v=3.4">
+  <link rel="stylesheet" href="layout-v3.css?v=3.4">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600;700&amp;display=swap">
 </head>
 <body>
@@ -105,11 +105,14 @@
 
     <section id="summaryView" class="view" aria-labelledby="summaryTitle" hidden>
       <h1 id="summaryTitle" class="sr-only">สรุปผลการตรวจสอบ</h1>
-      <p id="summaryPrompt" class="empty-state">เลือกจังหวัดด้านบนเพื่อดูสรุปผลการตรวจสอบ</p>
+      <p id="summaryPrompt" class="empty-state"><button class="back-link" type="button" data-go="work">‹ กลับหน้าหลัก</button><br>เลือกจังหวัดด้านบนเพื่อดูสรุปผลการตรวจสอบ</p>
       <div id="summaryContent" hidden>
         <div class="summary-head">
-          <p id="summaryScopeHint" class="summary-scope" role="status"></p>
-          <div class="summary-actions"><button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / PDF</button><button id="exportSummaryButton" class="secondary-button" type="button">ส่งออก CSV</button></div>
+          <div class="summary-title"><button class="back-link" type="button" data-go="work">‹ กลับหน้าหลัก</button><p id="summaryScopeHint" class="summary-scope" role="status"></p></div>
+          <div class="summary-actions">
+            <label id="reportPhotosWrap" class="check-option" hidden><input id="reportPhotos" type="checkbox" checked> แนบภาพหลักฐาน <small id="reportPhotoHint" class="muted"></small></label>
+            <button id="printReportButton" class="primary-button" type="button">พิมพ์รายงาน / PDF</button><button id="exportSummaryButton" class="secondary-button" type="button">ส่งออก CSV</button>
+          </div>
         </div>
         <div id="summaryStats" class="stat-grid"></div>
         <section class="table-card"><div class="section-title"><h2>ความคืบหน้าแยกตามพื้นที่</h2><label class="inline-label">ระดับ<select id="summaryLevel"><option value="province" hidden>จังหวัด</option><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div>
@@ -120,7 +123,7 @@
 
     <section id="adminView" class="view" aria-labelledby="adminTitle" hidden>
       <div class="admin-head">
-        <div><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p><strong id="adminDisplayName">—</strong> <span id="roleLabel" class="role-chip"></span></p><small id="adminRoleDescription" class="muted"></small></div>
+        <div><button class="back-link" type="button" data-go="work">‹ กลับหน้าหลัก</button><h1 id="adminTitle">ผู้ดูแลระบบ</h1><p><strong id="adminDisplayName">—</strong> <span id="roleLabel" class="role-chip"></span></p><small id="adminRoleDescription" class="muted"></small></div>
         <button id="logoutButton" class="secondary-button" type="button" hidden>ออกจากระบบ</button>
       </div>
       <div id="adminTabs" class="admin-tabs" role="tablist" aria-label="เมนูผู้ดูแล"></div>
@@ -230,15 +233,15 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="site-config.js?v=3.3"></script>
-  <script src="core.js?v=3.3"></script>
-  <script src="api.js?v=3.3"></script>
-  <script src="sheet-source.js?v=3.3"></script>
-  <script src="province-logos.js?v=3.3"></script>
-  <script src="evidence.js?v=3.3"></script>
-  <script src="image-compression.js?v=3.3"></script>
-  <script src="outbox.js?v=3.3"></script>
-  <script src="admin.js?v=3.3"></script>
-  <script src="app.js?v=3.3" defer></script>
+  <script src="site-config.js?v=3.4"></script>
+  <script src="core.js?v=3.4"></script>
+  <script src="api.js?v=3.4"></script>
+  <script src="sheet-source.js?v=3.4"></script>
+  <script src="province-logos.js?v=3.4"></script>
+  <script src="evidence.js?v=3.4"></script>
+  <script src="image-compression.js?v=3.4"></script>
+  <script src="outbox.js?v=3.4"></script>
+  <script src="admin.js?v=3.4"></script>
+  <script src="app.js?v=3.4" defer></script>
 </body>
 </html>

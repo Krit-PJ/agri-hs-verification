@@ -56,6 +56,7 @@ function handle_(body) {
     case 'photo_upload': return photoUpload_(user, body);
     case 'photo_get': return photoGet_(user, body);
     case 'photo_delete': return photoDelete_(user, body);
+    case 'report_photos': return reportPhotos_(user, body);
     // คำขอและบัญชี
     case 'requests_list': return requestsList_(user, body);
     case 'request_decide': return requestDecide_(user, body);

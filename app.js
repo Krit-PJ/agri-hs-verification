@@ -43,6 +43,7 @@
 
   function bind() {
     document.querySelectorAll('.nav-item[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+    document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) switchView(g.dataset.go); });
     $('menuButton').addEventListener('click', () => toggleMenu());
     document.querySelectorAll('#mainNav a').forEach(a => a.addEventListener('click', () => toggleMenu(false)));
     $('accessLoginNav').addEventListener('click', () => { toggleMenu(false); HSApi.user() ? logout() : HSAdmin.openAccess('phone'); });
@@ -494,6 +495,7 @@
     const has = Boolean(state.province);
     $('summaryPrompt').hidden = has; $('summaryContent').hidden = !has;
     if (!has) return;
+    updatePhotoOption();
     const rows = summaryRows(), t = C.tally(rows), f = filters();
     const stat = (v, label, color) => '<article class="stat-card" style="--accent:' + color + '"><strong>' + Number(v).toLocaleString('th-TH') + '</strong><span>' + label + '</span></article>';
     $('summaryStats').innerHTML = stat(t.total, 'จุดความร้อนทั้งหมด', '#174f38') + stat(t.verified, 'ตรวจแล้ว (' + t.progress + '%)', '#18845d') + stat(t.burned, 'พบการเผา', C.COLORS.burned) + stat(t.not_burned, 'ไม่พบการเผา', C.COLORS.not_burned) + stat(t.followup, 'ต้องติดตาม / ตรวจซ้ำ', C.COLORS.needs_review) + stat(t.pending + t.draft, 'รอตรวจ / งานร่าง', C.COLORS.pending);
@@ -510,23 +512,112 @@
     ], groups));
   }
 
-  function printReport() {
+  /* ---------- รายงานพิมพ์ / PDF (แนบภาพหลักฐานเมื่อเข้าสู่ระบบ) ---------- */
+  const REPORT_PHOTO_LIMIT = 150, REPORT_BATCH = 10;
+  function reportPhotoRows(rows) {
+    const u = HSApi.user();
+    if (!u || !HSApi.configured()) return [];
+    return rows.filter(r => r.status === 'verified' && Number(r.photoCount) > 0 && (C.isNational(u) || r.provinceCode === u.prov))
+      .sort((a, b) => String(a.district + a.tambon + a.village + a.hsId).localeCompare(String(b.district + b.tambon + b.village + b.hsId), 'th'));
+  }
+  function updatePhotoOption() {
+    const box = $('reportPhotosWrap'); if (!box) return;
+    const user = HSApi.user();
+    const n = user ? reportPhotoRows(summaryRows()).length : 0;
+    box.hidden = !user;
+    $('reportPhotoHint').textContent = !user ? '' : n ? n.toLocaleString('th-TH') + ' จุดมีภาพ' + (n > REPORT_PHOTO_LIMIT ? ' (แนบได้ ' + REPORT_PHOTO_LIMIT + ' จุดแรก — กรองพื้นที่ให้แคบลงเพื่อแนบครบ)' : '') : 'ยังไม่มีจุดที่แนบภาพในขอบเขตนี้';
+    $('reportPhotos').disabled = !n;
+  }
+  function shrinkImage(mime, base64, maxSide) {
+    return new Promise(resolve => {
+      const src = 'data:' + mime + ';base64,' + base64, img = new Image();
+      img.onload = () => {
+        try {
+          const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+          const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL('image/jpeg', .8));
+        } catch (_) { resolve(src); }
+      };
+      img.onerror = () => resolve('');
+      img.src = src;
+    });
+  }
+  async function fetchReportPhotos(rows, progress) {
+    const list = rows.slice(0, REPORT_PHOTO_LIMIT), out = new Map();
+    const batches = []; for (let i = 0; i < list.length; i += REPORT_BATCH) batches.push(list.slice(i, i + REPORT_BATCH));
+    let done = 0, first = true;
+    const run = async batch => {
+      const audit = first; first = false;
+      const d = await HSApi.post('report_photos', { items: batch.map(r => ({ province: r.provinceCode, hotspotId: r.hsId })), audit, total: list.length }, 120000);
+      for (const it of d.items || []) {
+        const photos = [];
+        for (const p of it.photos || []) { const url = await shrinkImage(p.mimeType, p.base64, 1000); if (url) photos.push({ url, takenAt: p.takenAt }); }
+        out.set(it.province + '|' + it.hotspotId, { v: it.verification || {}, photos });
+      }
+      done += batch.length; progress(done, list.length);
+    };
+    const queue = batches.slice();
+    await Promise.all([0, 1].map(async () => { while (queue.length) await run(queue.shift()); }));
+    return out;
+  }
+  function reportShell(title, body, ready) {
+    const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
+    return '<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title><base href="' + esc(base) + '">' +
+      '<style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:"Sarabun","Noto Sans Thai",sans-serif;color:#1f2328;font-size:12px;margin:0;padding:16px}' +
+      '.report-bar{position:sticky;top:0;display:flex;gap:8px;align-items:center;justify-content:space-between;background:#103c2b;color:#fff;padding:10px 14px;margin:-16px -16px 16px;z-index:2}.report-bar button{font:700 14px inherit;font-family:inherit;border:0;border-radius:8px;padding:9px 14px;cursor:pointer}.report-bar .go{background:#f0dda3;color:#103c2b}.report-bar .close{background:transparent;color:#fff;border:1px solid #fff8}' +
+      'header{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1a7f37;padding-bottom:8px}header img{height:56px}h1{font-size:20px;margin:0}h2{font-size:15px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #c9d1d9;padding:4px 6px;text-align:left;vertical-align:top}th{background:#dafbe1}thead{display:table-header-group}tr{break-inside:avoid}' +
+      '.stats{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}.stats div{border:1px solid #c9d1d9;border-radius:8px;padding:6px 10px}.stats b{display:block;font-size:18px}' +
+      '.ev{break-inside:avoid;page-break-inside:avoid;border:1px solid #c9d1d9;border-radius:8px;padding:8px 10px;margin:0 0 10px}.ev-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ev-head b{font-size:13px}.pill{border-radius:99px;padding:1px 9px;font-weight:700;font-size:11px;background:#eef2f0;white-space:nowrap}.pill.burned{background:#ffe1df;color:#a21f1c}.pill.not_burned{background:#dff5ea;color:#086a47}' +
+      '.ev-meta{color:#444c56;margin:3px 0 6px;line-height:1.5}.ev-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ev-photos figure{margin:0}.ev-photos img{width:100%;height:62mm;object-fit:cover;border-radius:4px;border:1px solid #d0d7de;background:#f6f8fa}.ev-photos figcaption{font-size:10px;color:#57606a;margin-top:2px}' +
+      '.note{color:#57606a;font-size:11px;margin-top:6px}.loading{padding:40px;text-align:center;font-size:16px;color:#174f38}footer{margin-top:12px;color:#57606a;font-size:10px}' +
+      '@media print{.report-bar{display:none}body{padding:0}}@media (max-width:700px){.ev-photos{grid-template-columns:1fr 1fr}.ev-photos img{height:40vw}}</style></head><body>' +
+      '<div class="report-bar"><button class="close" type="button" onclick="window.close()">‹ ปิดรายงาน</button><button class="go" type="button" onclick="print()"' + (ready ? '' : ' disabled') + '>พิมพ์ / บันทึก PDF</button></div>' + body +
+      (ready ? '<script>(function(){const imgs=[...document.images];Promise.all(imgs.map(i=>Promise.race([(i.decode?i.decode():Promise.resolve()).catch(()=>0),new Promise(r=>setTimeout(r,4000))]))).then(()=>setTimeout(()=>print(),400))})()<\/script>' : '') + '</body></html>';
+  }
+  async function printReport() {
     const rows = summaryRows(), t = C.tally(rows);
+    const title = 'รายงานผลตรวจสอบจุดความร้อน ' + scopeName();
+    const w = window.open('', '_blank');
+    if (!w) return toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต pop-up', true);
+    const write = html => { try { w.document.open(); w.document.write(html); w.document.close(); } catch (_) {} };
+    const withPhotos = HSApi.user() && $('reportPhotos') && $('reportPhotos').checked && !$('reportPhotos').disabled;
+    const photoRows = withPhotos ? reportPhotoRows(rows) : [];
+    let evidence = new Map(), photoNote = '';
+    if (photoRows.length) {
+      const btn = $('printReportButton'); btn.disabled = true;
+      const progress = (d, n) => { btn.textContent = 'กำลังเตรียมภาพ ' + d + '/' + n + '…'; write(reportShell(title, '<p class="loading">กำลังดึงภาพหลักฐาน ' + d + ' / ' + n + ' จุด…</p>', false)); };
+      progress(0, Math.min(photoRows.length, REPORT_PHOTO_LIMIT));
+      try { evidence = await fetchReportPhotos(photoRows, progress); }
+      catch (err) { photoNote = 'ดึงภาพหลักฐานไม่สำเร็จ (' + err.message + ') — รายงานนี้ไม่มีภาพ'; toast(photoNote, true); }
+      finally { btn.disabled = false; btn.textContent = 'พิมพ์รายงาน / PDF'; }
+      if (photoRows.length > REPORT_PHOTO_LIMIT) photoNote = 'แนบภาพ ' + REPORT_PHOTO_LIMIT + ' จุดแรกจาก ' + photoRows.length + ' จุด — กรองพื้นที่ให้แคบลงเพื่อพิมพ์ภาพครบทุกจุด';
+    }
+    if (w.closed) return;
     const groups = C.groupSummary(rows, $('summaryLevel').value);
     const burned = rows.filter(r => r.status === 'verified' && r.result === 'burned').slice(0, 300);
     const logo = !allMode() && globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[state.province];
-    const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
-    const html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานผลตรวจสอบจุดความร้อน ' + esc(scopeName()) + '</title><base href="' + esc(base) + '">' +
-      '<style>@page{size:A4 landscape;margin:12mm}body{font-family:"Sarabun","Noto Sans Thai",sans-serif;color:#1f2328;font-size:12px}header{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1a7f37;padding-bottom:8px}header img{height:56px}h1{font-size:20px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #c9d1d9;padding:4px 6px;text-align:left}th{background:#dafbe1}.stats{display:flex;gap:8px;margin:10px 0}.stats div{border:1px solid #c9d1d9;border-radius:8px;padding:6px 10px}.stats b{display:block;font-size:18px}footer{margin-top:12px;color:#57606a;font-size:10px}</style></head><body>' +
-      '<header><img src="assets/logo-doae.png" alt="">' + (logo ? '<img src="' + esc(logo.path) + '" alt="">' : '') + '<div><h1>รายงานผลการตรวจสอบจุดความร้อนในพื้นที่การเกษตร ' + esc(scopeName()) + '</h1><div>' + esc($('summaryScopeHint').textContent) + '</div></div></header>' +
+    const area = r => [r.village, 'ต.' + r.tambon, 'อ.' + r.district].concat(allMode() ? ['จ.' + C.provinceName(r.provinceCode)] : []).filter(x => x && !/^(ต|อ|จ)\.$/.test(x)).join(' ');
+    const evRows = photoRows.filter(r => evidence.has(r.provinceCode + '|' + r.hsId));
+    const evHtml = evRows.map(r => {
+      const e = evidence.get(r.provinceCode + '|' + r.hsId), v = e.v;
+      const who = v.fieldInspectorName || v.recordedByName || '';
+      const meta = ['HS ' + C.thaiDate(r.date), 'พืช ' + r.plantType, v.inspectedAt ? 'ตรวจ ' + C.thaiDateTime(v.inspectedAt) : (r.inspectedDate ? 'ตรวจ ' + C.thaiDate(r.inspectedDate) : ''), who ? 'ผู้ตรวจ ' + who + (v.personCategory ? ' (' + v.personCategory + ')' : '') : '',
+        v.obsLat ? 'GPS ' + Number(v.obsLat).toFixed(5) + ', ' + Number(v.obsLng).toFixed(5) : '', v.distanceM !== '' && v.distanceM != null ? 'ห่างจุด HS ' + C.formatDistance(Number(v.distanceM)) : ''].filter(Boolean).map(esc).join(' · ');
+      return '<section class="ev"><div class="ev-head"><b>' + esc(area(r)) + '</b><span class="pill ' + esc(v.result || r.result) + '">' + esc(C.RESULT_LABELS[v.result || r.result] || 'ตรวจแล้ว') + '</span></div>' +
+        '<div class="ev-meta">' + meta + '<br><small>รหัส ' + esc(r.hsId) + '</small>' + (v.notes ? '<br>หมายเหตุ: ' + esc(v.notes) : '') + '</div>' +
+        '<div class="ev-photos">' + e.photos.map((p, i) => '<figure><img src="' + p.url + '" alt="ภาพหลักฐาน ' + (i + 1) + ' จุด ' + esc(r.hsId) + '"><figcaption>ภาพ ' + (i + 1) + (p.takenAt ? ' · ถ่ายเมื่อ ' + esc(C.thaiDateTime(p.takenAt)) : '') + '</figcaption></figure>').join('') + '</div></section>';
+    }).join('');
+    const body = '<header><img src="assets/logo-doae.png" alt="">' + (logo ? '<img src="' + esc(logo.path) + '" alt="">' : '') + '<div><h1>รายงานผลการตรวจสอบจุดความร้อนในพื้นที่การเกษตร ' + esc(scopeName()) + '</h1><div>' + esc($('summaryScopeHint').textContent) + '</div></div></header>' +
       '<div class="stats"><div><b>' + t.total + '</b>จุดทั้งหมด</div><div><b>' + t.verified + '</b>ตรวจแล้ว (' + t.progress + '%)</div><div><b>' + t.burned + '</b>พบการเผา</div><div><b>' + t.not_burned + '</b>ไม่พบการเผา</div><div><b>' + t.followup + '</b>ติดตาม/ตรวจซ้ำ</div><div><b>' + (t.pending + t.draft) + '</b>รอตรวจ/ร่าง</div></div>' +
-      '<table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody>' +
+      '<h2>ความคืบหน้าแยกตามพื้นที่</h2><table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody>' +
       groups.map(g => '<tr><td>' + esc(g.area) + '</td><td>' + g.total + '</td><td>' + g.verified + '</td><td>' + g.burned + '</td><td>' + g.not_burned + '</td><td>' + g.draft + '</td><td>' + g.progress + '%</td></tr>').join('') + '</tbody></table>' +
-      (burned.length ? '<h2 style="font-size:14px;margin-top:14px">จุดที่ยืนยันพบการเผา</h2><table><thead><tr><th>HS</th><th>วันที่</th><th>อำเภอ</th><th>ตำบล</th><th>หมู่บ้าน</th><th>พืช</th><th>วันที่ตรวจ</th></tr></thead><tbody>' + burned.map(r => '<tr><td>' + esc(r.hsId) + '</td><td>' + esc(C.thaiDate(r.date)) + '</td><td>' + esc(r.district) + '</td><td>' + esc(r.tambon) + '</td><td>' + esc(r.village) + '</td><td>' + esc(r.plantType) + '</td><td>' + esc(C.thaiDate(r.inspectedDate)) + '</td></tr>').join('') + '</tbody></table>' : '') +
-      '<footer>พิมพ์เมื่อ ' + esc(new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })) + ' · แหล่ง HS: ฐานข้อมูล Agri-Risk Map Burning · ระบบตรวจสอบจุดความร้อน v3</footer><script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>';
-    const w = window.open('', '_blank');
-    if (!w) return toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต pop-up', true);
-    w.document.open(); w.document.write(html); w.document.close();
+      (burned.length ? '<h2>จุดที่ยืนยันพบการเผา</h2><table><thead><tr><th>HS</th><th>วันที่</th>' + (allMode() ? '<th>จังหวัด</th>' : '') + '<th>อำเภอ</th><th>ตำบล</th><th>หมู่บ้าน</th><th>พืช</th><th>วันที่ตรวจ</th><th>ภาพ</th></tr></thead><tbody>' + burned.map(r => '<tr><td>' + esc(r.hsId) + '</td><td>' + esc(C.thaiDate(r.date)) + '</td>' + (allMode() ? '<td>' + esc(C.provinceName(r.provinceCode)) + '</td>' : '') + '<td>' + esc(r.district) + '</td><td>' + esc(r.tambon) + '</td><td>' + esc(r.village) + '</td><td>' + esc(r.plantType) + '</td><td>' + esc(C.thaiDate(r.inspectedDate)) + '</td><td>' + (Number(r.photoCount) || '—') + '</td></tr>').join('') + '</tbody></table>' : '') +
+      (evHtml ? '<h2 style="break-before:page">ภาพหลักฐานการตรวจสอบรายจุด (' + evRows.length + ' จุด)</h2>' + evHtml : '') +
+      (photoNote ? '<p class="note">' + esc(photoNote) + '</p>' : '') +
+      (!HSApi.user() && t.verified ? '<p class="note">ภาพหลักฐานแนบในรายงานเฉพาะเจ้าหน้าที่ที่เข้าสู่ระบบ</p>' : '') +
+      '<footer>พิมพ์เมื่อ ' + esc(new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })) + (HSApi.user() ? ' โดย ' + esc(HSApi.user().name) : '') + ' · แหล่ง HS: ฐานข้อมูล Agri-Risk Map Burning · ระบบตรวจสอบจุดความร้อน v3</footer>';
+    write(reportShell(title, body, true));
   }
 
   function switchView(name) {
@@ -761,16 +852,22 @@
   function renderExistingPhotos() {
     const canEdit = state.record && state.record.canEdit;
     $('existingPhotos').innerHTML = state.existingPhotos.map(p => '<div class="photo-item" data-photo="' + esc(p.photoId) + '"><button type="button" class="photo-load" data-load="' + esc(p.photoId) + '">ดูภาพที่บันทึกไว้<br><small>' + esc(C.thaiDateTime(p.uploadedAt)) + '</small></button>' + (canEdit ? '<button type="button" data-delete-photo="' + esc(p.photoId) + '" aria-label="ลบภาพ">×</button>' : '') + '</div>').join('');
+    $('existingPhotos').querySelectorAll('[data-load]').forEach(b => loadExistingPhoto(b));
+  }
+  async function loadExistingPhoto(btn) {
+    if (!btn || btn.dataset.loading) return;
+    btn.dataset.loading = '1'; btn.textContent = 'กำลังโหลดภาพ…';
+    try {
+      const d = await HSApi.post('photo_get', { photoId: btn.dataset.load }, 60000);
+      const img = document.createElement('img'); img.src = 'data:' + d.mimeType + ';base64,' + d.base64; img.alt = 'ภาพหลักฐานที่บันทึกไว้';
+      if (btn.isConnected) btn.replaceWith(img);
+    } catch (err) { btn.textContent = 'โหลดภาพไม่สำเร็จ — แตะเพื่อลองใหม่'; delete btn.dataset.loading; }
   }
   async function existingPhotoAction(e) {
     const load = e.target.closest('[data-load]'), del = e.target.closest('[data-delete-photo]');
     try {
-      if (load) {
-        load.textContent = 'กำลังโหลด…';
-        const d = await HSApi.post('photo_get', { photoId: load.dataset.load }, 60000);
-        const img = document.createElement('img'); img.src = 'data:' + d.mimeType + ';base64,' + d.base64; img.alt = 'ภาพหลักฐาน';
-        load.replaceWith(img);
-      } else if (del && confirm('ลบภาพนี้ออกจากผลตรวจ?')) {
+      if (load) await loadExistingPhoto(load);
+      else if (del && confirm('ลบภาพนี้ออกจากผลตรวจ?')) {
         await HSApi.post('photo_delete', { photoId: del.dataset.deletePhoto });
         state.existingPhotos = state.existingPhotos.filter(p => p.photoId !== del.dataset.deletePhoto);
         renderExistingPhotos(); toast('ลบภาพแล้ว');
@@ -889,5 +986,10 @@
     a.download = name; document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  globalThis.HSApp = { toast, download };
+  function openHotspot(prov, hsId) {
+    const r = state.rows.find(x => x.hsId === hsId && String(x.provinceCode) === String(prov));
+    if (!r) return toast('จุดนี้ไม่อยู่ในข้อมูลที่เปิดอยู่ — เลือกจังหวัด' + C.provinceName(prov) + ' และช่วงเวลาที่ครอบคลุมในหน้าตรวจสอบก่อน', true);
+    openVerify(r);
+  }
+  globalThis.HSApp = { toast, download, openHotspot };
 })();

@@ -1,4 +1,4 @@
-# ระบบตรวจสอบจุดความร้อน (Agri Hot Spot Verification) v3.3
+# ระบบตรวจสอบจุดความร้อน (Agri Hot Spot Verification) v3.4
 
 ระบบบันทึกผลการลงพื้นที่ตรวจสอบจุดความร้อน (HS) ในพื้นที่การเกษตรของประเทศไทย
 ใช้ข้อมูล HS ชุดเดียวกับระบบ [Agri-Risk Map Burning](https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/)
@@ -8,7 +8,7 @@
 
 © copyright By Dr. Kitti PhoJuang กรมส่งเสริมการเกษตร
 
-> รุ่น 3.x แทนที่ระบบรุ่น 2.x ทั้งหมด — [v3.3 หน้าจอกระชับ แผนที่อยู่ในจอแรก](docs/RELEASE_V33_TH.md) · [v3.2 ดูทุกจังหวัด · Mini Super Admin ระดับประเทศ · ประวัติการเข้าใช้งาน](docs/RELEASE_V32_TH.md) · [v3.1 ลงทะเบียนใช้งานทันที งานภาคสนาม และมือถือ](docs/RELEASE_V31_TH.md) · [v3.0](docs/RELEASE_V30_TH.md) · เอกสารรุ่นเก่าอยู่ใน `docs/archive-v2/`
+> รุ่น 3.x แทนที่ระบบรุ่น 2.x ทั้งหมด — [v3.4 รายงานพร้อมภาพหลักฐาน](docs/RELEASE_V34_TH.md) · [v3.3 หน้าจอกระชับ แผนที่อยู่ในจอแรก](docs/RELEASE_V33_TH.md) · [v3.2 ดูทุกจังหวัด · Mini Super Admin ระดับประเทศ · ประวัติการเข้าใช้งาน](docs/RELEASE_V32_TH.md) · [v3.1 ลงทะเบียนใช้งานทันที งานภาคสนาม และมือถือ](docs/RELEASE_V31_TH.md) · [v3.0](docs/RELEASE_V30_TH.md) · เอกสารรุ่นเก่าอยู่ใน `docs/archive-v2/`
 
 ---
 
