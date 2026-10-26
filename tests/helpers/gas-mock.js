@@ -45,6 +45,8 @@ class Sheet {
   }
   getLastColumn() { return this.data.reduce((m, l) => { let w = 0; l.forEach((v, i) => { if (v !== '' && v != null) w = i + 1; }); return Math.max(m, w); }, 0); }
   getMaxRows() { return 1000; }
+  getMaxColumns() { return this.maxCols || 26; }
+  insertColumnsAfter(after, n) { this.maxCols = (this.maxCols || 26) + n; }
   getRange(row, col, rows = 1, cols = 1) { return new Range(this, row, col, rows, cols); }
   getDataRange() { return new Range(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   appendRow(values) { const row = this.getLastRow() + 1; values.forEach((v, i) => this.set(row, i + 1, v)); }

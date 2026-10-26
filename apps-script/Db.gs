@@ -21,10 +21,17 @@ function ensureSheet_(ss, name, headers, textCols) {
   let sh = ss.getSheetByName(name);
   if (!sh) sh = ss.insertSheet(name);
   const width = headers.length;
+  if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
   const current = sh.getLastColumn() ? sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), width)).getValues()[0].map(String) : [];
   // เพิ่มเฉพาะหัวคอลัมน์ที่ขาด ไม่สลับลำดับคอลัมน์เดิม
   if (!current.filter(String).length) sh.getRange(1, 1, 1, width).setValues([headers]);
-  else headers.forEach(h => { if (current.indexOf(h) < 0) sh.getRange(1, sh.getLastColumn() + 1).setValue(h); });
+  else headers.forEach(h => {
+    if (current.indexOf(h) >= 0) return;
+    const col = sh.getLastColumn() + 1;
+    if (col > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), col - sh.getMaxColumns());
+    sh.getRange(1, col).setValue(h);
+    current.push(h);
+  });
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, sh.getLastColumn()).setFontWeight('bold').setBackground('#dff3ef');
   const header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);

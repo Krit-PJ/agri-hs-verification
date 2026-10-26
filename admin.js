@@ -60,23 +60,27 @@ var HSAdmin = (() => {
     e.preventDefault();
     const msg = $('registerMessage'), btn = e.target.querySelector('button[type=submit]');
     const phone = C.normalizePhone($('regPhone').value);
+    if (!$('regProvince').value) { msg.textContent = 'กรุณาเลือกจังหวัดที่ปฏิบัติงาน'; return; }
     if (!C.validPhone(phone)) { msg.textContent = 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง 0812345678)'; return; }
-    btn.disabled = true; msg.textContent = 'กำลังส่งคำขอ…';
+    if (!$('regConsent').checked) { msg.textContent = 'กรุณายืนยันการรับทราบการใช้ข้อมูลส่วนบุคคล'; return; }
+    btn.disabled = true; btn.textContent = 'กำลังลงทะเบียน…'; msg.textContent = '';
     try {
-      const res = await HSApi.post('register', { phone, fullName: $('regName').value, position: $('regPosition').value, affiliation: $('regAffiliation').value, provinceCode: $('regProvince').value, requestedRole: $('regRole').value, note: $('regNote').value, consent: $('regConsent').checked });
-      msg.style.color = '#17633e';
-      msg.textContent = 'ส่งคำขอแล้ว (' + res.requestId + ') เมื่อได้รับอนุมัติ เข้าสู่ระบบด้วยเบอร์ ' + phone + ' ได้ทันที';
+      const user = await HSApi.register({ phone, fullName: $('regName').value, position: $('regPosition').value, affiliation: $('regAffiliation').value, provinceCode: $('regProvince').value, consent: true });
       e.target.reset();
-    } catch (err) { msg.style.color = ''; msg.textContent = err.message; }
-    finally { btn.disabled = false; }
+      $('accessDialog').close();
+      ctx.toast('ลงทะเบียนสำเร็จ ยินดีต้อนรับ ' + user.name + ' — ครั้งต่อไปเข้าสู่ระบบด้วยเบอร์ ' + phone);
+      tab = '';
+      ctx.onSession();
+    } catch (err) { msg.textContent = err.message; }
+    finally { btn.disabled = false; btn.textContent = 'ลงทะเบียนและเริ่มใช้งาน'; }
   }
 
   /* ---------------------------------------------------------------- แผงผู้ดูแล */
   function tabsFor(user) {
     if (!user) return [];
     const t = [];
-    if (C.can(user, 'manage')) t.push(['requests', 'คำขอใช้งาน'], ['accounts', 'บัญชีผู้ใช้']);
-    t.push(['records', 'ผลการตรวจสอบ'], ['audit', C.can(user, 'manage') ? 'บันทึกการใช้งาน' : 'บันทึกการใช้งานของฉัน']);
+    if (C.can(user, 'manage')) t.push(['requests', 'ผู้ลงทะเบียน'], ['accounts', 'บัญชีผู้ใช้']);
+    t.push(['records', C.can(user, 'manage') ? 'ผลการตรวจสอบ' : 'ผลตรวจที่บันทึก'], ['audit', C.can(user, 'manage') ? 'บันทึกการใช้งาน' : 'บันทึกการใช้งานของฉัน']);
     if (C.can(user, 'manage')) t.push(['logins', 'รายงานการเข้าใช้']);
     if (C.can(user, 'settings')) t.push(['settings', 'ตั้งค่าระบบ']);
     return t;
@@ -88,13 +92,14 @@ var HSAdmin = (() => {
     $('roleLabel').textContent = C.ROLE_LABELS[user.role] + (user.prov && user.prov !== '*' ? ' · จังหวัด' + (C.PROVINCES[user.prov] || '') : ' · ทุกจังหวัด');
     $('adminDisplayName').textContent = user.name;
     $('adminRoleDescription').textContent = C.ROLE_DESCRIPTIONS[user.role] || '';
-    $('adminTitle').textContent = C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'พื้นที่ผู้บันทึกข้อมูล';
+    $('adminTitle').textContent = C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'งานของฉัน';
     const tabs = tabsFor(user);
     if (!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
     $('adminTabs').innerHTML = tabs.map(([id, label]) => '<button type="button" role="tab" data-tab="' + id + '" aria-selected="' + (id === tab) + '">' + esc(label) + '</button>').join('');
     const panel = $('adminPanels');
     panel.innerHTML = '<section class="settings-card"><p class="muted">กำลังโหลด…</p></section>';
     ({ requests: renderRequests, accounts: renderAccounts, records: renderRecords, audit: renderAudit, logins: renderLogins, settings: renderSettings })[tab](panel, user)
+      .then(() => labelTables(panel))
       .catch(err => { panel.innerHTML = '<section class="settings-card"><p class="notice error">' + esc(err.message) + '</p></section>'; });
   }
 
@@ -105,26 +110,40 @@ var HSAdmin = (() => {
   };
   const table = (head, rows, empty) => '<div class="table-scroll" tabindex="0"><table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows.length ? rows.join('') : '<tr><td colspan="' + head.length + '" class="muted">' + (empty || 'ไม่มีข้อมูล') + '</td></tr>') + '</tbody></table></div>';
   const td = v => '<td>' + esc(v) + '</td>';
+  /** ใส่ชื่อคอลัมน์ให้ทุกช่อง เพื่อให้จอแคบแสดงตารางเป็นการ์ดรายแถว */
+  function labelTables(root) {
+    root.querySelectorAll('table').forEach(t => {
+      const heads = Array.from(t.querySelectorAll('thead th')).map(th => th.textContent.trim());
+      t.classList.add('card-table');
+      t.querySelectorAll('tbody tr').forEach(tr => Array.from(tr.children).forEach((cell, i) => { if (!cell.hasAttribute('colspan') && heads[i]) cell.setAttribute('data-label', heads[i]); }));
+    });
+  }
   const roleChip = role => '<span class="role-pill ' + esc(role) + '">' + esc(C.ROLE_LABELS[role] || role) + '</span>';
   async function act(fn, okMsg) {
     try { await fn(); if (okMsg) ctx.toast(okMsg); render(); } catch (err) { ctx.toast(err.message, true); }
   }
 
-  /* คำขอใช้งาน */
+  /* ผู้ลงทะเบียน — Admin ลงทะเบียนเองใช้งานได้ทันที ผู้ดูแลตรวจและระงับได้ */
   async function renderRequests(panel, user) {
-    const status = cache.reqStatus || 'pending';
-    const data = await HSApi.post('requests_list', { status });
-    panel.innerHTML = '<section class="table-card"><div class="section-title"><div><p class="eyebrow">อนุมัติ / อนุญาตเจ้าหน้าที่</p><h2>คำขอใช้งาน</h2><p class="field-hint">' + (C.can(user, 'manageMini') ? 'ทุกจังหวัด รวมคำขอ Mini Super Admin' : 'เฉพาะคำขอ Admin ของจังหวัด' + esc(C.PROVINCES[user.prov])) + '</p></div>' +
-      '<label class="inline-label">สถานะ<select id="reqStatus"><option value="pending">รออนุมัติ</option><option value="approved">อนุมัติแล้ว</option><option value="rejected">ปฏิเสธ</option><option value="all">ทั้งหมด</option></select></label></div>' +
-      table(['วันที่ขอ', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'จังหวัด', 'เบอร์โทร', 'บทบาทที่ขอ', 'สถานะ', ''], data.requests.map(r => '<tr>' + td(C.thaiDateTime(r.createdAt)) + td(r.fullName) + td(r.position + ' · ' + r.affiliation) + td(r.provinceName) + td(r.phone) + '<td>' + roleChip(r.requestedRole) + (r.note ? '<br><small>' + esc(r.note) + '</small>' : '') + '</td>' +
-        td(r.status === 'pending' ? 'รออนุมัติ' : r.status === 'approved' ? 'อนุมัติโดย ' + r.decidedBy : 'ปฏิเสธโดย ' + r.decidedBy + (r.reason ? ' (' + r.reason + ')' : '')) +
-        '<td>' + (r.status === 'pending' ? '<div class="button-row compact-row">' + (C.can(user, 'manageMini') ? '<select data-grant="' + esc(r.requestId) + '"><option value="admin"' + (r.requestedRole === 'admin' ? ' selected' : '') + '>ให้สิทธิ์ Admin</option><option value="minisuper"' + (r.requestedRole === 'minisuper' ? ' selected' : '') + '>ให้สิทธิ์ Mini Super Admin</option></select>' : '') + '<button class="primary-button compact" data-approve="' + esc(r.requestId) + '">อนุมัติ</button><button class="secondary-button compact" data-reject="' + esc(r.requestId) + '">ปฏิเสธ</button></div>' : '') + '</td></tr>'), 'ไม่มีคำขอ') + '</section>';
-    $('reqStatus').value = status;
-    $('reqStatus').onchange = e => { cache.reqStatus = e.target.value; render(); };
+    const days = cache.regDays === undefined ? 30 : cache.regDays;
+    const data = await HSApi.post('requests_list', { status: 'all', days });
+    const statusText = r => r.status === 'pending' ? 'รออนุมัติ' : r.accountStatus === 'approved' ? 'ใช้งานได้' : r.accountStatus === 'disabled' ? 'ระงับแล้ว' : r.accountStatus === 'deleted' ? 'ลบบัญชีแล้ว' : r.status;
+    const pillClass = r => r.accountStatus === 'approved' ? 'not_burned' : r.status === 'pending' ? 'pending' : 'burned';
+    const pending = data.requests.filter(r => r.status === 'pending').length;
+    panel.innerHTML = '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ลงทะเบียนแล้วใช้งานได้ทันที</p><h2>ผู้ลงทะเบียน ' + data.requests.length.toLocaleString('th-TH') + ' คน</h2>' +
+      '<p class="field-hint">' + (C.can(user, 'manageMini') ? 'ทุกจังหวัด' : 'จังหวัด' + esc(C.PROVINCES[user.prov])) + ' · ตรวจรายชื่อผู้ลงทะเบียนใหม่ หากไม่ใช่เจ้าหน้าที่ให้กด “ระงับ” มีผลทันที' + (pending ? ' · มีคำขอเดิมรออนุมัติ ' + pending + ' รายการ' : '') + '</p></div>' +
+      '<label class="inline-label">ช่วงเวลา<select id="regDays"><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option><option value="0">ทั้งหมด</option></select></label></div>' +
+      table(['วันที่ลงทะเบียน', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'จังหวัด', 'เบอร์โทร', 'สถานะบัญชี', ''], data.requests.map(r => '<tr>' + td(C.thaiDateTime(r.createdAt)) + td(r.fullName) + td(r.position + ' · ' + r.affiliation) + td(r.provinceName) + td(r.phone) +
+        '<td><span class="status-pill ' + pillClass(r) + '">' + esc(statusText(r)) + '</span>' + (r.accountRole === 'minisuper' ? ' ' + roleChip('minisuper') : '') + '</td>' +
+        '<td>' + (r.status === 'pending' ? '<div class="button-row compact-row"><button class="primary-button compact" data-approve="' + esc(r.requestId) + '">อนุมัติ</button><button class="secondary-button compact" data-reject="' + esc(r.requestId) + '">ปฏิเสธ</button></div>'
+          : r.accountId && r.accountId !== user.sub && (C.can(user, 'manageMini') || r.accountRole === 'admin') && r.accountStatus !== 'deleted' ? '<div class="button-row compact-row"><button class="secondary-button compact' + (r.accountStatus === 'approved' ? ' danger-button' : '') + '" data-status="' + esc(r.accountId) + '" data-to="' + (r.accountStatus === 'approved' ? 'disabled' : 'approved') + '">' + (r.accountStatus === 'approved' ? 'ระงับ' : 'เปิดใช้') + '</button></div>' : '') + '</td></tr>'), 'ยังไม่มีผู้ลงทะเบียนในช่วงนี้') + '</section>';
+    $('regDays').value = String(days);
+    $('regDays').onchange = e => { cache.regDays = Number(e.target.value); render(); };
     panel.onclick = e => {
-      const a = e.target.closest('[data-approve]'), r = e.target.closest('[data-reject]');
-      if (a) { const g = panel.querySelector('[data-grant="' + a.dataset.approve + '"]'); act(() => HSApi.post('request_decide', { requestId: a.dataset.approve, decision: 'approve', role: g ? g.value : undefined }), 'อนุมัติแล้ว ผู้ขอเข้าสู่ระบบด้วยเบอร์โทรได้ทันที'); }
+      const a = e.target.closest('[data-approve]'), r = e.target.closest('[data-reject]'), st = e.target.closest('[data-status]');
+      if (a) act(() => HSApi.post('request_decide', { requestId: a.dataset.approve, decision: 'approve' }), 'อนุมัติแล้ว');
       if (r) { const reason = prompt('เหตุผลที่ปฏิเสธ (ไม่บังคับ)'); if (reason !== null) act(() => HSApi.post('request_decide', { requestId: r.dataset.reject, decision: 'reject', reason }), 'ปฏิเสธคำขอแล้ว'); }
+      if (st && (st.dataset.to === 'approved' || confirm('ระงับบัญชีนี้? ผู้ใช้จะออกจากระบบและบันทึกผลไม่ได้ทันที'))) act(() => HSApi.post('account_status', { accountId: st.dataset.status, status: st.dataset.to }), st.dataset.to === 'approved' ? 'เปิดใช้บัญชีแล้ว' : 'ระงับบัญชีแล้ว (มีผลทันที)');
     };
   }
 
@@ -138,14 +157,14 @@ var HSAdmin = (() => {
       return '<tr' + (a.status !== 'approved' ? ' class="muted-row"' : '') + '>' + td(a.accountId) + td(a.fullName) + td(a.position + (a.affiliation ? ' · ' + a.affiliation : '')) + td(a.provinceName) + td(a.phone) + '<td>' + roleChip(a.role) + '</td>' + td(a.status === 'approved' ? 'ใช้งาน' : 'ระงับ') + td(C.thaiDateTime(a.lastLoginAt)) +
         '<td>' + (manageable && !self ? '<div class="button-row compact-row"><button class="secondary-button compact" data-edit="' + esc(a.accountId) + '">แก้ไข</button><button class="secondary-button compact" data-status="' + esc(a.accountId) + '" data-to="' + (a.status === 'approved' ? 'disabled' : 'approved') + '">' + (a.status === 'approved' ? 'ระงับ' : 'เปิดใช้') + '</button><button class="secondary-button compact danger-button" data-del="' + esc(a.accountId) + '">ลบ</button></div>' : self ? '<small>บัญชีของท่าน</small>' : '') + '</td></tr>';
     });
-    panel.innerHTML = '<section class="settings-card"><div class="section-title"><div><p class="eyebrow">เพิ่ม / แก้ไข</p><h2 id="accFormTitle">เพิ่มบัญชีผู้ใช้</h2></div></div>' +
+    panel.innerHTML = '<details id="accDetails" class="settings-card collapsible"' + (prefill ? ' open' : '') + '><summary><span id="accFormTitle">＋ เพิ่มบัญชีผู้ใช้' + (C.can(user, 'manageMini') ? ' / แต่งตั้ง Mini Super Admin' : '') + '</span></summary>' +
       '<form id="accountForm" class="team-fields"><input type="hidden" id="accId"><label>เบอร์โทรศัพท์<input id="accPhone" type="tel" required maxlength="15" value="' + esc(prefill) + '"></label><label>ชื่อ - สกุล<input id="accName" required maxlength="150"></label><label>ตำแหน่ง<input id="accPosition" maxlength="150"></label><label>สังกัด<input id="accAffiliation" maxlength="200"></label>' +
       '<label>จังหวัด<select id="accProvince">' + provinceOptions(user, ctx.province() || user.prov) + '</select></label><label>บทบาท<select id="accRole"><option value="admin">Admin — ผู้บันทึกข้อมูล</option>' + (C.can(user, 'manageMini') ? '<option value="minisuper">Mini Super Admin — ผู้ดูแลจังหวัด</option>' : '') + '</select></label>' +
-      '<div class="button-row"><button class="primary-button" type="submit">บันทึกบัญชี</button><button id="accCancel" class="secondary-button" type="button">ล้างฟอร์ม</button></div></form></section>' +
+      '<div class="button-row"><button class="primary-button" type="submit">บันทึกบัญชี</button><button id="accCancel" class="secondary-button" type="button">ล้างฟอร์ม</button></div></form></details>' +
       '<section class="table-card"><div class="section-title"><div><p class="eyebrow">' + (C.can(user, 'manageMini') ? 'ทุกจังหวัด' : 'จังหวัด' + esc(C.PROVINCES[user.prov])) + '</p><h2>บัญชีผู้ใช้ ' + data.accounts.length + ' บัญชี</h2></div><input id="accSearch" type="search" placeholder="ค้นหาชื่อ เบอร์ จังหวัด"></div>' +
       table(['รหัส', 'ชื่อ - สกุล', 'ตำแหน่ง / สังกัด', 'จังหวัด', 'เบอร์โทร', 'บทบาท', 'สถานะ', 'เข้าใช้ล่าสุด', ''], rows) + '</section>';
     $('accSearch').oninput = e => { const q = e.target.value.toLowerCase(); panel.querySelectorAll('tbody tr').forEach(tr => { tr.hidden = q && !tr.textContent.toLowerCase().includes(q); }); };
-    $('accCancel').onclick = () => { $('accountForm').reset(); $('accId').value = ''; $('accFormTitle').textContent = 'เพิ่มบัญชีผู้ใช้'; };
+    $('accCancel').onclick = () => { $('accountForm').reset(); $('accId').value = ''; $('accFormTitle').textContent = '＋ เพิ่มบัญชีผู้ใช้'; };
     $('accountForm').onsubmit = e => {
       e.preventDefault();
       const phone = C.normalizePhone($('accPhone').value);
@@ -157,7 +176,7 @@ var HSAdmin = (() => {
       if (ed) {
         const a = data.accounts.find(x => x.accountId === ed.dataset.edit);
         $('accId').value = a.accountId; $('accPhone').value = a.phone; $('accName').value = a.fullName; $('accPosition').value = a.position; $('accAffiliation').value = a.affiliation; $('accProvince').value = a.provinceCode; $('accRole').value = a.role;
-        $('accFormTitle').textContent = 'แก้ไขบัญชี ' + a.accountId; $('accountForm').scrollIntoView({ behavior: 'smooth' });
+        $('accFormTitle').textContent = 'แก้ไขบัญชี ' + a.accountId; $('accDetails').open = true; $('accDetails').scrollIntoView({ behavior: 'smooth' });
       }
       if (st) act(() => HSApi.post('account_status', { accountId: st.dataset.status, status: st.dataset.to }), st.dataset.to === 'approved' ? 'เปิดใช้บัญชีแล้ว' : 'ระงับบัญชีแล้ว (มีผลทันที)');
       if (del && confirm('ลบบัญชี ' + del.dataset.del + ' ถาวร?')) act(() => HSApi.post('account_delete', { accountId: del.dataset.del }), 'ลบบัญชีแล้ว');
@@ -170,14 +189,14 @@ var HSAdmin = (() => {
     let list = [];
     if (prov) list = (await HSApi.post('verifications_list', { province: prov })).verifications;
     list.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    const mine = cache.recMine && user.role === 'admin';
+    const mine = user.role === 'admin' && cache.recMine !== false;
     const shown = mine ? list.filter(v => v.recordedById === user.sub) : list;
     panel.innerHTML = '<section class="table-card"><div class="section-title"><div><p class="eyebrow">ฐานข้อมูลผลตรวจ</p><h2>ผลการตรวจสอบ ' + shown.length.toLocaleString('th-TH') + ' รายการ</h2></div><div class="button-row">' +
       (C.can(user, 'chooseProvince') ? '<label class="inline-label">จังหวัด<select id="recProv">' + provinceOptions(user, prov, '— เลือกจังหวัด —') + '</select></label>' : '') +
       (user.role === 'admin' ? '<label class="check-label inline"><input id="recMine" type="checkbox"' + (mine ? ' checked' : '') + '>เฉพาะที่ฉันบันทึก</label>' : '') +
       '<button id="recExport" class="secondary-button" type="button"' + (shown.length ? '' : ' disabled') + '>ส่งออก CSV</button>' + (C.can(user, 'manage') && prov ? '<button id="recCache" class="secondary-button" type="button">ดึง HS ต้นทางใหม่</button>' : '') + '</div></div>' +
       '<p class="field-hint">' + (C.can(user, 'deleteVerification', { province: prov }) ? 'ท่านแก้ไขและลบผลตรวจได้ทุกรายการในจังหวัด · ' : 'Admin แก้ไขได้เฉพาะรายการที่ตนบันทึก · ') + 'เปิดแก้ไขจากแผนที่หรือรายการจุดในหน้า “ตรวจสอบจุดความร้อน”</p>' +
-      table(['HS', 'วันที่ HS', 'อำเภอ / ตำบล', 'สถานะ', 'ผลตรวจ', 'ภาพ', 'ระยะ (ม.)', 'ผู้บันทึก', 'แก้ไขล่าสุด', ''], shown.slice(0, 500).map(v => '<tr>' + td(v.hotspotId) + td(C.thaiDate(v.hsDate)) + td(v.districtName + ' / ' + v.subdistrictName) + td(C.STATUS_LABELS[v.status]) + td(C.RESULT_LABELS[v.result] || '—') + td(v.photoCount || 0) + td(v.distanceM === '' ? '—' : v.distanceM) + td(v.recordedByName + ' (' + (C.ROLE_LABELS[v.recordedByRole] || '') + ')') + td(C.thaiDateTime(v.updatedAt) + (v.updatedByName && v.updatedByName !== v.recordedByName ? ' · ' + v.updatedByName : '')) +
+      table(['HS', 'วันที่ HS', 'อำเภอ / ตำบล', 'สถานะ', 'ผลตรวจ', 'ภาพ', 'ระยะจากจุด HS', 'ผู้บันทึก', 'แก้ไขล่าสุด', ''], shown.slice(0, 500).map(v => '<tr>' + td(v.hotspotId) + td(C.thaiDate(v.hsDate)) + td(v.districtName + ' / ' + v.subdistrictName) + td(C.STATUS_LABELS[v.status]) + td(C.RESULT_LABELS[v.result] || '—') + td(v.photoCount || 0) + td(v.distanceM === '' ? '—' : C.formatDistance(Number(v.distanceM))) + td(v.recordedByName + ' (' + (C.ROLE_LABELS[v.recordedByRole] || '') + ')') + td(C.thaiDateTime(v.updatedAt) + (v.updatedByName && v.updatedByName !== v.recordedByName ? ' · ' + v.updatedByName : '')) +
         '<td>' + (v.canDelete ? '<button class="secondary-button compact danger-button" data-del-v="' + esc(v.verificationId) + '" data-hs="' + esc(v.hotspotId) + '">ลบ</button>' : '') + '</td></tr>'), prov ? 'ยังไม่มีผลตรวจ' : 'เลือกจังหวัดก่อน') +
       (shown.length > 500 ? '<p class="field-hint">แสดง 500 รายการล่าสุด · ส่งออก CSV เพื่อดูทั้งหมด</p>' : '') + '</section>';
     if ($('recProv')) $('recProv').onchange = e => { cache.recProv = e.target.value; render(); };

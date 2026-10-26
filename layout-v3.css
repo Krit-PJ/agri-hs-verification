@@ -1,0 +1,207 @@
+/* v3.1 — การจัดวางรุ่น 3: แผงผู้ดูแล บทบาท งานภาคสนาม และมือถือ (ใช้ token เดิมของ design-tokens.css) */
+.admin-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:0 0 20px;overflow-x:auto}
+.admin-tabs button{background:transparent;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:12px 16px;min-height:48px;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.admin-tabs button[aria-selected=true]{border-bottom-color:var(--color-primary);color:var(--teal-950)}
+.admin-tabs button:hover{background:var(--teal-50)}
+#adminPanels>section{margin-bottom:20px}
+#adminPanels table{width:100%;border-collapse:collapse;font-size:.88rem}
+#adminPanels th,#adminPanels td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+#adminPanels th{background:var(--teal-50);font-weight:700;white-space:nowrap}
+#adminPanels select,#adminPanels input:not([type=checkbox]){min-height:44px;border:1px solid var(--color-control-border);border-radius:var(--radius-control);padding:6px 10px;font:inherit;background:#fff}
+#adminPanels form label{display:grid;gap:6px;font-weight:600;margin-bottom:12px}
+#adminPanels .section-title{gap:12px;flex-wrap:wrap}
+.compact-row{gap:6px;flex-wrap:wrap}
+.compact-row .compact,.compact-row select{min-height:38px;padding:6px 10px;font-size:.85rem}
+.danger-button{color:var(--danger)!important;border-color:#e6b0ad!important}
+.danger-button:hover{background:var(--danger-bg)!important}
+.role-pill{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:999px;background:#eef1f4;color:#3d4752;white-space:nowrap}
+.role-pill.superadmin{background:#3b1f5e;color:#fff}
+.role-pill.minisuper{background:#fff4db;color:#80500a}
+.role-pill.admin{background:var(--color-primary-soft);color:var(--teal-950)}
+.muted-row td{color:var(--muted);background:#f7f7f7}
+.detail-cell{max-width:360px;overflow-wrap:anywhere;color:var(--muted);font-size:.8rem}
+.check-label.inline{display:flex;align-items:center;gap:6px;font-weight:600}
+.status-pill.draft{background:#e2effa;color:#1d5f8f}
+.status-pill.verified,.status-pill.not_burned{background:#dff5ea;color:#086a47}
+.status-pill.not_found,.status-pill.needs_review{background:#ece7f6;color:#5b3f96}
+#verifyFields{border:0;padding:0;margin:0;min-width:0}
+#verifyFields[disabled]{opacity:.7}
+#recordInfo{margin:0 0 12px}
+.province-gate select{min-height:48px;min-width:260px}
+.period-range select{min-height:48px;border:1px solid var(--color-control-border);border-radius:var(--radius-control);padding:6px 10px;font:inherit;background:#fff}
+#provinceLogoFallback[hidden],#provinceLogo[hidden]{display:none}
+@media (max-width:700px){.admin-tabs{flex-wrap:nowrap}.province-gate select{min-width:0;width:100%}.province-gate label{width:100%}}
+.admin-session-bar small{display:block;margin-top:2px}
+
+/* ---------- แถบงานภาคสนาม ---------- */
+.field-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 20px;margin:0 0 18px;border-radius:var(--radius);border:1px solid var(--line);background:#fff;box-shadow:var(--shadow)}
+.field-bar[hidden]{display:none}
+.field-bar>div:first-child{display:grid;gap:2px;min-width:0}
+.field-bar strong{font-size:1.05rem;color:var(--teal-950)}
+.field-bar span{color:var(--muted);font-size:.9rem}
+.field-bar.guest{background:linear-gradient(100deg,#fff8e6,#fff);border-color:#f0d9a8}
+.field-bar.staff{background:linear-gradient(100deg,var(--color-primary-soft),#fff);border-color:#b9dfc4}
+.field-bar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.field-bar-actions button{min-height:48px}
+
+/* ---------- ตัวกรอง (พับได้) ---------- */
+.filter-panel{margin-bottom:18px}
+.filter-panel>summary{list-style:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;min-height:44px;font-weight:800;font-size:1.05rem;color:var(--teal-950)}
+.filter-panel>summary::-webkit-details-marker{display:none}
+.filter-panel>summary::after{content:'▾';margin-left:auto;color:var(--muted);transition:transform .15s}
+.filter-panel[open]>summary::after{transform:rotate(180deg)}
+.filter-panel[open]>summary{margin-bottom:12px}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;font-weight:600}
+.filter-chips span{font-size:.78rem;background:var(--teal-50);border:1px solid #c6e3cd;color:var(--teal-950);border-radius:999px;padding:3px 10px}
+.filter-panel .period-range{margin-top:0}
+.filter-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+.mobile-only-flex{display:none}
+
+/* ---------- เครื่องมือบนแผนที่ ---------- */
+.map-tools{display:flex;flex-direction:column;background:#fff;padding:4px;gap:2px;font:600 .82rem var(--font-body)}
+.map-tools label{display:flex;align-items:center;gap:6px;min-height:36px;padding:0 8px;cursor:pointer;white-space:nowrap}
+.map-tools input{width:18px;height:18px;margin:0;accent-color:var(--color-primary)}
+.map-tools button{border:0;background:#fff;min-height:36px;padding:0 8px;text-align:left;font:inherit;cursor:pointer;color:var(--teal-950);border-top:1px solid #eef1f4}
+.map-tools button:hover,.map-tools label:hover{background:var(--teal-50)}
+.dot.me{background:#1d6fd1}
+.map-layout.list-only{grid-template-columns:1fr!important}
+.map-layout.list-only .result-panel{max-height:none;height:auto}
+.map-layout.list-only .hotspot-list{max-height:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+
+/* ---------- การ์ดจุดความร้อน ---------- */
+.hotspot-card{display:block;cursor:pointer}
+.hotspot-card.todo{border-left:4px solid var(--orange-600)}
+.card-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;flex-wrap:wrap}
+.card-actions .distance{margin-right:auto;font-weight:700;color:#1d5f8f;font-size:.85rem}
+.card-actions .compact{min-height:40px;padding:6px 14px;font-size:.88rem}
+.card-actions .text-button{min-height:40px;padding:6px 8px;font-size:.85rem}
+.back-to-map{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:900;border:0;border-radius:999px;background:var(--teal-950);color:#fff;font:700 .9rem var(--font-body);padding:12px 18px;box-shadow:0 6px 18px #0004}
+.back-to-map[hidden]{display:none}
+
+/* ---------- ฟอร์มบันทึกผล ---------- */
+.verify-gate{background:#fff8e6;border:1px solid #f0d9a8;border-radius:12px;padding:16px;margin:12px 0}
+.verify-gate p{margin:0 0 12px;line-height:1.7}
+.verify-gate[hidden],#verifyFields[hidden],#verifyActions[hidden]{display:none!important}
+.record-info{font-size:.88rem;color:var(--muted);margin:10px 0 4px}
+.verify-steps{display:grid;gap:14px}
+.verify-step{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff}
+.verify-step h3{display:flex;align-items:center;gap:8px;font-size:1rem;margin:0 0 12px;color:var(--teal-950)}
+.verify-step h3>span{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.85rem;flex:0 0 auto}
+.verify-step h3 small{font-weight:500;color:var(--muted);font-size:.8rem}
+.verify-step label{display:grid;gap:6px;margin-top:10px}
+.verify-step .check-label{display:flex}
+.location-panel.ok{border-style:solid;border-color:#9fd4b0;background:#f1faf3}
+.compact-meta{grid-template-columns:1fr 1fr!important;gap:8px 14px}
+.compact-meta .meta-wide{grid-column:1/-1}
+.photo-load{position:static!important;width:100%!important;height:100%!important;border-radius:0!important;background:#e9f5ed!important;color:#17633e!important;font:600 .82rem var(--font-body)!important;line-height:1.4}
+.sticky-submit #deleteVerificationButton[hidden]{display:none}
+
+/* ---------- แผงผู้ดูแล ---------- */
+details.collapsible>summary{cursor:pointer;font-weight:800;font-size:1.05rem;color:var(--teal-950);min-height:44px;display:flex;align-items:center}
+details.collapsible[open]>summary{margin-bottom:12px}
+.mode-badge{white-space:nowrap}
+
+/* ---------- ส่วนเลือกจังหวัด (กระชับ) ---------- */
+.province-gate{margin:14px clamp(16px,3vw,42px) 0!important;padding:12px 18px!important}
+.province-gate .province-context{display:flex!important;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:0!important}
+.province-gate .province-context label{flex:0 1 420px}
+.province-gate .province-context .field-hint{margin:0}
+main{padding-top:20px}
+.work-heading{margin-bottom:12px}
+
+/* ---------- เดสก์ท็อปขนาดกลาง ---------- */
+@media (min-width:701px){#menuButton{display:none!important}}
+
+/* ---------- มือถือ ---------- */
+@media screen and (max-width:700px){
+  .topbar{position:sticky!important;top:0;min-height:0!important;height:auto!important;padding:10px 64px 10px 12px!important;z-index:1100}
+  .brand{display:flex!important;align-items:center!important;gap:10px!important;width:auto!important}
+  .agency-logos{flex-wrap:nowrap!important;padding-top:0!important}
+  .agency-logo{width:34px!important;height:34px!important}
+  .province-mark{width:34px;height:34px;font-size:.8rem}
+  .brand-copy strong{font-size:1rem!important;line-height:1.3!important}
+  .brand-copy small:not(.developer-credit){font-size:.78rem!important;line-height:1.3!important;margin-top:2px!important}
+  .brand-copy .developer-credit{display:none!important}
+  .header-actions{display:block!important;position:static!important;width:auto!important;padding:0!important}
+  #headerIdentity,.header-actions .mode-badge{display:none!important}
+  #menuButton.admin-menu-toggle{display:grid!important;position:absolute!important;right:10px!important;top:50%!important;transform:translateY(-50%);width:46px;height:46px;min-width:46px;min-height:46px}
+  .main-nav,.main-nav.open{display:none!important}
+  .main-nav.open{display:flex!important;flex-direction:column!important;align-items:stretch!important;position:sticky!important;top:var(--topbar-h,76px);z-index:1050;padding:8px 12px 12px!important;gap:6px!important;box-shadow:0 10px 24px #0002!important;overflow:visible!important}
+  .main-nav.open .nav-item{width:100%!important;justify-content:flex-start!important;text-align:left!important;font-size:.95rem!important;min-height:48px;white-space:normal!important}
+  .province-gate{margin:10px 12px 0!important;padding:10px 12px!important}
+  .province-gate .province-context{gap:4px}
+  .province-gate .province-context label{flex:1 1 100%}
+  main{padding:14px 12px 40px!important}
+  .work-heading{margin-bottom:10px}
+  .work-heading h1,.work-instruction{display:none}
+  .work-heading{margin:0}
+  .brand-copy strong{white-space:nowrap}
+  .table-scroll{border:0!important;overflow:visible!important}
+  .field-bar{padding:12px 14px;gap:10px}
+  .field-bar-actions{width:100%}
+  .field-bar-actions button{flex:1 1 140px}
+  .filter-panel{padding:12px 14px!important}
+  .filter-panel>summary{font-size:.98rem}
+  .filter-grid{grid-template-columns:1fr 1fr!important;gap:10px!important}
+  .filter-grid .search-label{grid-column:1/-1}
+  .period-range{padding:10px!important;gap:8px!important}
+  .period-range label{flex:1 1 40%!important;min-width:0!important}
+  .period-range>span{display:none}
+  .period-range button{flex:1 1 100%}
+  .filter-actions{position:sticky;bottom:0;background:#fff;padding:8px 0 4px}
+  .filter-actions button{flex:1}
+  .mobile-only-flex{display:inline-flex;justify-content:center;align-items:center}
+  .map-heading{margin-top:4px}
+  .map-heading h2{font-size:1.15rem!important}
+  .map-heading .eyebrow{display:none}
+  .result-toolbar{position:sticky!important;top:var(--topbar-h,76px);z-index:800;background:var(--wash);padding:6px 0!important;margin-bottom:8px}
+  .map-wrap,#map{height:clamp(300px,52svh,460px)!important}
+  .map-legend{font-size:.72rem!important;gap:4px 10px!important;padding:6px 8px!important}
+  .map-tools{font-size:.78rem}
+  .map-tools label,.map-tools button{min-height:40px}
+  .result-panel{padding:12px!important}
+  .hotspot-list{max-height:none!important;overflow:visible!important}
+  .verify-dialog form{padding:14px!important;padding-bottom:0!important}
+  .verify-step{padding:12px}
+  .quick-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px}
+  .quick-actions>*{font-size:.85rem;padding:10px 8px;min-height:48px}
+  .outcome-grid{grid-template-columns:1fr 1fr!important}
+  .outcome{min-height:60px!important}
+  .photo-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px}
+  .photo-preview{grid-template-columns:repeat(3,1fr)!important}
+  .sticky-submit{position:sticky!important;bottom:0!important;background:#fff;display:flex!important;gap:8px!important;padding:10px 0 calc(10px + env(safe-area-inset-bottom))!important;margin:12px 0 0!important;border-top:1px solid var(--line);z-index:6}
+  .sticky-submit button{min-height:50px;padding:8px 10px;flex:1 1 0}
+  .sticky-submit .primary-button{flex:1.7 1 0}
+  .sticky-submit #deleteVerificationButton{flex:0 0 auto}
+  .admin-session-bar{padding:12px 14px!important}
+  .admin-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;margin-bottom:14px}
+  .admin-tabs button{padding:10px 12px;font-size:.9rem}
+  #adminPanels .section-title{flex-direction:column;align-items:stretch}
+  #adminPanels .table-scroll table.card-table{min-width:0!important}
+  table.card-table thead{display:none}
+  table.card-table,table.card-table tbody,table.card-table tr,table.card-table td{display:block;width:100%}
+  table.card-table tr{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;background:#fff}
+  table.card-table td{border:0!important;padding:4px 0!important;display:grid;grid-template-columns:104px 1fr;gap:8px;font-size:.88rem}
+  table.card-table td::before{content:attr(data-label);font-weight:700;color:var(--muted);font-size:.78rem}
+  table.card-table td:not([data-label]){display:block}
+  table.card-table td:not([data-label])::before{content:none}
+  table.card-table td[data-label=""]{grid-template-columns:1fr}
+  #summaryBody td{display:grid}
+  .detail-cell{max-width:none}
+  .site-footer{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+}
+@media screen and (max-width:700px){
+  .map-heading{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:8px!important;margin-bottom:4px}
+  .map-heading>div{flex:1 1 auto;min-width:0}
+  .map-heading .field-hint{display:none}
+  .map-heading button{width:auto!important;flex:0 0 auto;min-height:44px;padding:8px 12px!important;font-size:.85rem!important}
+  .field-bar span{font-size:.85rem}
+}
+@media screen and (max-width:700px){
+  .map-tools{font-size:.76rem;padding:2px}
+  .map-tools label{min-height:34px;padding:0 6px;gap:4px}
+  .map-tools input{width:16px;height:16px}
+  .map-tools button{min-height:34px;font-size:1.05rem;text-align:center}
+  .map-tools .t{display:none}
+}
+.result-toolbar,.map-wrap,.verify-step,#photoMissingReason{scroll-margin-top:calc(var(--topbar-h,0px) + 8px)}

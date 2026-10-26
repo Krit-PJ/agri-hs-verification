@@ -12,8 +12,8 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.0.0';
-const SETUP_VERSION = '3.0';
+const APP_VERSION = '3.1.0';
+const SETUP_VERSION = '3.1';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
 const DB_ID = '1LOuhCmG8nSS5Si-wHUtgyUtbWYkTw-XKaVjrYBHPxlQ';
@@ -25,6 +25,7 @@ const DEFAULT_PHOTO_FOLDER_ID = '1bo9-9z9M2fb09T51qG2Od0SjZXkUd6vl';
 const TOKEN_HOURS = 8;
 const HS_CACHE_SECONDS = 600;
 const MAX_PHOTOS_PER_HS = 3;
+const REGISTER_LIMIT_PER_10_MIN = 30;
 const MAX_PHOTO_BYTES = 1000000;
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -32,7 +33,7 @@ const PROVINCES = {"10":"กรุงเทพมหานคร","11":"สม�
 
 const SHEETS = {
   Accounts: ['accountId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'role', 'status', 'createdAt', 'approvedAt', 'approvedBy', 'lastLoginAt'],
-  Requests: ['requestId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'requestedRole', 'note', 'consentAt', 'status', 'createdAt', 'decidedAt', 'decidedBy', 'reason'],
+  Requests: ['requestId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'requestedRole', 'note', 'consentAt', 'status', 'createdAt', 'decidedAt', 'decidedBy', 'reason', 'accountId'],
   Verifications: ['verificationId', 'clientRequestId', 'provinceCode', 'provinceName', 'hotspotId', 'hsDate', 'districtName', 'subdistrictName', 'village', 'plantType', 'hsLat', 'hsLng',
     'status', 'result', 'fireState', 'observedMatches', 'observedLandType', 'observedPlantType', 'personCategory', 'personCategoryOther', 'fieldInspectorName', 'inspectedAt',
     'obsLat', 'obsLng', 'gpsAccuracyM', 'missingGpsReason', 'distanceM', 'notes', 'followUpAction', 'photoCount', 'photoMissingReason',
@@ -47,7 +48,7 @@ const SHEETS = {
 /** คอลัมน์ที่ต้องเก็บเป็นข้อความ (กัน Google Sheet ตัดเลข 0 นำหน้าหรือแปลงเป็นวันที่) */
 const TEXT_COLUMNS = {
   Accounts: ['accountId', 'phone', 'provinceCode', 'createdAt', 'approvedAt', 'lastLoginAt'],
-  Requests: ['requestId', 'phone', 'provinceCode', 'consentAt', 'createdAt', 'decidedAt'],
+  Requests: ['requestId', 'phone', 'provinceCode', 'consentAt', 'createdAt', 'decidedAt', 'accountId'],
   Verifications: ['verificationId', 'clientRequestId', 'provinceCode', 'hotspotId', 'hsDate', 'inspectedAt', 'recordedById', 'createdAt', 'updatedAt', 'updatedById'],
   Photos: ['photoId', 'clientRequestId', 'verificationId', 'hotspotId', 'provinceCode', 'driveFileId', 'sha256', 'takenAt', 'uploadedById', 'uploadedAt'],
   AuditLog: ['logId', 'time', 'actorId', 'provinceCode'],
@@ -66,7 +67,7 @@ const PHOTO_MISSING_REASONS = ['', 'field_safety', 'device_unavailable', 'retros
 const PERSON_CATEGORIES = ['นักวิชาการส่งเสริมการเกษตร', 'กำนัน', 'ผู้ใหญ่บ้าน', 'ผู้ช่วยผู้ใหญ่บ้าน', 'อกม.', 'อื่นๆ'];
 const LOGIN_RESULTS = { success: 'สำเร็จ', not_found: 'ไม่มีหมายเลขในระบบ', pending: 'รออนุมัติ', disabled: 'บัญชีถูกระงับ', invalid: 'รูปแบบไม่ถูกต้อง', wrong_credentials: 'ชื่อผู้ใช้/รหัสผ่านไม่ถูกต้อง' };
 const AUDIT_LABELS = {
-  setup: 'ติดตั้งระบบ', login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', register: 'ยื่นคำขอใช้งาน',
+  setup: 'ติดตั้งระบบ', login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', register: 'ลงทะเบียน Admin',
   request_approve: 'อนุมัติคำขอ', request_reject: 'ปฏิเสธคำขอ',
   account_create: 'เพิ่มบัญชี', account_update: 'แก้ไขบัญชี', account_approved: 'เปิดใช้บัญชี', account_disabled: 'ระงับบัญชี', account_delete: 'ลบบัญชี',
   verification_create: 'บันทึกผลตรวจ', verification_update: 'แก้ไขผลตรวจ', verification_delete: 'ลบผลตรวจ',

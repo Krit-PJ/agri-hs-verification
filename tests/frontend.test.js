@@ -97,7 +97,7 @@ test('index.html wires every script that exists and no removed v2 module', () =>
   assert.equal(new Set(ids).size, ids.length, 'duplicate element ids');
   const js = read('app.js') + read('admin.js');
   const used = [...js.matchAll(/\$\('([A-Za-z0-9_]+)'\)/g)].map(m => m[1]);
-  const dynamic = new Set(['reqStatus', 'accSearch', 'accCancel', 'accountForm', 'accId', 'accPhone', 'accName', 'accPosition', 'accAffiliation', 'accProvince', 'accRole', 'accFormTitle', 'recProv', 'recMine', 'recCache', 'recExport', 'auditFilter', 'auditExport', 'settingsForm']);
+  const dynamic = new Set(['regDays', 'accDetails', 'boundaryDistrictOn', 'boundarySubdistrictOn', 'boundaryFit', 'mapLocate', 'reqStatus', 'accSearch', 'accCancel', 'accountForm', 'accId', 'accPhone', 'accName', 'accPosition', 'accAffiliation', 'accProvince', 'accRole', 'accFormTitle', 'recProv', 'recMine', 'recCache', 'recExport', 'auditFilter', 'auditExport', 'settingsForm']);
   for (const id of used) assert.ok(ids.includes(id) || dynamic.has(id), 'app/admin reference unknown id ' + id);
 });
 

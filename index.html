@@ -8,11 +8,11 @@
   <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="design-tokens.css?v=3.0">
-  <link rel="stylesheet" href="styles.css?v=3.0">
-  <link rel="stylesheet" href="registration.css?v=3.0">
-  <link rel="stylesheet" href="boundaries.css?v=3.0">
-  <link rel="stylesheet" href="admin.css?v=3.0">
+  <link rel="stylesheet" href="design-tokens.css?v=3.1">
+  <link rel="stylesheet" href="styles.css?v=3.1">
+  <link rel="stylesheet" href="registration.css?v=3.1">
+  <link rel="stylesheet" href="boundaries.css?v=3.1">
+  <link rel="stylesheet" href="layout-v3.css?v=3.1">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600;700&amp;display=swap">
 </head>
 <body>
@@ -51,48 +51,24 @@
   <main id="main">
     <section id="workView" class="view active" aria-labelledby="workTitle">
       <div class="work-heading">
-        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนบนแผนที่หรือรายการเพื่อดูรายละเอียดและบันทึกผลลงพื้นที่</p>
-          <div class="period-range" role="group" aria-label="ช่วงเวลาจุดความร้อน">
-            <label>เดือน–ปี เริ่มต้น<select id="startMonth"></select></label><span aria-hidden="true">ถึง</span>
-            <label>เดือน–ปี สิ้นสุด<select id="endMonth"></select></label>
-            <button id="resetPeriod" type="button" class="secondary-button">ช่วงข้อมูลล่าสุด</button>
-          </div>
-          <p id="periodHint" class="field-hint" role="status"></p>
-        </div>
-        <button id="retryButton" class="secondary-button compact" type="button" hidden>ลองส่งงานค้าง <span id="retryCount">0</span></button>
+        <div><h1 id="workTitle">ตรวจสอบจุดความร้อน</h1><p class="work-instruction">เลือกจุดความร้อนบนแผนที่หรือรายการ แล้วกด “บันทึกผล” เพื่อบันทึกผลการลงพื้นที่</p></div>
+        <button id="retryButton" class="secondary-button compact" type="button" hidden>ส่งงานค้าง <span id="retryCount">0</span> รายการ</button>
       </div>
 
       <aside id="publicNotice" class="notice warning" role="status" hidden></aside>
       <aside id="liveError" class="notice error" role="alert" hidden></aside>
 
-      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map Burning</p><h2>แผนที่จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กรุณาเลือกจังหวัด</p></div><button id="refreshDataButton" type="button" class="primary-button">↻ อัปเดตข้อมูล</button></div>
-      <div class="result-toolbar">
-        <p><strong id="resultCount">0</strong> จุดที่พบ <span id="selectedCount" class="muted"></span></p>
-        <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
-          <button class="active" data-layout="map" type="button">แผนที่</button>
-          <button data-layout="list" type="button">รายการ</button>
-        </div>
-      </div>
+      <!-- แถบงานภาคสนาม: ผู้ใช้ทั่วไปเห็นปุ่มลงทะเบียน/เข้าสู่ระบบ, เจ้าหน้าที่เห็นความคืบหน้าและปุ่มลัด -->
+      <section id="fieldBar" class="field-bar" aria-live="polite"></section>
 
-      <section id="boundaryPanel" class="boundary-panel" aria-label="ขอบเขตการปกครอง">
-        <div class="boundary-heading"><strong>ขอบเขตการปกครอง</strong><button type="button" id="boundaryFit" class="secondary-button">ดูเต็มขอบเขต</button></div>
-        <div class="boundary-options"><label><input id="boundaryDistrictOn" type="checkbox" checked><i class="boundary-line district"></i>อำเภอ</label><label><input id="boundarySubdistrictOn" type="checkbox"><i class="boundary-line subdistrict"></i>ตำบล</label></div>
-      </section>
-      <div id="mapLayout" class="map-layout">
-        <div class="map-wrap">
-          <div id="map" aria-label="แผนที่จุดความร้อน"></div>
-          <div id="mapFallback" class="map-fallback" hidden><strong>เปิดแผนที่ไม่ได้</strong><span>ยังเลือกรายการด้านข้างและนำทางด้วย Google Maps ได้</span></div>
-          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot" style="background:#2677ad"></i>งานร่าง</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบการเผา</span><span><i class="dot blocked"></i>อื่น ๆ / ติดตาม</span></div>
+      <details id="filterPanel" class="filter-card filter-panel" open>
+        <summary><span class="filter-summary-title">ตัวกรองจุดความร้อน</span><span id="filterChips" class="filter-chips"></span></summary>
+        <div class="period-range" role="group" aria-label="ช่วงเวลาจุดความร้อน">
+          <label>เดือน–ปี เริ่มต้น<select id="startMonth"></select></label><span aria-hidden="true">ถึง</span>
+          <label>เดือน–ปี สิ้นสุด<select id="endMonth"></select></label>
+          <button id="resetPeriod" type="button" class="secondary-button">ช่วงข้อมูลล่าสุด</button>
         </div>
-        <section class="result-panel" aria-labelledby="resultTitle">
-          <div class="panel-heading"><h2 id="resultTitle">รายการจุด</h2><button id="allHotspotsButton" class="secondary-button all-hotspots" type="button">จุดความร้อนทั้งหมด</button></div>
-          <div id="hotspotList" class="hotspot-list" aria-live="polite"></div>
-          <button id="loadMore" class="secondary-button full" type="button" hidden>แสดงเพิ่ม</button>
-        </section>
-      </div>
-
-      <section class="filter-card" aria-labelledby="filterTitle">
-        <div class="section-title"><div><p class="eyebrow">ค้นหาเร็ว</p><h2 id="filterTitle">ตัวกรองจุดความร้อน</h2></div><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button></div>
+        <p id="periodHint" class="field-hint" role="status"></p>
         <div class="filter-grid">
           <label>อำเภอ<select id="districtFilter"><option value="">ทุกอำเภอ</option></select></label>
           <label>ตำบล<select id="tambonFilter"><option value="">ทุกตำบล</option></select></label>
@@ -102,7 +78,32 @@
           <label>ผลตรวจ<select id="resultFilter"><option value="">ทุกผลตรวจ</option><option value="burned">พบการเผา</option><option value="not_burned">ไม่พบการเผา</option><option value="not_found">ไม่พบจุด</option><option value="needs_review">ต้องตรวจซ้ำ</option><option value="inaccessible">เข้าตรวจสอบไม่ได้</option></select></label>
           <label class="search-label">ค้นหา HS<input id="searchFilter" type="search" inputmode="search" placeholder="เลข HS หรือชื่อพื้นที่"></label>
         </div>
-      </section>
+        <div class="filter-actions"><button id="resetFilters" class="text-button" type="button">ล้างตัวกรอง</button><button id="applyFiltersMobile" class="primary-button mobile-only-flex" type="button">ดูผลลัพธ์</button></div>
+      </details>
+
+      <div class="map-heading"><div><p class="eyebrow">ฐาน HS เดียวกับ Agri-Risk Map Burning</p><h2 id="resultsTitle">จุดความร้อน</h2><p id="dataSourceLabel" class="field-hint">กรุณาเลือกจังหวัด</p></div><button id="refreshDataButton" type="button" class="secondary-button">↻ อัปเดตข้อมูล</button></div>
+      <div class="result-toolbar">
+        <p><strong id="resultCount">0</strong> จุดที่พบ <span id="selectedCount" class="muted"></span></p>
+        <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
+          <button class="active" data-layout="map" type="button">แผนที่</button>
+          <button data-layout="list" type="button">รายการ</button>
+        </div>
+      </div>
+
+      <div id="mapLayout" class="map-layout">
+        <div class="map-wrap">
+          <div id="map" aria-label="แผนที่จุดความร้อน"></div>
+          <div id="mapFallback" class="map-fallback" hidden><strong>เปิดแผนที่ไม่ได้</strong><span>ยังเลือกรายการและนำทางด้วย Google Maps ได้</span></div>
+          <div class="map-legend"><span><i class="dot pending"></i>รอตรวจ</span><span><i class="dot" style="background:#2677ad"></i>งานร่าง</span><span><i class="dot fire"></i>พบการเผา</span><span><i class="dot clear"></i>ไม่พบการเผา</span><span><i class="dot blocked"></i>ติดตาม</span><span><i class="dot me"></i>ตำแหน่งฉัน</span></div>
+        </div>
+        <section class="result-panel" aria-labelledby="resultTitle">
+          <div class="panel-heading"><h2 id="resultTitle">รายการจุด</h2><button id="allHotspotsButton" class="secondary-button all-hotspots" type="button">ล้างตัวกรอง</button></div>
+          <p id="sortHint" class="field-hint" hidden></p>
+          <div id="hotspotList" class="hotspot-list" aria-live="polite"></div>
+          <button id="loadMore" class="secondary-button full" type="button" hidden>แสดงเพิ่ม</button>
+        </section>
+      </div>
+      <button id="backToMap" class="back-to-map" type="button" hidden>↑ แผนที่</button>
     </section>
 
     <section id="summaryView" class="view" aria-labelledby="summaryTitle" hidden>
@@ -117,7 +118,7 @@
         </div>
         <div id="summaryStats" class="stat-grid"></div>
         <section class="table-card"><div class="section-title"><div><p class="eyebrow">ความคืบหน้า</p><h2>แยกตามพื้นที่</h2></div><label class="inline-label">ระดับ<select id="summaryLevel"><option value="amphoe" selected>อำเภอ</option><option value="tambon">ตำบล</option><option value="village">หมู่บ้าน</option></select></label></div>
-          <div class="table-scroll" tabindex="0" role="region" aria-label="ตารางสรุปผล"><table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody id="summaryBody"></tbody></table></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="ตารางสรุปผล"><table class="card-table"><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody id="summaryBody"></tbody></table></div>
         </section>
       </div>
     </section>
@@ -132,19 +133,32 @@
 
   <footer class="site-footer"><span class="copyright">Copyright © 2026 Dr. Kitti Phojuang. All rights reserved.</span><span id="visitCounter" class="site-counters" role="status"></span></footer>
 
-  <!-- เข้าใช้งานระบบ: Admin / Mini Super Admin (เบอร์โทร) · Super Admin (ชื่อผู้ใช้) · ขออนุญาตใช้งาน -->
+  <!-- เข้าใช้งานระบบ: เจ้าหน้าที่ (Admin / Mini Super Admin) ใช้เบอร์โทร · Super Admin ใช้ชื่อผู้ใช้ · ลงทะเบียน Admin ใช้งานได้ทันที -->
   <dialog id="accessDialog" class="access-dialog" aria-labelledby="accessTitle">
     <div class="registration-heading"><h2 id="accessTitle">เข้าใช้งานระบบ</h2><button id="accessClose" class="access-close" type="button" aria-label="ปิด">×</button></div>
     <div class="access-tabs" role="tablist">
-      <button type="button" role="tab" data-access-tab="phone" aria-selected="true">Admin / Mini Super Admin</button>
+      <button type="button" role="tab" data-access-tab="phone" aria-selected="true">เข้าสู่ระบบ</button>
+      <button type="button" role="tab" data-access-tab="register" aria-selected="false">ลงทะเบียน Admin</button>
       <button type="button" role="tab" data-access-tab="super" aria-selected="false">Super Admin</button>
-      <button type="button" role="tab" data-access-tab="register" aria-selected="false">ขออนุญาตใช้งาน</button>
     </div>
     <form id="phoneLoginForm" data-access-panel="phone">
-      <p>เข้าสู่ระบบด้วยเบอร์โทรศัพท์ที่ได้รับอนุญาต (ระบบเดียวกับ Agri-Risk Map Burning)</p>
+      <p>Admin และ Mini Super Admin เข้าสู่ระบบด้วยเบอร์โทรศัพท์ที่ลงทะเบียนไว้</p>
       <label>เบอร์โทรศัพท์<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0812345678" required maxlength="15"></label>
       <p id="phoneLoginMessage" class="access-message" role="alert"></p>
       <button class="primary-button full" type="submit">เข้าสู่ระบบ</button>
+      <p class="access-footer">ยังไม่มีบัญชี? <button type="button" class="access-link" data-access-tab="register">ลงทะเบียน Admin ใช้งานได้ทันที</button></p>
+    </form>
+    <form id="registerForm" data-access-panel="register" hidden>
+      <p>สำหรับเจ้าหน้าที่ผู้บันทึกผลตรวจจุดความร้อน (Admin) · ลงทะเบียนแล้วเข้าใช้งานได้ทันที ครั้งต่อไปเข้าสู่ระบบด้วยเบอร์โทรนี้</p>
+      <label>จังหวัดที่ปฏิบัติงาน<select id="regProvince" required></select></label>
+      <label>ชื่อ - นามสกุล<input id="regName" required maxlength="150" autocomplete="name"></label>
+      <label>ตำแหน่ง<input id="regPosition" required maxlength="150" list="positionOptions" placeholder="เช่น นักวิชาการส่งเสริมการเกษตร"><datalist id="positionOptions"><option value="นักวิชาการส่งเสริมการเกษตร"><option value="เจ้าพนักงานการเกษตร"><option value="เกษตรอำเภอ"><option value="กำนัน"><option value="ผู้ใหญ่บ้าน"><option value="อาสาสมัครเกษตร (อกม.)"></datalist></label>
+      <label>สังกัด<input id="regAffiliation" required maxlength="200" placeholder="เช่น สำนักงานเกษตรอำเภอ…"></label>
+      <label>เบอร์โทรศัพท์ (ใช้เข้าสู่ระบบ)<input id="regPhone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="15" placeholder="0812345678"></label>
+      <label class="check-label"><input id="regConsent" type="checkbox" required><span>รับทราบว่าระบบเก็บชื่อ ตำแหน่ง สังกัด เบอร์โทร และบันทึกการใช้งาน เพื่อยืนยันตัวตนและตรวจสอบย้อนหลัง · <a href="privacy.html" target="_blank" rel="noopener">ประกาศความเป็นส่วนตัว</a></span></label>
+      <p id="registerMessage" class="access-message" role="alert"></p>
+      <button class="primary-button full" type="submit">ลงทะเบียนและเริ่มใช้งาน</button>
+      <p class="field-hint">Mini Super Admin (ผู้ดูแลจังหวัด) แต่งตั้งโดย Super Admin เท่านั้น · ผู้ดูแลจังหวัดระงับบัญชีที่ไม่ใช่เจ้าหน้าที่ได้ทันที</p>
     </form>
     <form id="superLoginForm" data-access-panel="super" hidden>
       <p>สำหรับ Super Admin ผู้ดูแลทั้งระบบ</p>
@@ -153,54 +167,53 @@
       <p id="superLoginMessage" class="access-message" role="alert"></p>
       <button class="primary-button full" type="submit">เข้าสู่ระบบ</button>
     </form>
-    <form id="registerForm" data-access-panel="register" hidden>
-      <p>คำขอของ Admin ส่งถึง Mini Super Admin ของจังหวัดและ Super Admin · คำขอ Mini Super Admin ส่งถึง Super Admin</p>
-      <label>บทบาทที่ขอ<select id="regRole"><option value="admin">Admin — ผู้บันทึกข้อมูลจุดความร้อน</option><option value="minisuper">Mini Super Admin — ผู้ดูแลระดับจังหวัด</option></select></label>
-      <label>จังหวัด<select id="regProvince" required></select></label>
-      <label>ชื่อ - นามสกุล<input id="regName" required maxlength="150"></label>
-      <label>ตำแหน่ง<input id="regPosition" required maxlength="150"></label>
-      <label>สังกัด<input id="regAffiliation" required maxlength="200"></label>
-      <label>เบอร์โทรศัพท์ (ใช้เข้าสู่ระบบ)<input id="regPhone" type="tel" inputmode="tel" required maxlength="15"></label>
-      <label>หมายเหตุ (ไม่บังคับ)<input id="regNote" maxlength="300"></label>
-      <label class="check-label"><input id="regConsent" type="checkbox" required><span>รับทราบว่าระบบเก็บชื่อ ตำแหน่ง สังกัด เบอร์โทร และบันทึกการใช้งาน เพื่อยืนยันตัวตนและตรวจสอบย้อนหลัง · <a href="privacy.html" target="_blank" rel="noopener">ประกาศความเป็นส่วนตัว</a></span></label>
-      <p id="registerMessage" class="access-message" role="alert"></p>
-      <button class="primary-button full" type="submit">ส่งคำขอ</button>
-    </form>
   </dialog>
 
   <dialog id="verifyDialog" class="verify-dialog">
-    <form id="verifyForm" method="dialog">
+    <form id="verifyForm" method="dialog" novalidate>
       <div class="dialog-header"><div><p class="eyebrow">บันทึกผลลงพื้นที่</p><h2 id="verifyTitle">จุด HS</h2></div><button id="closeDialog" class="icon-button" type="button" aria-label="ปิด">×</button></div>
       <div id="selectedMeta" class="selected-meta"></div>
       <div class="quick-actions"><a id="navigateLink" class="secondary-button" href="#" target="_blank" rel="noopener">นำทาง Google Maps ↗</a><button id="locateButton" class="secondary-button" type="button">⌖ ใช้ตำแหน่งของฉัน</button></div>
-      <p id="verifyLoginHint" class="notice warning" hidden></p>
-      <fieldset id="verifyFields">
-        <div id="recordInfo" class="field-hint" role="status"></div>
-        <section class="person-section"><label>ประเภทผู้ลงพื้นที่ <select id="personCategory"><option value="">เลือกประเภทบุคคล</option></select></label><label id="personOtherWrap" hidden>ประเภทบุคคลอื่น โปรดระบุ<input id="personCategoryOther" maxlength="150"></label>
-          <details><summary>บันทึกแทนผู้ลงพื้นที่ / ตรวจย้อนหลัง</summary><label>ชื่อผู้ลงพื้นที่<input id="fieldInspectorName" maxlength="200" placeholder="เว้นว่างเพื่อใช้ชื่อผู้เข้าสู่ระบบ"></label><label>วันเวลาตรวจจริง<input id="inspectedAt" type="datetime-local"></label></details></section>
-        <div id="locationPanel" class="location-panel" aria-live="polite"><span class="location-icon">⌖</span><div><strong>ยังไม่ได้บันทึกตำแหน่ง</strong><small>กดใช้ตำแหน่งของฉันเมื่ออยู่หน้างาน</small></div></div>
-        <label class="check-label"><input id="noGps" type="checkbox"><span><strong>บันทึกโดยไม่มี GPS</strong><small>ใช้เมื่ออุปกรณ์หรือพื้นที่ไม่สามารถรับพิกัดได้</small></span></label>
-        <label id="noGpsReasonWrap" hidden>เหตุผลที่ไม่มี GPS <em class="required-word">จำเป็น</em><select id="noGpsReason"><option value="">เลือกเหตุผล</option><option value="permission_denied">ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง</option><option value="signal_unavailable">ไม่มีสัญญาณ GPS ในพื้นที่</option><option value="device_unavailable">อุปกรณ์ไม่รองรับหรือ GPS ขัดข้อง</option><option value="field_safety">ไม่ปลอดภัยที่จะบันทึกตำแหน่งหน้างาน</option><option value="other">เหตุผลอื่น</option></select></label>
-        <fieldset><legend>ผลการตรวจ <em>จำเป็น</em></legend><div class="outcome-grid">
-          <label class="outcome fire"><input type="radio" name="outcome" value="burned"><span aria-hidden="true">♧</span><strong>พบการเผา</strong></label>
-          <label class="outcome clear"><input type="radio" name="outcome" value="not_burned"><span aria-hidden="true">✓</span><strong>ไม่พบการเผา</strong></label>
-          <label class="outcome blocked"><input type="radio" name="outcome" value="not_found"><span aria-hidden="true">?</span><strong>ไม่พบจุด</strong></label>
-          <label class="outcome blocked"><input type="radio" name="outcome" value="inaccessible"><span aria-hidden="true">!</span><strong>เข้าตรวจสอบไม่ได้</strong></label>
-          <label class="outcome blocked"><input type="radio" name="outcome" value="needs_review"><span aria-hidden="true">↻</span><strong>ต้องตรวจซ้ำ</strong></label>
-        </div></fieldset>
-        <label id="fireStateWrap" hidden>สถานะไฟขณะตรวจ<select id="fireState"><option value="unknown">ยังระบุไม่ได้</option><option value="active">ยังมีไฟ / ควัน</option><option value="extinguished">ไฟดับแล้ว</option></select></label>
-        <details class="conditional-fields"><summary>ยืนยันสภาพพื้นที่จริง</summary><label>พื้นที่ตรงกับข้อมูลต้นทางหรือไม่<select id="observedMatches"><option value="">ยังไม่ได้ยืนยัน</option><option value="yes">ตรงกับข้อมูลต้นทาง</option><option value="no">แตกต่างจากข้อมูลต้นทาง</option></select></label><div id="observedFields" hidden><label>ประเภทพื้นที่จริง<select id="observedLandType"><option>พื้นที่เกษตร</option><option>ไม่ใช่พื้นที่เกษตร</option><option>ยังระบุไม่ได้</option></select></label><label>ชนิดพืชจริง<input id="observedPlantType" maxlength="150" placeholder="ระบุเมื่อทราบ"></label></div></details>
-        <div id="existingPhotos" class="photo-preview" aria-live="polite"></div>
-        <div class="photo-actions"><label class="photo-field camera-field">ถ่ายภาพ <span class="optional">สูงสุด 3 รูปต่อจุด</span><input id="photoInput" type="file" accept="image/*" capture="environment"><span class="photo-button">◉ เปิดกล้อง</span></label>
-          <label class="photo-field import-photo-field">นำเข้าภาพ <span class="optional">JPEG / PNG / WebP</span><input id="importPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple><span class="photo-button">＋ นำเข้ารูปภาพ</span></label></div>
-        <p class="field-hint">ระบบย่อภาพไม่เกิน 1 MB ก่อนส่ง และอ่านพิกัด/เวลาจาก EXIF ของ JPEG ต้นฉบับเมื่อมี</p>
-        <label>ไม่มีภาพแนบ<select id="photoMissingReason"><option value="">เลือกเหตุผลที่ไม่แนบภาพถ่าย (เฉพาะเมื่อไม่มีภาพ)</option><option value="field_safety">ไม่ปลอดภัยที่จะถ่ายภาพ</option><option value="device_unavailable">กล้องหรือไฟล์ภาพไม่พร้อม</option><option value="retrospective">รายงานย้อนหลัง ไม่มีภาพต้นฉบับ</option></select></label>
-        <div id="photoPreview" class="photo-preview"></div>
-        <label>หมายเหตุ <span class="optional">ไม่บังคับ</span><textarea id="noteInput" rows="3" maxlength="500" placeholder="รายละเอียดที่ช่วยให้ตรวจสอบย้อนหลังได้"></textarea><small id="noteCount" class="field-hint">0/500</small></label>
-        <label>การดำเนินการ <span class="optional">ไม่บังคับ</span><input id="actionInput" type="text" maxlength="1000" placeholder="เช่น ประสานผู้นำชุมชน หรือติดตามซ้ำ"></label>
+      <section id="verifyGate" class="verify-gate" hidden>
+        <p id="verifyGateText"></p>
+        <div class="button-row"><button id="gateLogin" class="primary-button" type="button">เข้าสู่ระบบด้วยเบอร์โทร</button><button id="gateRegister" class="secondary-button" type="button">ลงทะเบียน Admin</button></div>
+      </section>
+      <div id="recordInfo" class="record-info" role="status"></div>
+      <fieldset id="verifyFields" class="verify-steps">
+        <section class="verify-step"><h3><span>1</span>ตำแหน่งหน้างาน</h3>
+          <div id="locationPanel" class="location-panel" aria-live="polite"></div>
+          <label class="check-label"><input id="noGps" type="checkbox"><span><strong>บันทึกโดยไม่มี GPS</strong><small>ใช้เมื่ออุปกรณ์หรือพื้นที่ไม่สามารถรับพิกัดได้</small></span></label>
+          <label id="noGpsReasonWrap" hidden>เหตุผลที่ไม่มี GPS <em class="required-word">จำเป็น</em><select id="noGpsReason"><option value="">เลือกเหตุผล</option><option value="permission_denied">ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง</option><option value="signal_unavailable">ไม่มีสัญญาณ GPS ในพื้นที่</option><option value="device_unavailable">อุปกรณ์ไม่รองรับหรือ GPS ขัดข้อง</option><option value="field_safety">ไม่ปลอดภัยที่จะบันทึกตำแหน่งหน้างาน</option><option value="other">เหตุผลอื่น</option></select></label>
+        </section>
+        <section class="verify-step"><h3><span>2</span>ผลการตรวจ <em class="required-word">จำเป็น</em></h3>
+          <div class="outcome-grid" role="radiogroup" aria-label="ผลการตรวจ">
+            <label class="outcome fire"><input type="radio" name="outcome" value="burned"><span aria-hidden="true">♧</span><strong>พบการเผา</strong></label>
+            <label class="outcome clear"><input type="radio" name="outcome" value="not_burned"><span aria-hidden="true">✓</span><strong>ไม่พบการเผา</strong></label>
+            <label class="outcome blocked"><input type="radio" name="outcome" value="not_found"><span aria-hidden="true">?</span><strong>ไม่พบจุด</strong></label>
+            <label class="outcome blocked"><input type="radio" name="outcome" value="inaccessible"><span aria-hidden="true">!</span><strong>เข้าตรวจสอบไม่ได้</strong></label>
+            <label class="outcome blocked"><input type="radio" name="outcome" value="needs_review"><span aria-hidden="true">↻</span><strong>ต้องตรวจซ้ำ</strong></label>
+          </div>
+          <label id="fireStateWrap" hidden>สถานะไฟขณะตรวจ<select id="fireState"><option value="unknown">ยังระบุไม่ได้</option><option value="active">ยังมีไฟ / ควัน</option><option value="extinguished">ไฟดับแล้ว</option></select></label>
+        </section>
+        <section class="verify-step"><h3><span>3</span>ภาพถ่ายหลักฐาน <small>สูงสุด 3 ภาพ</small></h3>
+          <div id="existingPhotos" class="photo-preview" aria-live="polite"></div>
+          <div id="photoPreview" class="photo-preview"></div>
+          <div class="photo-actions"><label class="photo-field camera-field"><input id="photoInput" type="file" accept="image/*" capture="environment"><span class="photo-button">◉ ถ่ายภาพ</span></label>
+            <label class="photo-field import-photo-field"><input id="importPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple><span class="photo-button">＋ เลือกจากเครื่อง</span></label></div>
+          <p class="field-hint">ระบบย่อภาพไม่เกิน 1 MB ก่อนส่ง · อ่านพิกัด/เวลาจากภาพ JPEG ต้นฉบับเมื่อมี</p>
+          <label>ไม่มีภาพแนบ<select id="photoMissingReason"><option value="">— มีภาพแนบ —</option><option value="field_safety">ไม่ปลอดภัยที่จะถ่ายภาพ</option><option value="device_unavailable">กล้องหรือไฟล์ภาพไม่พร้อม</option><option value="retrospective">รายงานย้อนหลัง ไม่มีภาพต้นฉบับ</option></select></label>
+        </section>
+        <section class="verify-step"><h3><span>4</span>รายละเอียดเพิ่มเติม <small>ไม่บังคับ</small></h3>
+          <label>ประเภทผู้ลงพื้นที่<select id="personCategory"><option value="">เลือกประเภทบุคคล</option></select></label>
+          <label id="personOtherWrap" hidden>ประเภทบุคคลอื่น โปรดระบุ<input id="personCategoryOther" maxlength="150"></label>
+          <label>หมายเหตุ<textarea id="noteInput" rows="3" maxlength="500" placeholder="รายละเอียดที่ช่วยให้ตรวจสอบย้อนหลังได้"></textarea><small id="noteCount" class="field-hint">0/500</small></label>
+          <label>การดำเนินการ<input id="actionInput" type="text" maxlength="1000" placeholder="เช่น ประสานผู้นำชุมชน หรือติดตามซ้ำ"></label>
+          <details class="conditional-fields"><summary>ยืนยันสภาพพื้นที่จริง</summary><label>พื้นที่ตรงกับข้อมูลต้นทางหรือไม่<select id="observedMatches"><option value="">ยังไม่ได้ยืนยัน</option><option value="yes">ตรงกับข้อมูลต้นทาง</option><option value="no">แตกต่างจากข้อมูลต้นทาง</option></select></label><div id="observedFields" hidden><label>ประเภทพื้นที่จริง<select id="observedLandType"><option>พื้นที่เกษตร</option><option>ไม่ใช่พื้นที่เกษตร</option><option>ยังระบุไม่ได้</option></select></label><label>ชนิดพืชจริง<input id="observedPlantType" maxlength="150" placeholder="ระบุเมื่อทราบ"></label></div></details>
+          <details><summary>บันทึกแทนผู้ลงพื้นที่ / ตรวจย้อนหลัง</summary><label>ชื่อผู้ลงพื้นที่<input id="fieldInspectorName" maxlength="200" placeholder="เว้นว่างเพื่อใช้ชื่อผู้เข้าสู่ระบบ"></label><label>วันเวลาตรวจจริง<input id="inspectedAt" type="datetime-local"></label></details>
+        </section>
       </fieldset>
       <p id="verifyMessage" class="form-message" aria-live="polite"></p>
-      <div class="sticky-submit"><button id="deleteVerificationButton" class="secondary-button danger-button" type="button" hidden>ลบผลตรวจ</button><button id="saveDraftButton" class="secondary-button" type="button">เก็บงานร่าง</button><button id="reviewSubmitButton" class="primary-button" type="submit">ตรวจทานและยืนยัน</button></div>
+      <div id="verifyActions" class="sticky-submit"><button id="deleteVerificationButton" class="secondary-button danger-button" type="button" hidden>ลบ</button><button id="saveDraftButton" class="secondary-button" type="button">เก็บร่าง</button><button id="reviewSubmitButton" class="primary-button" type="submit">ตรวจทานและยืนยัน</button></div>
     </form>
   </dialog>
 
@@ -211,15 +224,15 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="site-config.js?v=3.0"></script>
-  <script src="core.js?v=3.0"></script>
-  <script src="api.js?v=3.0"></script>
-  <script src="sheet-source.js?v=3.0"></script>
-  <script src="province-logos.js?v=3.0"></script>
-  <script src="evidence.js?v=3.0"></script>
-  <script src="image-compression.js?v=3.0"></script>
-  <script src="outbox.js?v=3.0"></script>
-  <script src="admin.js?v=3.0"></script>
-  <script src="app.js?v=3.0" defer></script>
+  <script src="site-config.js?v=3.1"></script>
+  <script src="core.js?v=3.1"></script>
+  <script src="api.js?v=3.1"></script>
+  <script src="sheet-source.js?v=3.1"></script>
+  <script src="province-logos.js?v=3.1"></script>
+  <script src="evidence.js?v=3.1"></script>
+  <script src="image-compression.js?v=3.1"></script>
+  <script src="outbox.js?v=3.1"></script>
+  <script src="admin.js?v=3.1"></script>
+  <script src="app.js?v=3.1" defer></script>
 </body>
 </html>

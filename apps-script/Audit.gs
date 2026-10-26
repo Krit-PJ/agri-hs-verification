@@ -8,6 +8,7 @@ function audit_(user, action, target, detail, prov) {
       provinceCode: prov !== undefined && prov !== null ? String(prov) : (user.prov && user.prov !== '*' ? user.prov : ''),
       action: action, target: clean_(target, 300), detail: clean_(typeof detail === 'string' ? detail : JSON.stringify(detail || ''), 2000)
     });
+    if (['admin', 'minisuper', 'superadmin'].indexOf(user.role) >= 0) CacheService.getScriptCache().remove('staff:' + today_());
   } catch (err) {
     console.error('audit failed: ' + err);
   }
@@ -95,6 +96,21 @@ function counter_(increment) {
       else appendObj_('Counter', { date: today, hits: todayHits });
       setSetting_('counter_total', total);
     }
-    return { today: todayHits, total: total };
+    return { today: todayHits, total: total, staffToday: staffToday_() };
   });
+}
+
+/** จำนวนเจ้าหน้าที่ (Admin / Mini Super Admin / Super Admin) ที่ใช้งานวันนี้ จากบันทึกการใช้งาน — แคช 5 นาที */
+function staffToday_() {
+  const cache = CacheService.getScriptCache();
+  const key = 'staff:' + today_();
+  const hit = cache.get(key);
+  if (hit !== null && hit !== undefined) return Number(hit);
+  const today = today_(), seen = {};
+  readAll_('AuditLog').forEach(r => {
+    if (String(r.time).slice(0, 10) === today && ['admin', 'minisuper', 'superadmin'].indexOf(r.role) >= 0) seen[r.actorId] = true;
+  });
+  const n = Object.keys(seen).length;
+  cache.put(key, String(n), 300);
+  return n;
 }

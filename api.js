@@ -5,12 +5,12 @@ var HSApi = (() => {
   const cfg = globalThis.HS_SITE_CONFIG || {};
   const endpoint = () => String(cfg.apiEndpoint || '').trim();
   let session = null;
-  try { session = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (_) { session = null; }
+  try { session = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) { session = null; }
   if (session && (!session.exp || session.exp < Date.now() || session.endpoint !== endpoint())) session = null;
 
   function save(s) {
     session = s;
-    try { if (s) sessionStorage.setItem(KEY, JSON.stringify(s)); else sessionStorage.removeItem(KEY); } catch (_) {}
+    try { if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); } catch (_) {}
   }
 
   async function request(url, options, timeoutMs) {
@@ -48,10 +48,18 @@ var HSApi = (() => {
 
   const device = () => (navigator.userAgent || '').replace(/\s+/g, ' ').slice(0, 120);
 
-  async function login(kind, credentials) {
-    const data = await post(kind === 'super' ? 'login_super' : 'login_admin', Object.assign({ device: device() }, credentials));
+  function adopt(data) {
     save({ token: data.token, user: data.user, exp: Date.now() + 8 * 3600 * 1000 - 60000, endpoint: endpoint() });
     return data.user;
+  }
+
+  async function login(kind, credentials) {
+    return adopt(await post(kind === 'super' ? 'login_super' : 'login_admin', Object.assign({ device: device() }, credentials)));
+  }
+
+  /** ลงทะเบียน Admin — สำเร็จแล้วเข้าสู่ระบบให้ทันที */
+  async function register(form) {
+    return adopt(await post('register', Object.assign({ device: device() }, form)));
   }
 
   async function logout() {
@@ -60,7 +68,7 @@ var HSApi = (() => {
   }
 
   return {
-    get, post, login, logout,
+    get, post, login, register, logout,
     configured: () => Boolean(endpoint()),
     endpoint,
     user: () => (session && session.exp > Date.now() ? session.user : null),

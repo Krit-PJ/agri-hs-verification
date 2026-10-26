@@ -87,18 +87,41 @@ test('tampered or expired tokens are rejected', () => {
   expectError(() => env.call({ action: 'me', token: p + '.x' }), /AUTH/);
 });
 
-test('registration → Mini Super Admin of the province approves → Admin can log in', () => {
+test('Admin self-registration: usable immediately, phone-only, always role Admin', () => {
   const env = boot();
-  const reg = env.call({ action: 'register', phone: '0833333333', fullName: 'สมชาย ใจดี', position: 'นวส.', affiliation: 'สนง.เกษตรอำเภอ', provinceCode: '62', consent: true });
-  expectError(() => loginPhone(env, '0833333333'), /รอการอนุมัติ/);
+  const reg = env.call({ action: 'register', phone: '083-333-3333', fullName: 'สมชาย ใจดี', position: 'นวส.', affiliation: 'สนง.เกษตรอำเภอ', provinceCode: '62', requestedRole: 'minisuper', consent: true, device: 'phone' });
+  assert.ok(reg.token, 'registration logs the user in');
+  assert.equal(reg.user.role, 'admin', 'a Mini Super Admin cannot be self-registered');
+  assert.equal(reg.user.prov, '62');
+  assert.equal(env.call({ action: 'me', token: reg.token }).user.sub, reg.user.sub);
+  const again = loginPhone(env, '0833333333');
+  assert.equal(again.user.sub, reg.user.sub);
+  expectError(() => env.call({ action: 'register', phone: '0833333333', fullName: 'x', position: 'a', affiliation: 'b', provinceCode: '62', consent: true }), /ลงทะเบียนแล้ว/);
+  expectError(() => env.call({ action: 'register', phone: '0833333334', fullName: 'x', position: 'a', affiliation: 'b', provinceCode: '62' }), /ข้อมูลส่วนบุคคล/);
+  const saved = env.call(verifiedPayload(reg.token));
+  assert.equal(saved.verification.recordedById, reg.user.sub);
+  assert.ok(env.rows('AuditLog').some(l => l.action === 'register' && l.actorId === reg.user.sub && l.provinceCode === '62'));
+  assert.equal(env.rows('Requests')[0].status, 'auto_approved');
+});
+
+test('Mini Super Admin sees new registrations of its province and can suspend them at once', () => {
+  const env = boot();
   const mini = loginPhone(env, '0811111111');
-  const list = env.call({ action: 'requests_list', token: mini.token });
-  assert.equal(list.requests.length, 1);
-  env.call({ action: 'request_decide', token: mini.token, requestId: reg.requestId, decision: 'approve' });
-  const admin = loginPhone(env, '0833333333');
-  assert.equal(admin.user.role, 'admin');
-  assert.equal(admin.user.prov, '62');
-  assert.ok(env.rows('AuditLog').some(l => l.action === 'request_approve' && l.actorId === mini.user.sub));
+  const reg62 = env.call({ action: 'register', phone: '0833333333', fullName: 'ใหม่ 62', position: 'a', affiliation: 'b', provinceCode: '62', consent: true });
+  env.call({ action: 'register', phone: '0855555555', fullName: 'ใหม่ 51', position: 'a', affiliation: 'b', provinceCode: '51', consent: true });
+  const list = env.call({ action: 'requests_list', token: mini.token }).requests;
+  assert.deepEqual(list.map(r => r.fullName), ['ใหม่ 62']);
+  assert.equal(list[0].accountStatus, 'approved');
+  env.call({ action: 'account_status', token: mini.token, accountId: list[0].accountId, status: 'disabled' });
+  expectError(() => env.call({ action: 'me', token: reg62.token }), /ระงับ/);
+  expectError(() => env.call({ action: 'register', phone: '0833333333', fullName: 'ซ้ำ', position: 'a', affiliation: 'b', provinceCode: '62', consent: true }), /ถูกระงับ/);
+  assert.equal(env.call({ action: 'requests_list', token: mini.token }).requests[0].accountStatus, 'disabled');
+});
+
+test('registration burst is rate limited', () => {
+  const env = boot();
+  for (let i = 0; i < 30; i++) env.call({ action: 'register', phone: '08100000' + String(i).padStart(2, '0'), fullName: 'n' + i, position: 'a', affiliation: 'b', provinceCode: '62', consent: true });
+  expectError(() => env.call({ action: 'register', phone: '0819999999', fullName: 'n', position: 'a', affiliation: 'b', provinceCode: '62', consent: true }), /10 นาที/);
 });
 
 test('Mini Super Admin is limited to its own province and cannot manage Mini Super Admins', () => {
@@ -106,16 +129,16 @@ test('Mini Super Admin is limited to its own province and cannot manage Mini Sup
   const mini = loginPhone(env, '0811111111');
   expectError(() => addAdmin(env, mini.token, '0844444444', '51'), /ไม่มีสิทธิ์/);
   expectError(() => addAdmin(env, mini.token, '0844444444', '62', 'minisuper'), /เฉพาะ Super Admin/);
-  env.call({ action: 'register', phone: '0855555555', fullName: 'ขอ ลำพูน', position: 'a', affiliation: 'b', provinceCode: '51', consent: true });
-  env.call({ action: 'register', phone: '0866666666', fullName: 'ขอ มินิ', position: 'a', affiliation: 'b', provinceCode: '62', requestedRole: 'minisuper', consent: true });
-  assert.equal(env.call({ action: 'requests_list', token: mini.token }).requests.length, 0, 'other province and minisuper requests are hidden');
   addAdmin(env, mini.token, '0844444444', '62');
   const accounts = env.call({ action: 'accounts_list', token: mini.token }).accounts;
   assert.deepEqual(accounts.map(a => a.provinceCode), ['62', '62']);
   const sup = loginSuper(env);
-  assert.equal(env.call({ action: 'requests_list', token: sup.token }).requests.length, 2);
   addAdmin(env, sup.token, '0877777777', '51', 'minisuper');
-  assert.equal(loginPhone(env, '0877777777').user.prov, '51');
+  const other = loginPhone(env, '0877777777');
+  assert.equal(other.user.prov, '51');
+  assert.equal(other.user.role, 'minisuper');
+  const miniAcc = env.call({ action: 'accounts_list', token: sup.token }).accounts.find(a => a.accountId === mini.user.sub);
+  expectError(() => env.call({ action: 'account_status', token: other.token, accountId: miniAcc.accountId, status: 'disabled' }), /เฉพาะ Super Admin|ไม่มีสิทธิ์/);
 });
 
 test('Admin records results; cannot edit another Admin record; cannot delete; Mini Super Admin can', () => {

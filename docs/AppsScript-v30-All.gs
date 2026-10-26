@@ -16,8 +16,8 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.0.0';
-const SETUP_VERSION = '3.0';
+const APP_VERSION = '3.1.0';
+const SETUP_VERSION = '3.1';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
 const DB_ID = '1LOuhCmG8nSS5Si-wHUtgyUtbWYkTw-XKaVjrYBHPxlQ';
@@ -29,6 +29,7 @@ const DEFAULT_PHOTO_FOLDER_ID = '1bo9-9z9M2fb09T51qG2Od0SjZXkUd6vl';
 const TOKEN_HOURS = 8;
 const HS_CACHE_SECONDS = 600;
 const MAX_PHOTOS_PER_HS = 3;
+const REGISTER_LIMIT_PER_10_MIN = 30;
 const MAX_PHOTO_BYTES = 1000000;
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -36,7 +37,7 @@ const PROVINCES = {"10":"กรุงเทพมหานคร","11":"สม�
 
 const SHEETS = {
   Accounts: ['accountId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'role', 'status', 'createdAt', 'approvedAt', 'approvedBy', 'lastLoginAt'],
-  Requests: ['requestId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'requestedRole', 'note', 'consentAt', 'status', 'createdAt', 'decidedAt', 'decidedBy', 'reason'],
+  Requests: ['requestId', 'phone', 'fullName', 'position', 'affiliation', 'provinceCode', 'provinceName', 'requestedRole', 'note', 'consentAt', 'status', 'createdAt', 'decidedAt', 'decidedBy', 'reason', 'accountId'],
   Verifications: ['verificationId', 'clientRequestId', 'provinceCode', 'provinceName', 'hotspotId', 'hsDate', 'districtName', 'subdistrictName', 'village', 'plantType', 'hsLat', 'hsLng',
     'status', 'result', 'fireState', 'observedMatches', 'observedLandType', 'observedPlantType', 'personCategory', 'personCategoryOther', 'fieldInspectorName', 'inspectedAt',
     'obsLat', 'obsLng', 'gpsAccuracyM', 'missingGpsReason', 'distanceM', 'notes', 'followUpAction', 'photoCount', 'photoMissingReason',
@@ -51,7 +52,7 @@ const SHEETS = {
 /** คอลัมน์ที่ต้องเก็บเป็นข้อความ (กัน Google Sheet ตัดเลข 0 นำหน้าหรือแปลงเป็นวันที่) */
 const TEXT_COLUMNS = {
   Accounts: ['accountId', 'phone', 'provinceCode', 'createdAt', 'approvedAt', 'lastLoginAt'],
-  Requests: ['requestId', 'phone', 'provinceCode', 'consentAt', 'createdAt', 'decidedAt'],
+  Requests: ['requestId', 'phone', 'provinceCode', 'consentAt', 'createdAt', 'decidedAt', 'accountId'],
   Verifications: ['verificationId', 'clientRequestId', 'provinceCode', 'hotspotId', 'hsDate', 'inspectedAt', 'recordedById', 'createdAt', 'updatedAt', 'updatedById'],
   Photos: ['photoId', 'clientRequestId', 'verificationId', 'hotspotId', 'provinceCode', 'driveFileId', 'sha256', 'takenAt', 'uploadedById', 'uploadedAt'],
   AuditLog: ['logId', 'time', 'actorId', 'provinceCode'],
@@ -70,7 +71,7 @@ const PHOTO_MISSING_REASONS = ['', 'field_safety', 'device_unavailable', 'retros
 const PERSON_CATEGORIES = ['นักวิชาการส่งเสริมการเกษตร', 'กำนัน', 'ผู้ใหญ่บ้าน', 'ผู้ช่วยผู้ใหญ่บ้าน', 'อกม.', 'อื่นๆ'];
 const LOGIN_RESULTS = { success: 'สำเร็จ', not_found: 'ไม่มีหมายเลขในระบบ', pending: 'รออนุมัติ', disabled: 'บัญชีถูกระงับ', invalid: 'รูปแบบไม่ถูกต้อง', wrong_credentials: 'ชื่อผู้ใช้/รหัสผ่านไม่ถูกต้อง' };
 const AUDIT_LABELS = {
-  setup: 'ติดตั้งระบบ', login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', register: 'ยื่นคำขอใช้งาน',
+  setup: 'ติดตั้งระบบ', login: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', register: 'ลงทะเบียน Admin',
   request_approve: 'อนุมัติคำขอ', request_reject: 'ปฏิเสธคำขอ',
   account_create: 'เพิ่มบัญชี', account_update: 'แก้ไขบัญชี', account_approved: 'เปิดใช้บัญชี', account_disabled: 'ระงับบัญชี', account_delete: 'ลบบัญชี',
   verification_create: 'บันทึกผลตรวจ', verification_update: 'แก้ไขผลตรวจ', verification_delete: 'ลบผลตรวจ',
@@ -182,10 +183,17 @@ function ensureSheet_(ss, name, headers, textCols) {
   let sh = ss.getSheetByName(name);
   if (!sh) sh = ss.insertSheet(name);
   const width = headers.length;
+  if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
   const current = sh.getLastColumn() ? sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), width)).getValues()[0].map(String) : [];
   // เพิ่มเฉพาะหัวคอลัมน์ที่ขาด ไม่สลับลำดับคอลัมน์เดิม
   if (!current.filter(String).length) sh.getRange(1, 1, 1, width).setValues([headers]);
-  else headers.forEach(h => { if (current.indexOf(h) < 0) sh.getRange(1, sh.getLastColumn() + 1).setValue(h); });
+  else headers.forEach(h => {
+    if (current.indexOf(h) >= 0) return;
+    const col = sh.getLastColumn() + 1;
+    if (col > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), col - sh.getMaxColumns());
+    sh.getRange(1, col).setValue(h);
+    current.push(h);
+  });
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, sh.getLastColumn()).setFontWeight('bold').setBackground('#dff3ef');
   const header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
@@ -382,6 +390,7 @@ function audit_(user, action, target, detail, prov) {
       provinceCode: prov !== undefined && prov !== null ? String(prov) : (user.prov && user.prov !== '*' ? user.prov : ''),
       action: action, target: clean_(target, 300), detail: clean_(typeof detail === 'string' ? detail : JSON.stringify(detail || ''), 2000)
     });
+    if (['admin', 'minisuper', 'superadmin'].indexOf(user.role) >= 0) CacheService.getScriptCache().remove('staff:' + today_());
   } catch (err) {
     console.error('audit failed: ' + err);
   }
@@ -469,8 +478,23 @@ function counter_(increment) {
       else appendObj_('Counter', { date: today, hits: todayHits });
       setSetting_('counter_total', total);
     }
-    return { today: todayHits, total: total };
+    return { today: todayHits, total: total, staffToday: staffToday_() };
   });
+}
+
+/** จำนวนเจ้าหน้าที่ (Admin / Mini Super Admin / Super Admin) ที่ใช้งานวันนี้ จากบันทึกการใช้งาน — แคช 5 นาที */
+function staffToday_() {
+  const cache = CacheService.getScriptCache();
+  const key = 'staff:' + today_();
+  const hit = cache.get(key);
+  if (hit !== null && hit !== undefined) return Number(hit);
+  const today = today_(), seen = {};
+  readAll_('AuditLog').forEach(r => {
+    if (String(r.time).slice(0, 10) === today && ['admin', 'minisuper', 'superadmin'].indexOf(r.role) >= 0) seen[r.actorId] = true;
+  });
+  const n = Object.keys(seen).length;
+  cache.put(key, String(n), 300);
+  return n;
 }
 
 /* ===== Auth.gs ===== */
@@ -532,28 +556,46 @@ function loginSuper_(b) {
   return { ok: true, token: signToken_(user), user: user };
 }
 
-/** ยื่นคำขอใช้งาน (ผู้ใช้ทั่วไป) — Admin: ผู้ดูแลจังหวัดหรือ Super Admin อนุมัติ, Mini Super Admin: Super Admin อนุมัติ */
+/**
+ * ลงทะเบียน Admin ด้วยตนเอง — ใช้งานได้ทันที (เข้าสู่ระบบให้อัตโนมัติ) ในจังหวัดที่เลือก
+ * Mini Super Admin ไม่เปิดให้ลงทะเบียน: แต่งตั้งได้โดย Super Admin เท่านั้น
+ * Mini Super Admin ของจังหวัดเห็นผู้ลงทะเบียนใหม่ และระงับ/ลบได้ทันทีหากไม่ใช่เจ้าหน้าที่จริง
+ */
 function register_(b) {
   const phone = normalizePhone_(b.phone);
   const prov = provCode_(b.provinceCode);
-  const requestedRole = b.requestedRole === 'minisuper' ? 'minisuper' : 'admin';
+  const device = clean_(b.device, 120);
   if (!validPhone_(phone)) throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง 0812345678)');
   if (!prov) throw new Error('กรุณาเลือกจังหวัด');
   if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
   if (!clean_(b.position)) throw new Error('กรุณากรอกตำแหน่ง');
   if (!clean_(b.affiliation)) throw new Error('กรุณากรอกสังกัด');
   if (b.consent !== true) throw new Error('กรุณายืนยันการรับทราบการใช้ข้อมูลส่วนบุคคล');
+  const cache = CacheService.getScriptCache();
+  const recent = Number(cache.get('regcount') || 0);
+  if (recent >= REGISTER_LIMIT_PER_10_MIN) throw new Error('มีการลงทะเบียนจำนวนมากในขณะนี้ กรุณาลองใหม่ในอีก 10 นาที');
   return withLock_(() => {
-    if (findRow_('Accounts', r => normalizePhone_(r.phone) === phone)) throw new Error('เบอร์โทรศัพท์นี้มีสิทธิ์ใช้งานแล้ว สามารถเข้าสู่ระบบได้ทันที');
-    if (findRow_('Requests', r => normalizePhone_(r.phone) === phone && r.status === 'pending')) throw new Error('มีคำขอของเบอร์นี้รอการอนุมัติอยู่แล้ว');
+    const existing = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
+    if (existing) throw new Error(existing.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด');
+    const accountId = nextAccountId_(prov);
+    const data = {
+      accountId: accountId, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
+      provinceCode: prov, provinceName: PROVINCES[prov], role: 'admin', status: 'approved',
+      createdAt: now_(), approvedAt: now_(), approvedBy: 'ลงทะเบียนด้วยตนเอง', lastLoginAt: now_()
+    };
+    appendObj_('Accounts', data);
     const id = newId_('R');
     appendObj_('Requests', {
-      requestId: id, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
-      provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: requestedRole, note: clean_(b.note, 500), consentAt: now_(),
-      status: 'pending', createdAt: now_(), decidedAt: '', decidedBy: '', reason: ''
+      requestId: id, phone: phone, fullName: data.fullName, position: data.position, affiliation: data.affiliation,
+      provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: 'admin', note: clean_(b.note, 500), consentAt: now_(),
+      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: accountId
     });
-    audit_({ sub: phone, name: clean_(b.fullName), role: 'public', prov: prov }, 'register', id, ROLE_LABELS[requestedRole], prov);
-    return { ok: true, requestId: id };
+    cache.put('regcount', String(recent + 1), 600);
+    const acc = findRow_('Accounts', r => r.accountId === accountId);
+    const user = accountUser_(acc);
+    logAttempt_('admin', phone, 'success', acc, device);
+    audit_(user, 'register', accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
+    return { ok: true, requestId: id, token: signToken_(user), user: user };
   });
 }
 
@@ -608,14 +650,23 @@ function requireAccountManager_(user, role, prov) {
 /* ===== Accounts.gs ===== */
 /* ============================== คำขอใช้งาน / บัญชีผู้ใช้ ============================== */
 
+/** ผู้ลงทะเบียน (Admin ลงทะเบียนเองใช้งานได้ทันที) พร้อมสถานะบัญชีปัจจุบัน เพื่อให้ผู้ดูแลจังหวัดตรวจและระงับได้ */
 function requestsList_(user, b) {
   requireManager_(user);
-  const status = (b && b.status) || 'pending';
+  const status = (b && b.status) || 'all';
+  const days = Math.max(0, Number(b && b.days) || 0);
+  const since = days ? Utilities.formatDate(new Date(Date.now() - days * 86400000), 'Asia/Bangkok', "yyyy-MM-dd") : '';
+  const accounts = {};
+  readAll_('Accounts').forEach(a => { accounts[a.accountId] = a; accounts['p' + normalizePhone_(a.phone)] = a; });
   const rows = readAll_('Requests').filter(r => inScope_(user, r.provinceCode)
     && (isSuper_(user) || r.requestedRole !== 'minisuper')
-    && (status === 'all' || r.status === status));
+    && (status === 'all' || r.status === status)
+    && (!since || String(r.createdAt).slice(0, 10) >= since));
   rows.sort((a, c) => String(c.createdAt).localeCompare(String(a.createdAt)));
-  return { ok: true, requests: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone), requestedRole: r.requestedRole || 'admin' })) };
+  return { ok: true, requests: rows.map(stripRow_).map(r => {
+    const acc = accounts[r.accountId] || accounts['p' + normalizePhone_(r.phone)] || null;
+    return Object.assign(r, { phone: normalizePhone_(r.phone), requestedRole: r.requestedRole || 'admin', accountId: acc ? acc.accountId : '', accountStatus: acc ? acc.status : 'deleted', accountRole: acc ? acc.role : '' });
+  }) };
 }
 
 function requestDecide_(user, b) {

@@ -56,28 +56,46 @@ function loginSuper_(b) {
   return { ok: true, token: signToken_(user), user: user };
 }
 
-/** ยื่นคำขอใช้งาน (ผู้ใช้ทั่วไป) — Admin: ผู้ดูแลจังหวัดหรือ Super Admin อนุมัติ, Mini Super Admin: Super Admin อนุมัติ */
+/**
+ * ลงทะเบียน Admin ด้วยตนเอง — ใช้งานได้ทันที (เข้าสู่ระบบให้อัตโนมัติ) ในจังหวัดที่เลือก
+ * Mini Super Admin ไม่เปิดให้ลงทะเบียน: แต่งตั้งได้โดย Super Admin เท่านั้น
+ * Mini Super Admin ของจังหวัดเห็นผู้ลงทะเบียนใหม่ และระงับ/ลบได้ทันทีหากไม่ใช่เจ้าหน้าที่จริง
+ */
 function register_(b) {
   const phone = normalizePhone_(b.phone);
   const prov = provCode_(b.provinceCode);
-  const requestedRole = b.requestedRole === 'minisuper' ? 'minisuper' : 'admin';
+  const device = clean_(b.device, 120);
   if (!validPhone_(phone)) throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง 0812345678)');
   if (!prov) throw new Error('กรุณาเลือกจังหวัด');
   if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
   if (!clean_(b.position)) throw new Error('กรุณากรอกตำแหน่ง');
   if (!clean_(b.affiliation)) throw new Error('กรุณากรอกสังกัด');
   if (b.consent !== true) throw new Error('กรุณายืนยันการรับทราบการใช้ข้อมูลส่วนบุคคล');
+  const cache = CacheService.getScriptCache();
+  const recent = Number(cache.get('regcount') || 0);
+  if (recent >= REGISTER_LIMIT_PER_10_MIN) throw new Error('มีการลงทะเบียนจำนวนมากในขณะนี้ กรุณาลองใหม่ในอีก 10 นาที');
   return withLock_(() => {
-    if (findRow_('Accounts', r => normalizePhone_(r.phone) === phone)) throw new Error('เบอร์โทรศัพท์นี้มีสิทธิ์ใช้งานแล้ว สามารถเข้าสู่ระบบได้ทันที');
-    if (findRow_('Requests', r => normalizePhone_(r.phone) === phone && r.status === 'pending')) throw new Error('มีคำขอของเบอร์นี้รอการอนุมัติอยู่แล้ว');
+    const existing = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
+    if (existing) throw new Error(existing.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด');
+    const accountId = nextAccountId_(prov);
+    const data = {
+      accountId: accountId, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
+      provinceCode: prov, provinceName: PROVINCES[prov], role: 'admin', status: 'approved',
+      createdAt: now_(), approvedAt: now_(), approvedBy: 'ลงทะเบียนด้วยตนเอง', lastLoginAt: now_()
+    };
+    appendObj_('Accounts', data);
     const id = newId_('R');
     appendObj_('Requests', {
-      requestId: id, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
-      provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: requestedRole, note: clean_(b.note, 500), consentAt: now_(),
-      status: 'pending', createdAt: now_(), decidedAt: '', decidedBy: '', reason: ''
+      requestId: id, phone: phone, fullName: data.fullName, position: data.position, affiliation: data.affiliation,
+      provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: 'admin', note: clean_(b.note, 500), consentAt: now_(),
+      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: accountId
     });
-    audit_({ sub: phone, name: clean_(b.fullName), role: 'public', prov: prov }, 'register', id, ROLE_LABELS[requestedRole], prov);
-    return { ok: true, requestId: id };
+    cache.put('regcount', String(recent + 1), 600);
+    const acc = findRow_('Accounts', r => r.accountId === accountId);
+    const user = accountUser_(acc);
+    logAttempt_('admin', phone, 'success', acc, device);
+    audit_(user, 'register', accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
+    return { ok: true, requestId: id, token: signToken_(user), user: user };
   });
 }
 

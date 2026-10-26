@@ -160,6 +160,27 @@
     return Math.round(2 * R * Math.asin(Math.sqrt(a)));
   }
 
+  /** เรียงจุดตามระยะจากตำแหน่งผู้ใช้ (ม.) — ใช้กับโหมด “จุดใกล้ฉัน” */
+  function byDistance(rows, lat, lng) {
+    return rows.map(r => Object.assign({}, r, { distance: distanceM(lat, lng, r.lat, r.lng) }))
+      .sort((a, b) => (a.distance == null ? Infinity : a.distance) - (b.distance == null ? Infinity : b.distance));
+  }
+  function formatDistance(m) {
+    if (m == null || !Number.isFinite(m)) return '';
+    return m < 1000 ? m.toLocaleString('th-TH') + ' ม.' : (m / 1000).toLocaleString('th-TH', { maximumFractionDigits: 1 }) + ' กม.';
+  }
+
+  /** จัดกลุ่มเดือนตามปีงบประมาณ (ใหม่ → เก่า) สำหรับ <optgroup> */
+  function fiscalGroups(months) {
+    const groups = new Map();
+    months.slice().sort().reverse().forEach(m => {
+      const fy = fiscalYear(m + '-01');
+      if (!groups.has(fy)) groups.set(fy, []);
+      groups.get(fy).push(m);
+    });
+    return Array.from(groups, ([year, list]) => ({ year, months: list.sort() }));
+  }
+
   /** สิทธิ์ฝั่งหน้าเว็บ (ใช้แสดง/ซ่อนปุ่มเท่านั้น — เซิร์ฟเวอร์ตรวจสิทธิ์จริงทุกคำสั่ง) */
   function can(user, what, ctx) {
     if (!user) return false;
@@ -187,6 +208,6 @@
   return {
     PROVINCES, MONTHS, MONTHS_SHORT, RESULT_LABELS, STATUS_LABELS, ROLE_LABELS, ROLE_DESCRIPTIONS, COLORS, PERSON_CATEGORIES,
     normalizePhone, validPhone, fromApi, fromSheetSource, fiscalYear, monthKey, monthLabel, thaiDate, thaiDateTime,
-    defaultPeriod, monthsBetween, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid
+    defaultPeriod, monthsBetween, byDistance, formatDistance, fiscalGroups, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid
   };
 });

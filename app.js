@@ -5,37 +5,45 @@
   const cfg = globalThis.HS_SITE_CONFIG || {};
   const $ = id => document.getElementById(id);
   const esc = C.escapeHtml;
-  const PAGE = 80;
+  const PAGE = 60;
   const LAST_PROVINCE = 'hsverify.v3.province';
+  const LAST_PERSON = 'hsverify.v3.personCategory';
   const MAX_PHOTOS = 3;
+  const mobile = () => matchMedia('(max-width: 700px)').matches;
 
   const state = {
     provinces: [], province: '', rows: [], filtered: [], visible: PAGE, source: '',
-    map: null, markers: null, boundary: {}, fitPending: false,
-    selected: null, record: null, existingPhotos: [], photos: [], location: null, busy: false
+    map: null, markers: null, boundaryLayer: null, meLayer: null, boundary: {}, fitPending: false,
+    near: null, selected: null, record: null, existingPhotos: [], photos: [], location: null, busy: false, pendingHs: null
   };
 
   document.addEventListener('DOMContentLoaded', init);
 
-  /* ---------------------------------------------------------------- เริ่มต้น */
+  /* ================================================================ เริ่มต้น */
   async function init() {
+    const setTop = () => document.documentElement.style.setProperty('--topbar-h', document.querySelector('.topbar').offsetHeight + 'px');
+    setTop(); window.addEventListener('resize', setTop);
     if (cfg.riskMapUrl) $('riskNavLink').href = cfg.riskMapUrl;
     if (cfg.greenGainHubUrl) $('hubNavLink').href = cfg.greenGainHubUrl;
     bind();
     fillPersonCategories();
     initMap();
     HSAdmin.init({ provinces: () => state.provinces, province: () => state.province, onSession: sessionChanged, toast, reloadHotspots: () => loadProvince(state.province, true) });
-    window.addEventListener('hs:session-expired', () => { toast('หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่', true); sessionChanged(); });
+    $('accessDialog').addEventListener('close', () => setTimeout(() => { if (!HSApi.user()) state.pendingHs = null; }, 0));
+    window.addEventListener('hs:session-expired', e => { toast(String((e.detail || '').replace(/^AUTH:\s*/, '')) || 'หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่', true); closeVerify(); sessionChanged(); });
+    if (mobile()) $('filterPanel').open = false;
     applySessionUI();
     counter();
     await loadProvinces();
     refreshOutbox();
+    watchBackToMap();
   }
 
   function bind() {
     document.querySelectorAll('.nav-item[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
-    $('menuButton').addEventListener('click', () => { const open = !$('mainNav').classList.contains('open'); $('mainNav').classList.toggle('open', open); $('menuButton').setAttribute('aria-expanded', String(open)); });
-    $('accessLoginNav').addEventListener('click', () => HSApi.user() ? logout() : HSAdmin.openAccess('phone'));
+    $('menuButton').addEventListener('click', () => toggleMenu());
+    document.querySelectorAll('#mainNav a').forEach(a => a.addEventListener('click', () => toggleMenu(false)));
+    $('accessLoginNav').addEventListener('click', () => { toggleMenu(false); HSApi.user() ? logout() : HSAdmin.openAccess('phone'); });
     $('provinceSelect').addEventListener('change', e => loadProvince(e.target.value));
     document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
     ['districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'startMonth', 'endMonth'].forEach(id => $(id).addEventListener('change', () => {
@@ -45,14 +53,24 @@
       state.fitPending = ['districtFilter', 'tambonFilter', 'villageFilter'].includes(id);
       if (id === 'startMonth' || id === 'endMonth') $('summaryYear').value = '';
       applyFilters();
+      if (id === 'districtFilter' || id === 'tambonFilter') drawBoundaries();
     }));
     let t; $('searchFilter').addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 180); });
     $('resetFilters').addEventListener('click', resetFilters);
     $('allHotspotsButton').addEventListener('click', resetFilters);
-    $('resetPeriod').addEventListener('click', () => { setDefaultPeriod(); applyFilters(); });
+    $('applyFiltersMobile').addEventListener('click', () => { $('filterPanel').open = false; $('resultCount').closest('.result-toolbar').scrollIntoView({ behavior: 'smooth' }); });
+    $('resetPeriod').addEventListener('click', () => { setDefaultPeriod(); fillLocationFilters(); applyFilters(); });
     $('refreshDataButton').addEventListener('click', () => loadProvince(state.province, true));
     $('loadMore').addEventListener('click', () => { state.visible += PAGE; renderList(); });
-    $('hotspotList').addEventListener('click', e => { const card = e.target.closest('[data-hs-id]'); if (card) openVerify(state.rows.find(r => r.hsId === card.dataset.hsId)); });
+    $('hotspotList').addEventListener('click', e => {
+      const card = e.target.closest('[data-hs-id]');
+      if (!card) return;
+      const r = state.rows.find(x => x.hsId === card.dataset.hsId);
+      if (e.target.closest('[data-show-map]')) return showOnMap(r);
+      openVerify(r);
+    });
+    $('fieldBar').addEventListener('click', fieldBarAction);
+    $('backToMap').addEventListener('click', () => document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth' }));
     $('summaryLevel').addEventListener('change', renderSummary);
     $('summaryYear').addEventListener('change', () => {
       const y = Number($('summaryYear').value);
@@ -62,9 +80,6 @@
     });
     $('printReportButton').addEventListener('click', printReport);
     $('exportSummaryButton').addEventListener('click', exportSummary);
-    $('boundaryDistrictOn').addEventListener('change', () => drawBoundaries());
-    $('boundarySubdistrictOn').addEventListener('change', () => drawBoundaries());
-    $('boundaryFit').addEventListener('click', fitProvince);
     // ฟอร์มบันทึกผล
     $('closeDialog').addEventListener('click', closeVerify);
     $('verifyDialog').addEventListener('cancel', e => { e.preventDefault(); closeVerify(); });
@@ -73,11 +88,13 @@
     $('confirmSubmit').addEventListener('click', () => { $('confirmDialog').close(); submit('verified'); });
     $('cancelConfirm').addEventListener('click', () => $('confirmDialog').close());
     $('deleteVerificationButton').addEventListener('click', deleteRecord);
-    $('locateButton').addEventListener('click', locate);
+    $('locateButton').addEventListener('click', () => locate(true));
+    $('gateLogin').addEventListener('click', () => gate('phone'));
+    $('gateRegister').addEventListener('click', () => gate('register'));
     $('noGps').addEventListener('change', () => { $('noGpsReasonWrap').hidden = !$('noGps').checked; if ($('noGps').checked) { state.location = null; renderLocation(); } else $('noGpsReason').value = ''; });
-    $('personCategory').addEventListener('change', () => { $('personOtherWrap').hidden = $('personCategory').value !== 'อื่นๆ'; });
+    $('personCategory').addEventListener('change', () => { $('personOtherWrap').hidden = $('personCategory').value !== 'อื่นๆ'; try { localStorage.setItem(LAST_PERSON, $('personCategory').value); } catch (_) {} });
     $('observedMatches').addEventListener('change', () => { $('observedFields').hidden = $('observedMatches').value !== 'no'; });
-    document.querySelectorAll('input[name=outcome]').forEach(r => r.addEventListener('change', () => { $('fireStateWrap').hidden = outcome() !== 'burned'; }));
+    document.querySelectorAll('input[name=outcome]').forEach(r => r.addEventListener('change', () => { $('fireStateWrap').hidden = outcome() !== 'burned'; $('verifyMessage').textContent = ''; }));
     $('photoInput').addEventListener('change', addPhotos);
     $('importPhotoInput').addEventListener('change', addPhotos);
     $('photoPreview').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (b) { state.photos.splice(Number(b.dataset.remove), 1); renderPhotos(); } });
@@ -87,30 +104,43 @@
     window.addEventListener('online', () => { toast('กลับมาออนไลน์แล้ว'); flushOutbox(); });
   }
 
-  /* ---------------------------------------------------------------- บัญชีผู้ใช้ */
+  function toggleMenu(force) {
+    const open = typeof force === 'boolean' ? force : !$('mainNav').classList.contains('open');
+    $('mainNav').classList.toggle('open', open);
+    $('menuButton').setAttribute('aria-expanded', String(open));
+  }
+
+  /* ================================================================ บัญชีผู้ใช้ */
   function applySessionUI() {
     const user = HSApi.user();
     $('headerIdentity').textContent = user ? user.name + ' · ' + C.ROLE_LABELS[user.role] : 'ผู้ใช้ทั่วไป';
     $('accessLoginNav').textContent = user ? 'ออกจากระบบ' : 'เข้าใช้งานระบบ';
     $('adminNav').hidden = !user;
-    $('adminNav').textContent = user && C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'บันทึกการใช้งานของฉัน';
+    $('adminNav').textContent = user && C.can(user, 'manage') ? 'ผู้ดูแลระบบ' : 'งานของฉัน';
     const live = HSApi.configured();
     $('modeBadge').className = 'mode-badge ' + (user ? 'live' : 'demo');
-    $('modeBadge').textContent = user ? (C.ROLE_LABELS[user.role] + (user.prov && user.prov !== '*' ? ' · ' + (C.PROVINCES[user.prov] || '') : '')) : live ? 'ข้อมูลสาธารณะ' : 'อ่านอย่างเดียว';
+    $('modeBadge').textContent = user ? C.ROLE_LABELS[user.role] + (user.prov && user.prov !== '*' ? ' · ' + (C.PROVINCES[user.prov] || '') : '') : live ? 'ข้อมูลสาธารณะ' : 'อ่านอย่างเดียว';
     const notice = $('publicNotice');
-    if (!live) { notice.hidden = false; notice.innerHTML = '<strong>อ่านจุด HS จาก Google Sheet ต้นทางโดยตรง</strong><span>ยังไม่ได้เชื่อม API ของฐานข้อมูลผลตรวจ จึงแสดงทุกจุดเป็น “รอตรวจ” และยังเข้าสู่ระบบไม่ได้</span>'; }
-    else notice.hidden = true;
-    const sel = $('provinceSelect');
+    notice.hidden = live;
+    if (!live) notice.innerHTML = '<strong>ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ</strong><span>แสดงจุด HS จาก Google Sheet ต้นทางได้ แต่ยังเข้าสู่ระบบและบันทึกผลไม่ได้ จนกว่าผู้ติดตั้งจะเชื่อม API</span>';
     const locked = user && !C.can(user, 'chooseProvince');
-    sel.disabled = Boolean(locked);
+    $('provinceSelect').disabled = Boolean(locked);
     if (locked && state.provinces.length && state.province !== user.prov) loadProvince(user.prov);
+    renderFieldBar();
   }
 
   function sessionChanged() {
     applySessionUI();
+    counter();
     HSAdmin.render();
-    if (state.province) loadProvince(state.province, true);
-    if (!HSApi.user() && !$('adminView').hidden) switchView('work');
+    const pending = state.pendingHs;
+    state.pendingHs = null;
+    const user = HSApi.user();
+    const reload = state.province ? loadProvince(user && !C.can(user, 'chooseProvince') ? user.prov : state.province, true) : Promise.resolve();
+    reload.then(() => {
+      if (pending && user) { const r = state.rows.find(x => x.hsId === pending); if (r) openVerify(r); }
+    });
+    if (!user && !$('adminView').hidden) switchView('work');
   }
 
   async function logout() {
@@ -120,14 +150,55 @@
   }
 
   function counter() {
-    if (!HSApi.configured()) return;
+    const el = $('visitCounter');
+    if (!HSApi.configured()) { el.textContent = 'สถิติผู้เข้าชมจะแสดงเมื่อเชื่อมฐานข้อมูลแล้ว'; return; }
+    el.textContent = 'กำลังอ่านสถิติการใช้งาน…';
     let seen = false; try { seen = sessionStorage.getItem('hsverify.v3.hit') === '1'; sessionStorage.setItem('hsverify.v3.hit', '1'); } catch (_) {}
     HSApi.get(seen ? 'counter' : 'hit').then(d => {
-      $('visitCounter').textContent = 'ผู้เข้าชมวันนี้ ' + d.counter.today.toLocaleString('th-TH') + ' · ทั้งหมด ' + d.counter.total.toLocaleString('th-TH');
-    }).catch(() => {});
+      const c = d.counter;
+      el.textContent = 'ผู้เข้าชมวันนี้ ' + c.today.toLocaleString('th-TH') + ' · ทั้งหมด ' + c.total.toLocaleString('th-TH') + (c.staffToday != null ? ' · เจ้าหน้าที่ใช้งานวันนี้ ' + c.staffToday.toLocaleString('th-TH') + ' คน' : '');
+    }).catch(() => { el.textContent = 'อ่านสถิติการใช้งานไม่สำเร็จ'; });
   }
 
-  /* ---------------------------------------------------------------- จังหวัดและข้อมูล HS */
+  /* ================================================================ แถบงานภาคสนาม */
+  function renderFieldBar() {
+    const bar = $('fieldBar'), user = HSApi.user();
+    if (!HSApi.configured()) { bar.hidden = true; return; }
+    bar.hidden = false;
+    if (!user) {
+      bar.className = 'field-bar guest';
+      bar.innerHTML = '<div><strong>เจ้าหน้าที่ภาคสนาม</strong><span>ลงทะเบียนด้วยเบอร์โทรครั้งเดียว แล้วบันทึกผลตรวจจุดความร้อนได้ทันที</span></div>' +
+        '<div class="field-bar-actions"><button type="button" class="primary-button" data-fb="register">ลงทะเบียน Admin</button><button type="button" class="secondary-button" data-fb="login">เข้าสู่ระบบ</button></div>';
+      return;
+    }
+    const canRecord = C.can(user, 'record', { province: state.province });
+    const t = C.tally(state.rows);
+    const prov = user.prov && user.prov !== '*' ? 'จังหวัด' + (C.PROVINCES[user.prov] || '') : 'ทุกจังหวัด';
+    bar.className = 'field-bar staff';
+    bar.innerHTML = '<div><strong>' + esc(user.name) + '</strong><span>' + esc(C.ROLE_LABELS[user.role]) + ' · ' + esc(prov) + (state.province ? ' · รอตรวจ ' + t.pending.toLocaleString('th-TH') + ' · ร่าง ' + t.draft.toLocaleString('th-TH') + ' · ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') : '') + '</span></div>' +
+      '<div class="field-bar-actions">' + (canRecord && state.province ? '<button type="button" class="primary-button" data-fb="near">⌖ จุดรอตรวจใกล้ฉัน</button><button type="button" class="secondary-button" data-fb="pending">รายการรอตรวจ</button>' : '') +
+      (state.near ? '<button type="button" class="secondary-button" data-fb="clearnear">เลิกเรียงตามระยะ</button>' : '') + '</div>';
+  }
+
+  function fieldBarAction(e) {
+    const b = e.target.closest('[data-fb]');
+    if (!b) return;
+    const a = b.dataset.fb;
+    if (a === 'register' || a === 'login') return HSAdmin.openAccess(a === 'register' ? 'register' : 'phone');
+    if (a === 'pending') { $('statusFilter').value = 'pending'; state.near = null; applyFilters(); setLayout('list'); scrollToResults(); }
+    if (a === 'clearnear') { state.near = null; clearMe(); applyFilters(); renderFieldBar(); }
+    if (a === 'near') {
+      b.disabled = true; b.textContent = 'กำลังหาตำแหน่ง…';
+      getPosition().then(p => {
+        state.near = { lat: p.latitude, lng: p.longitude, accuracy: p.accuracy };
+        $('statusFilter').value = 'pending';
+        showMe(); applyFilters(); setLayout('list'); scrollToResults(); renderFieldBar();
+      }).catch(err => { toast(err.message, true); renderFieldBar(); });
+    }
+  }
+  function scrollToResults() { document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+  /* ================================================================ จังหวัดและข้อมูล HS */
   async function loadProvinces() {
     const sel = $('provinceSelect');
     try {
@@ -156,7 +227,7 @@
     if (user && !C.can(user, 'chooseProvince') && code !== user.prov) code = user.prov;
     $('provinceSelect').value = code || '';
     if (!code) { state.province = ''; state.rows = []; updateBrand(); renderAll(); return; }
-    if (code !== state.province) { resetFilterControls(); state.fitPending = true; }
+    if (code !== state.province) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); }
     state.province = code;
     try { localStorage.setItem(LAST_PROVINCE, code); } catch (_) {}
     updateBrand();
@@ -165,27 +236,30 @@
     try {
       if (HSApi.configured()) {
         state.rows = C.fromApi(await HSApi.get('hotspots', { province: code }));
-        state.source = 'ฐานข้อมูลระบบตรวจสอบ + HS_' + code + ' จาก Agri-Risk Map';
+        state.source = 'ฐานข้อมูลผลตรวจ + จุด HS_' + code + ' จากระบบ Agri-Risk Map';
       } else {
         const res = await HSSheetSource.load(cfg.sourceSheetUrl, code, C.PROVINCES);
         state.rows = C.fromSheetSource(res.rows);
         state.source = 'Google Sheet ต้นทาง แท็บ HS_' + code + ' (อ่านอย่างเดียว)';
       }
       if (state.province !== code) return;
+      const keepPeriod = force === true && $('startMonth').value;
+      const period = [$('startMonth').value, $('endMonth').value];
       buildPeriodOptions();
-      if (force !== true || !$('startMonth').value) setDefaultPeriod();
+      if (keepPeriod) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; }
+      if (!$('startMonth').value) setDefaultPeriod();
       fillLocationFilters();
       fillCropFilter();
       loadBoundaries(code);
       applyFilters();
       const p = state.provinces.find(x => x.code === code);
-      $('provinceCoverage').textContent = 'จังหวัด' + C.PROVINCES[code] + ' · ' + state.rows.length.toLocaleString('th-TH') + ' จุด' + (p && p.firstDate ? ' · ข้อมูล ' + C.thaiDate(p.firstDate) + ' – ' + C.thaiDate(p.lastDate) : '');
+      $('provinceCoverage').textContent = state.rows.length.toLocaleString('th-TH') + ' จุด' + (p && p.firstDate ? ' · ข้อมูล ' + C.thaiDate(p.firstDate) + ' – ' + C.thaiDate(p.lastDate) : '');
       $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source;
     } catch (err) {
       state.rows = [];
       showError('อ่านจุดความร้อนของจังหวัด' + C.PROVINCES[code] + ' ไม่สำเร็จ: ' + err.message);
       renderAll();
-    } finally { setLoading(false); }
+    } finally { setLoading(false); renderFieldBar(); }
   }
 
   function updateBrand() {
@@ -195,18 +269,18 @@
     $('provinceLogoFallback').hidden = Boolean(logo);
     if (logo) { $('provinceLogo').src = logo.path; $('provinceLogo').alt = 'ตราประจำจังหวัด' + C.PROVINCES[code]; }
     $('areaSubtitle').textContent = code ? 'พื้นที่การเกษตรในจังหวัด' + C.PROVINCES[code] : 'พื้นที่การเกษตรของประเทศไทย';
+    $('resultsTitle').textContent = code ? 'จุดความร้อน จังหวัด' + C.PROVINCES[code] : 'จุดความร้อน';
   }
 
-  function setLoading(on) { $('refreshDataButton').disabled = on; $('refreshDataButton').textContent = on ? 'กำลังอ่านข้อมูล…' : '↻ อัปเดตข้อมูล'; }
+  function setLoading(on) { $('refreshDataButton').disabled = on; $('refreshDataButton').textContent = on ? 'กำลังอ่าน…' : '↻ อัปเดตข้อมูล'; }
   function showError(msg) { $('liveError').hidden = false; $('liveError').textContent = msg; }
 
-  /* ---------------------------------------------------------------- ตัวกรอง */
+  /* ================================================================ ตัวกรอง */
   function buildPeriodOptions() {
-    const months = C.monthsBetween(state.rows);
-    const opts = months.map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('');
+    const groups = C.fiscalGroups(C.monthsBetween(state.rows));
+    const opts = groups.map(g => '<optgroup label="ปีงบประมาณ ' + g.year + '">' + g.months.map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('') + '</optgroup>').join('');
     $('startMonth').innerHTML = opts; $('endMonth').innerHTML = opts;
-    const years = Array.from(new Set(state.rows.map(r => C.fiscalYear(r.date)).filter(Boolean))).sort((a, b) => b - a);
-    $('summaryYear').innerHTML = '<option value="">ตามช่วงเวลาที่เลือก</option>' + years.map(y => '<option value="' + y + '">ปีงบประมาณ ' + y + ' (ต.ค. ' + (y - 1) + ' – ก.ย. ' + y + ')</option>').join('');
+    $('summaryYear').innerHTML = '<option value="">ตามช่วงเวลาที่เลือก</option>' + groups.map(g => '<option value="' + g.year + '">ปีงบประมาณ ' + g.year + ' (ต.ค. ' + (g.year - 1) + ' – ก.ย. ' + g.year + ')</option>').join('');
   }
   function pickMonth(target, edge) {
     const months = C.monthsBetween(state.rows);
@@ -234,9 +308,9 @@
     const inPeriod = r => (!f.start || C.monthKey(r.date) >= f.start) && (!f.end || C.monthKey(r.date) <= f.end);
     fillSelect('districtFilter', C.distinct(state.rows, 'district', inPeriod), 'ทุกอำเภอ');
     const d = $('districtFilter').value;
-    fillSelect('tambonFilter', d ? C.distinct(state.rows, 'tambon', r => inPeriod(r) && r.district === d) : [], 'ทุกตำบล');
+    fillSelect('tambonFilter', d ? C.distinct(state.rows, 'tambon', r => inPeriod(r) && r.district === d) : [], d ? 'ทุกตำบล' : 'เลือกอำเภอก่อน');
     const t = $('tambonFilter').value;
-    fillSelect('villageFilter', t ? C.distinct(state.rows, 'village', r => inPeriod(r) && r.district === d && r.tambon === t) : [], 'ทุกหมู่บ้าน');
+    fillSelect('villageFilter', t ? C.distinct(state.rows, 'village', r => inPeriod(r) && r.district === d && r.tambon === t) : [], t ? 'ทุกหมู่บ้าน' : 'เลือกตำบลก่อน');
     $('tambonFilter').disabled = !d; $('villageFilter').disabled = !t;
   }
   function fillCropFilter() { fillSelect('cropFilter', C.distinct(state.rows, 'plantType'), 'ทุกประเภท'); }
@@ -244,22 +318,39 @@
     ['districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'searchFilter'].forEach(id => { $(id).value = ''; });
   }
   function resetFilters() {
-    resetFilterControls(); setDefaultPeriod(); fillLocationFilters(); state.fitPending = true; applyFilters();
+    resetFilterControls(); setDefaultPeriod(); fillLocationFilters(); state.fitPending = true; state.near = null; clearMe(); applyFilters(); drawBoundaries(); renderFieldBar();
   }
   function applyFilters() {
-    state.filtered = C.applyFilters(state.rows, filters()).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+    let rows = C.applyFilters(state.rows, filters());
+    rows = state.near ? C.byDistance(rows, state.near.lat, state.near.lng) : rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+    state.filtered = rows;
     state.visible = PAGE;
     const f = filters();
-    $('periodHint').textContent = f.start ? 'แสดงจุดตั้งแต่ ' + C.monthLabel(f.start) + ' ถึง ' + C.monthLabel(f.end) + ' (ปีงบประมาณเริ่ม ต.ค.)' : '';
+    $('periodHint').textContent = f.start ? 'แสดงจุดตั้งแต่ ' + C.monthLabel(f.start) + ' ถึง ' + C.monthLabel(f.end) + ' · ปีงบประมาณเริ่มเดือนตุลาคม' : '';
+    $('sortHint').hidden = !state.near;
+    if (state.near) $('sortHint').textContent = 'เรียงจากจุดที่ใกล้ตำแหน่งของท่านที่สุด (ระยะเส้นตรง)';
+    renderChips();
     renderAll();
   }
+  function renderChips() {
+    const f = filters(), chips = [];
+    if (f.start) chips.push(C.monthLabel(f.start) + '–' + C.monthLabel(f.end));
+    if (f.district) chips.push('อ.' + f.district);
+    if (f.tambon) chips.push('ต.' + f.tambon);
+    if (f.village) chips.push(f.village);
+    if (f.crop) chips.push(f.crop);
+    if (f.status) chips.push(C.STATUS_LABELS[f.status]);
+    if (f.result) chips.push(C.RESULT_LABELS[f.result]);
+    if (f.search) chips.push('“' + f.search + '”');
+    $('filterChips').innerHTML = chips.map(c => '<span>' + esc(c) + '</span>').join('');
+  }
 
-  /* ---------------------------------------------------------------- แสดงผล */
+  /* ================================================================ แสดงผล */
   function renderAll() {
     $('resultCount').textContent = state.filtered.length.toLocaleString('th-TH');
     const t = C.tally(state.filtered);
     $('selectedCount').textContent = state.filtered.length ? '· ตรวจแล้ว ' + t.verified.toLocaleString('th-TH') + ' · รอตรวจ ' + t.pending.toLocaleString('th-TH') : '';
-    renderList(); renderMarkers(); renderSummary();
+    renderList(); renderMarkers(); renderSummary(); renderFieldBar();
   }
 
   function renderList() {
@@ -267,29 +358,48 @@
     const items = state.filtered.slice(0, state.visible);
     if (!state.province) list.innerHTML = '<div class="empty-state">กรุณาเลือกจังหวัดก่อนแสดงจุดความร้อน</div>';
     else if (!items.length) list.innerHTML = '<div class="empty-state"><strong>ไม่พบจุดที่ตรงกับตัวกรอง</strong><br>ลองล้างหรือเปลี่ยนตัวกรอง</div>';
-    else list.innerHTML = items.map(card).join('');
+    else {
+      const user = HSApi.user(), canRecord = C.can(user, 'record', { province: state.province });
+      list.innerHTML = items.map(r => card(r, canRecord)).join('');
+    }
     $('loadMore').hidden = state.visible >= state.filtered.length;
     if (!$('loadMore').hidden) $('loadMore').textContent = 'แสดงเพิ่ม (เหลือ ' + (state.filtered.length - state.visible).toLocaleString('th-TH') + ')';
   }
   const statusText = r => r.result ? C.RESULT_LABELS[r.result] + (r.status === 'draft' ? ' (ร่าง)' : '') : C.STATUS_LABELS[r.status] || 'รอตรวจ';
   const statusClass = r => r.status === 'verified' && r.result ? r.result : r.status;
   const areaLabel = r => [r.village, r.tambon, r.district].filter(Boolean).join(' · ') || 'ไม่ระบุพื้นที่';
-  function card(r) {
-    return '<button type="button" class="hotspot-card" data-hs-id="' + esc(r.hsId) + '"><div class="row"><span class="hotspot-id">' + esc(r.hsId) + '</span><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div><h3>' + esc(areaLabel(r)) + '</h3><p>' + esc(r.plantType) + ' · ' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + (r.photoCount ? ' · ภาพ ' + r.photoCount : '') + '</p></button>';
+  function card(r, canRecord) {
+    const action = canRecord ? (r.status === 'pending' ? 'บันทึกผล' : 'ดู / แก้ไขผล') : 'ดูรายละเอียด';
+    return '<article class="hotspot-card' + (canRecord && r.status === 'pending' ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '">' +
+      '<div class="row"><span class="hotspot-id">' + esc(r.hsId) + '</span><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div>' +
+      '<h3>' + esc(areaLabel(r)) + '</h3><p>' + esc(r.plantType) + ' · ' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + (r.photoCount ? ' · ภาพ ' + r.photoCount : '') + '</p>' +
+      '<div class="card-actions">' + (r.distance != null ? '<span class="distance">⌖ ' + esc(C.formatDistance(r.distance)) + '</span>' : '') +
+      '<button type="button" class="text-button" data-show-map aria-label="แสดงจุด ' + esc(r.hsId) + ' บนแผนที่">แผนที่</button>' +
+      '<button type="button" class="' + (canRecord && r.status === 'pending' ? 'primary-button' : 'secondary-button') + ' compact">' + action + ' ›</button></div></article>';
   }
   const markerColor = r => r.status === 'draft' ? C.COLORS.draft : r.status === 'verified' ? (C.COLORS[r.result] || C.COLORS.not_found) : C.COLORS.pending;
 
   function renderMarkers() {
     if (!state.map) return;
     state.markers.clearLayers();
+    state.markerById = {};
     const bounds = [];
     state.filtered.forEach(r => {
-      const m = L.circleMarker([r.lat, r.lng], { radius: 7, weight: 2, color: '#fff', fillColor: markerColor(r), fillOpacity: .95 });
+      const m = L.circleMarker([r.lat, r.lng], { radius: 8, weight: 2, color: '#fff', fillColor: markerColor(r), fillOpacity: .95 });
       m.bindTooltip('<strong>' + esc(r.hsId) + '</strong><br>' + esc(areaLabel(r)) + '<br>' + esc(statusText(r)));
       m.on('click', () => openVerify(r));
       m.addTo(state.markers); bounds.push([r.lat, r.lng]);
+      state.markerById[r.hsId] = m;
     });
     if (state.fitPending && bounds.length) { state.map.fitBounds(bounds, { padding: [25, 25], maxZoom: 14 }); state.fitPending = false; }
+  }
+  function showOnMap(r) {
+    if (!state.map || !r) return;
+    setLayout('map');
+    document.querySelector('.map-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    state.map.setView([r.lat, r.lng], 15);
+    const m = state.markerById && state.markerById[r.hsId];
+    if (m) m.openTooltip();
   }
 
   function summaryRows() {
@@ -305,7 +415,7 @@
     $('summaryStats').innerHTML = stat(t.total, 'จุดความร้อนทั้งหมด', '#174f38') + stat(t.verified, 'ตรวจแล้ว (' + t.progress + '%)', '#18845d') + stat(t.burned, 'พบการเผา', C.COLORS.burned) + stat(t.not_burned, 'ไม่พบการเผา', C.COLORS.not_burned) + stat(t.followup, 'ต้องติดตาม / ตรวจซ้ำ', C.COLORS.needs_review) + stat(t.pending + t.draft, 'รอตรวจ / งานร่าง', C.COLORS.pending);
     $('summaryScopeHint').textContent = 'จังหวัด' + C.PROVINCES[state.province] + (f.district ? ' › อำเภอ' + f.district : '') + (f.tambon ? ' › ตำบล' + f.tambon : '') + (f.start ? ' · ' + C.monthLabel(f.start) + ' – ' + C.monthLabel(f.end) : '');
     const groups = C.groupSummary(rows, $('summaryLevel').value);
-    $('summaryBody').innerHTML = groups.length ? groups.map(g => '<tr><td>' + esc(g.area) + '</td><td>' + g.total + '</td><td>' + g.verified + '</td><td>' + g.burned + '</td><td>' + g.not_burned + '</td><td>' + g.draft + '</td><td><div class="progress" role="img" aria-label="' + g.progress + '%"><i style="width:' + g.progress + '%"></i></div><small>' + g.progress + '%</small></td></tr>').join('') : '<tr><td colspan="7" class="muted">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
+    $('summaryBody').innerHTML = groups.length ? groups.map(g => '<tr><td data-label="พื้นที่">' + esc(g.area) + '</td><td data-label="ทั้งหมด">' + g.total + '</td><td data-label="ตรวจแล้ว">' + g.verified + '</td><td data-label="พบการเผา">' + g.burned + '</td><td data-label="ไม่พบการเผา">' + g.not_burned + '</td><td data-label="งานร่าง">' + g.draft + '</td><td data-label="ความคืบหน้า"><div class="progress" role="img" aria-label="' + g.progress + '%"><i style="width:' + g.progress + '%"></i></div><small>' + g.progress + '%</small></td></tr>').join('') : '<tr><td colspan="7" class="muted">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
   }
 
   function exportSummary() {
@@ -317,7 +427,7 @@
   }
 
   function printReport() {
-    const rows = summaryRows(), t = C.tally(rows), f = filters();
+    const rows = summaryRows(), t = C.tally(rows);
     const groups = C.groupSummary(rows, $('summaryLevel').value);
     const burned = rows.filter(r => r.status === 'verified' && r.result === 'burned').slice(0, 300);
     const logo = globalThis.HS_PROVINCE_LOGOS && HS_PROVINCE_LOGOS[state.province];
@@ -329,30 +439,40 @@
       '<table><thead><tr><th>พื้นที่</th><th>ทั้งหมด</th><th>ตรวจแล้ว</th><th>พบการเผา</th><th>ไม่พบการเผา</th><th>งานร่าง</th><th>ความคืบหน้า</th></tr></thead><tbody>' +
       groups.map(g => '<tr><td>' + esc(g.area) + '</td><td>' + g.total + '</td><td>' + g.verified + '</td><td>' + g.burned + '</td><td>' + g.not_burned + '</td><td>' + g.draft + '</td><td>' + g.progress + '%</td></tr>').join('') + '</tbody></table>' +
       (burned.length ? '<h2 style="font-size:14px;margin-top:14px">จุดที่ยืนยันพบการเผา</h2><table><thead><tr><th>HS</th><th>วันที่</th><th>อำเภอ</th><th>ตำบล</th><th>หมู่บ้าน</th><th>พืช</th><th>วันที่ตรวจ</th></tr></thead><tbody>' + burned.map(r => '<tr><td>' + esc(r.hsId) + '</td><td>' + esc(C.thaiDate(r.date)) + '</td><td>' + esc(r.district) + '</td><td>' + esc(r.tambon) + '</td><td>' + esc(r.village) + '</td><td>' + esc(r.plantType) + '</td><td>' + esc(C.thaiDate(r.inspectedDate)) + '</td></tr>').join('') + '</tbody></table>' : '') +
-      '<footer>พิมพ์เมื่อ ' + esc(new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })) + ' · แหล่ง HS: ฐานข้อมูล Agri-Risk Map Burning · ระบบตรวจสอบจุดความร้อน v3.0</footer><script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>';
+      '<footer>พิมพ์เมื่อ ' + esc(new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })) + ' · แหล่ง HS: ฐานข้อมูล Agri-Risk Map Burning · ระบบตรวจสอบจุดความร้อน v3</footer><script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>';
     const w = window.open('', '_blank');
     if (!w) return toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต pop-up', true);
     w.document.open(); w.document.write(html); w.document.close();
   }
 
   function switchView(name) {
+    toggleMenu(false);
     if (name === 'admin' && !HSApi.user()) return HSAdmin.openAccess('phone');
     document.querySelectorAll('.view').forEach(v => { const on = v.id === name + 'View'; v.classList.toggle('active', on); v.hidden = !on; });
     document.querySelectorAll('.nav-item[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
     $('provinceGate').hidden = name === 'admin';
-    $('mainNav').classList.remove('open'); $('menuButton').setAttribute('aria-expanded', 'false');
+    $('backToMap').hidden = true;
     if (name === 'summary') renderSummary();
     if (name === 'admin') HSAdmin.render();
     if (name === 'work' && state.map) setTimeout(() => state.map.invalidateSize(), 30);
+    window.scrollTo({ top: 0 });
   }
   function setLayout(layout) {
     document.querySelectorAll('[data-layout]').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
     document.querySelector('.map-wrap').hidden = layout === 'list';
-    $('mapLayout').style.gridTemplateColumns = layout === 'list' ? '1fr' : '';
+    $('mapLayout').classList.toggle('list-only', layout === 'list');
     if (layout === 'map' && state.map) setTimeout(() => state.map.invalidateSize(), 30);
   }
+  function watchBackToMap() {
+    if (!('IntersectionObserver' in window)) return;
+    const panel = document.querySelector('.result-panel'), toolbar = document.querySelector('.result-toolbar');
+    let panelVisible = false, toolbarVisible = true;
+    const update = () => { $('backToMap').hidden = !(mobile() && panelVisible && !toolbarVisible && !$('workView').hidden); };
+    new IntersectionObserver(e => { panelVisible = e[0].isIntersecting; update(); }).observe(panel);
+    new IntersectionObserver(e => { toolbarVisible = e[0].isIntersecting; update(); }).observe(toolbar);
+  }
 
-  /* ---------------------------------------------------------------- แผนที่และขอบเขต */
+  /* ================================================================ แผนที่และขอบเขต */
   function initMap() {
     if (!window.L) { $('mapFallback').hidden = false; return; }
     try {
@@ -360,9 +480,24 @@
       const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(state.map);
       const satellite = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' });
       const terrain = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' });
-      L.control.layers({ 'ถนน': streets, 'ดาวเทียม': satellite, 'ภูมิประเทศ': terrain }, {}, { collapsed: true }).addTo(state.map);
       state.boundaryLayer = L.layerGroup().addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
+      state.meLayer = L.layerGroup().addTo(state.map);
+      L.control.layers({ 'ถนน': streets, 'ดาวเทียม': satellite, 'ภูมิประเทศ': terrain }, {}, { collapsed: true }).addTo(state.map);
+      const Tools = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd() {
+          const div = L.DomUtil.create('div', 'map-tools leaflet-bar');
+          div.innerHTML = '<label><input type="checkbox" id="boundaryDistrictOn" checked>อำเภอ</label><label><input type="checkbox" id="boundarySubdistrictOn">ตำบล</label><button type="button" id="boundaryFit" title="ดูเต็มจังหวัด" aria-label="ดูเต็มจังหวัด">⤢<span class="t"> เต็มจังหวัด</span></button><button type="button" id="mapLocate" title="ตำแหน่งของฉัน" aria-label="ตำแหน่งของฉัน">⌖<span class="t"> ตำแหน่งฉัน</span></button>';
+          L.DomEvent.disableClickPropagation(div);
+          return div;
+        }
+      });
+      new Tools().addTo(state.map);
+      $('boundaryDistrictOn').addEventListener('change', drawBoundaries);
+      $('boundarySubdistrictOn').addEventListener('change', drawBoundaries);
+      $('boundaryFit').addEventListener('click', fitProvince);
+      $('mapLocate').addEventListener('click', () => getPosition().then(p => { state.near = state.near || null; showMe(p); state.map.setView([p.latitude, p.longitude], 14); }).catch(err => toast(err.message, true)));
     } catch (err) { $('mapFallback').hidden = false; state.map = null; }
   }
 
@@ -381,15 +516,34 @@
     const b = state.boundary, f = filters();
     const style = (color, weight, dash) => ({ color, weight, fill: false, dashArray: dash, interactive: false });
     if (b.province) L.geoJSON(b.province, { style: style('#174f38', 2.5) }).addTo(state.boundaryLayer);
-    if (b.district && $('boundaryDistrictOn').checked) L.geoJSON(b.district, { style: f2 => style('#75530c', f2.properties.nameTH === f.district ? 3 : 1.4) }).bindTooltip(l => 'อ.' + l.feature.properties.nameTH, { sticky: true }).addTo(state.boundaryLayer);
-    if (b.subdistrict && $('boundarySubdistrictOn').checked) L.geoJSON(b.subdistrict, { style: style('#6f57a1', 1, '3 3') }).addTo(state.boundaryLayer);
+    if (b.district && $('boundaryDistrictOn').checked) L.geoJSON(b.district, { style: ft => style('#75530c', ft.properties.nameTH === f.district ? 3.5 : 1.4) }).addTo(state.boundaryLayer);
+    if (b.subdistrict && $('boundarySubdistrictOn').checked) L.geoJSON(b.subdistrict, { style: ft => style('#6f57a1', ft.properties.nameTH === f.tambon ? 3 : 1, ft.properties.nameTH === f.tambon ? '' : '3 3') }).addTo(state.boundaryLayer);
   }
   function fitProvince() {
     const b = state.boundary;
     if (state.map && b.province) state.map.fitBounds(L.geoJSON(b.province).getBounds(), { padding: [10, 10] });
   }
+  function showMe(p) {
+    if (!state.map) return;
+    const pos = p || (state.near && { latitude: state.near.lat, longitude: state.near.lng, accuracy: state.near.accuracy });
+    if (!pos) return;
+    state.meLayer.clearLayers();
+    if (pos.accuracy) L.circle([pos.latitude, pos.longitude], { radius: pos.accuracy, color: '#1d5f8f', weight: 1, fillOpacity: .08, interactive: false }).addTo(state.meLayer);
+    L.circleMarker([pos.latitude, pos.longitude], { radius: 8, color: '#fff', weight: 3, fillColor: '#1d6fd1', fillOpacity: 1 }).bindTooltip('ตำแหน่งของฉัน').addTo(state.meLayer);
+  }
+  function clearMe() { if (state.meLayer) state.meLayer.clearLayers(); }
 
-  /* ---------------------------------------------------------------- ฟอร์มบันทึกผล */
+  function getPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('อุปกรณ์ไม่รองรับการระบุตำแหน่ง'));
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: Math.round(p.coords.accuracy) }),
+        err => reject(new Error(err.code === 1 ? 'ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง — เปิดสิทธิ์ตำแหน่งให้เบราว์เซอร์ หรือเลือก “บันทึกโดยไม่มี GPS”' : 'หาตำแหน่งไม่สำเร็จ ลองอีกครั้งในที่โล่ง')),
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+    });
+  }
+
+  /* ================================================================ ฟอร์มบันทึกผล */
   function fillPersonCategories() {
     $('personCategory').innerHTML = '<option value="">เลือกประเภทบุคคล</option>' + C.PERSON_CATEGORIES.map(c => '<option>' + esc(c) + '</option>').join('');
   }
@@ -400,7 +554,24 @@
     state.photos = []; state.location = null; state.record = null; state.existingPhotos = [];
     $('personOtherWrap').hidden = true; $('noGpsReasonWrap').hidden = true; $('fireStateWrap').hidden = true; $('observedFields').hidden = true;
     $('verifyMessage').textContent = ''; $('recordInfo').textContent = ''; $('noteCount').textContent = '0/500';
+    try { const last = localStorage.getItem(LAST_PERSON); if (last && C.PERSON_CATEGORIES.includes(last)) $('personCategory').value = last; } catch (_) {}
     $('existingPhotos').innerHTML = ''; renderPhotos(); renderLocation();
+  }
+
+  function setMode(mode, text) {
+    // mode: edit | readonly | gate
+    $('verifyGate').hidden = mode !== 'gate';
+    $('verifyGateText').textContent = text || '';
+    $('verifyFields').hidden = mode === 'gate';
+    $('verifyFields').disabled = mode !== 'edit';
+    $('verifyActions').hidden = mode !== 'edit';
+    $('locateButton').hidden = mode !== 'edit';
+  }
+
+  function gate(which) {
+    state.pendingHs = state.selected && state.selected.hsId;
+    closeVerify(true);
+    HSAdmin.openAccess(which);
   }
 
   async function openVerify(r) {
@@ -408,44 +579,49 @@
     resetForm();
     state.selected = r;
     $('verifyTitle').textContent = 'จุด HS ' + r.hsId;
-    $('selectedMeta').innerHTML = '<div class="meta-grid"><span><small>วันที่ตรวจพบ</small><strong>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</strong></span><span><small>พืช/พื้นที่</small><strong>' + esc(r.plantType) + '</strong></span><span class="meta-wide"><small>ที่ตั้ง</small><strong>' + esc(areaLabel(r)) + ' จ.' + esc(C.PROVINCES[r.provinceCode] || '') + '</strong></span><span><small>พิกัด</small><strong>' + r.lat.toFixed(5) + ', ' + r.lng.toFixed(5) + '</strong></span><span><small>สถานะ</small><strong>' + esc(statusText(r)) + '</strong></span></div>';
+    $('selectedMeta').innerHTML = '<div class="meta-grid compact-meta"><span><small>วันที่ตรวจพบ</small><strong>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</strong></span><span><small>สถานะ</small><strong>' + esc(statusText(r)) + '</strong></span><span><small>พืช/พื้นที่</small><strong>' + esc(r.plantType) + '</strong></span><span><small>พิกัด</small><strong>' + r.lat.toFixed(5) + ', ' + r.lng.toFixed(5) + '</strong></span><span class="meta-wide"><small>ที่ตั้ง</small><strong>' + esc(areaLabel(r)) + ' จ.' + esc(C.PROVINCES[r.provinceCode] || '') + '</strong></span></div>';
     $('navigateLink').href = 'https://www.google.com/maps/dir/?api=1&destination=' + r.lat + ',' + r.lng;
     const user = HSApi.user();
     const allowed = C.can(user, 'record', { province: r.provinceCode });
-    setFormEnabled(false);
     $('deleteVerificationButton').hidden = true;
-    const hint = $('verifyLoginHint');
-    hint.hidden = allowed;
-    hint.textContent = !HSApi.configured() ? 'ยังไม่ได้เชื่อม API ฐานข้อมูลผลตรวจ จึงดูข้อมูลได้อย่างเดียว' : !user ? 'เข้าสู่ระบบ (Admin / Mini Super Admin) เพื่อบันทึกผลการตรวจสอบ' : 'บัญชีของท่านบันทึกผลได้เฉพาะจังหวัด' + (C.PROVINCES[user.prov] || '');
+    if (!HSApi.configured()) setMode('gate', 'ระบบยังไม่ได้เชื่อมฐานข้อมูลผลตรวจ จึงดูข้อมูลจุดได้อย่างเดียว');
+    else if (!user) setMode('gate', 'บันทึกผลการตรวจต้องเข้าสู่ระบบด้วยเบอร์โทร — ยังไม่มีบัญชี ลงทะเบียน Admin แล้วใช้งานได้ทันที ระบบจะเปิดจุดนี้ให้อัตโนมัติ');
+    else if (!allowed) setMode('gate', 'บัญชีของท่านบันทึกผลได้เฉพาะจังหวัด' + (C.PROVINCES[user.prov] || ''));
+    else setMode('edit');
+    $('gateLogin').hidden = $('gateRegister').hidden = Boolean(user) || !HSApi.configured();
     $('verifyDialog').showModal();
-    if (!allowed) return;
-    $('recordInfo').textContent = 'กำลังอ่านผลตรวจเดิม…';
+    $('verifyDialog').querySelector('form').scrollTop = 0;
+    if (!allowed || !HSApi.configured()) return;
+    autoLocate();
+    if (r.status === 'pending') $('recordInfo').textContent = 'ยังไม่มีผลตรวจของจุดนี้ — กรอกผลแล้วกด “ตรวจทานและยืนยัน”';
+    else $('recordInfo').textContent = 'กำลังอ่านผลตรวจเดิม…';
     try {
       const data = await HSApi.post('verification_get', { province: r.provinceCode, hotspotId: r.hsId });
       if (state.selected !== r) return;
       state.record = data.verification;
       state.existingPhotos = data.photos || [];
-      fillForm(state.record);
+      if (state.record) {
+        fillForm(state.record);
+        const editable = state.record.canEdit;
+        setMode(editable ? 'edit' : 'readonly');
+        $('deleteVerificationButton').hidden = !state.record.canDelete;
+        $('recordInfo').textContent = 'บันทึกโดย ' + state.record.recordedByName + ' (' + (C.ROLE_LABELS[state.record.recordedByRole] || '') + ') ' + C.thaiDateTime(state.record.createdAt) + (state.record.updatedByName ? ' · แก้ไขล่าสุด ' + state.record.updatedByName + ' ' + C.thaiDateTime(state.record.updatedAt) : '') + (editable ? '' : ' · ดูได้อย่างเดียว: ผู้บันทึกเดิมหรือผู้ดูแลจังหวัดเท่านั้นที่แก้ไขได้');
+      } else $('recordInfo').textContent = 'ยังไม่มีผลตรวจของจุดนี้ — กรอกผลแล้วกด “ตรวจทานและยืนยัน”';
       renderExistingPhotos();
-      const editable = !state.record || state.record.canEdit;
-      setFormEnabled(editable);
-      $('deleteVerificationButton').hidden = !(state.record && state.record.canDelete);
-      $('recordInfo').textContent = state.record
-        ? 'บันทึกโดย ' + state.record.recordedByName + ' (' + (C.ROLE_LABELS[state.record.recordedByRole] || '') + ') เมื่อ ' + C.thaiDateTime(state.record.createdAt) + (state.record.updatedByName ? ' · แก้ไขล่าสุดโดย ' + state.record.updatedByName + ' ' + C.thaiDateTime(state.record.updatedAt) : '') + (editable ? '' : ' · ท่านดูได้อย่างเดียว ผู้บันทึกเดิมหรือผู้ดูแลจังหวัดเท่านั้นที่แก้ไขได้')
-        : 'ยังไม่มีผลตรวจของจุดนี้';
     } catch (err) {
-      $('recordInfo').textContent = 'อ่านผลตรวจเดิมไม่สำเร็จ: ' + err.message;
-      setFormEnabled(!err.network ? false : true);
+      $('recordInfo').textContent = err.network ? 'ออฟไลน์ — บันทึกได้ ระบบจะเก็บไว้ในเครื่องและส่งเมื่อมีสัญญาณ' : 'อ่านผลตรวจเดิมไม่สำเร็จ: ' + err.message;
     }
   }
 
-  function setFormEnabled(on) {
-    $('verifyFields').disabled = !on;
-    $('saveDraftButton').hidden = !on; $('reviewSubmitButton').hidden = !on; $('locateButton').hidden = !on;
+  async function autoLocate() {
+    try {
+      if (!navigator.permissions) return;
+      const p = await navigator.permissions.query({ name: 'geolocation' });
+      if (p.state === 'granted' && !state.location) locate(false);
+    } catch (_) {}
   }
 
   function fillForm(v) {
-    if (!v) return;
     const set = (id, val) => { $(id).value = val == null ? '' : val; };
     set('personCategory', v.personCategory); $('personOtherWrap').hidden = v.personCategory !== 'อื่นๆ'; set('personCategoryOther', v.personCategoryOther);
     if (v.fieldInspectorName && v.fieldInspectorName !== v.recordedByName) set('fieldInspectorName', v.fieldInspectorName);
@@ -453,29 +629,30 @@
     const radio = document.querySelector('input[name=outcome][value="' + v.result + '"]'); if (radio) radio.checked = true;
     $('fireStateWrap').hidden = v.result !== 'burned'; set('fireState', v.fireState || 'unknown');
     set('observedMatches', v.observedMatches); $('observedFields').hidden = v.observedMatches !== 'no'; set('observedLandType', v.observedLandType || 'พื้นที่เกษตร'); set('observedPlantType', v.observedPlantType);
-    if (v.obsLat !== '' && v.obsLat != null) { state.location = { latitude: Number(v.obsLat), longitude: Number(v.obsLng), accuracy: Number(v.gpsAccuracyM) || null, saved: true }; }
+    if (v.obsLat !== '' && v.obsLat != null) state.location = { latitude: Number(v.obsLat), longitude: Number(v.obsLng), accuracy: Number(v.gpsAccuracyM) || null, saved: true };
     else if (v.missingGpsReason) { $('noGps').checked = true; $('noGpsReasonWrap').hidden = false; set('noGpsReason', v.missingGpsReason); }
     set('photoMissingReason', v.photoMissingReason); set('noteInput', v.notes); set('actionInput', v.followUpAction);
     $('noteCount').textContent = String(v.notes || '').length + '/500';
     renderLocation();
   }
 
-  function locate() {
-    if (!navigator.geolocation) return toast('อุปกรณ์ไม่รองรับการระบุตำแหน่ง', true);
-    $('locateButton').disabled = true; $('locateButton').textContent = 'กำลังหาตำแหน่ง…';
-    navigator.geolocation.getCurrentPosition(p => {
-      state.location = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: Math.round(p.coords.accuracy) };
+  function locate(manual) {
+    const btn = $('locateButton');
+    btn.disabled = true; btn.textContent = 'กำลังหาตำแหน่ง…';
+    getPosition().then(p => {
+      state.location = p;
       $('noGps').checked = false; $('noGpsReasonWrap').hidden = true; $('noGpsReason').value = '';
-      renderLocation(); done();
-    }, err => { toast(err.code === 1 ? 'ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง — เลือก “บันทึกโดยไม่มี GPS” และระบุเหตุผล' : 'หาตำแหน่งไม่สำเร็จ ลองอีกครั้งในที่โล่ง', true); done(); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-    function done() { $('locateButton').disabled = false; $('locateButton').textContent = '⌖ ใช้ตำแหน่งของฉัน'; }
+      renderLocation();
+    }).catch(err => { if (manual) toast(err.message, true); })
+      .finally(() => { btn.disabled = false; btn.textContent = '⌖ ใช้ตำแหน่งของฉัน'; });
   }
   function renderLocation() {
     const l = state.location, r = state.selected;
     const panel = $('locationPanel');
-    if (!l) { panel.innerHTML = '<span class="location-icon">⌖</span><div><strong>ยังไม่ได้บันทึกตำแหน่ง</strong><small>กดใช้ตำแหน่งของฉันเมื่ออยู่หน้างาน</small></div>'; return; }
+    if (!l) { panel.className = 'location-panel'; panel.innerHTML = '<span class="location-icon">⌖</span><div><strong>ยังไม่ได้บันทึกตำแหน่ง</strong><small>กด “ใช้ตำแหน่งของฉัน” เมื่ออยู่หน้างาน</small></div>'; return; }
     const d = r ? C.distanceM(r.lat, r.lng, l.latitude, l.longitude) : null;
-    panel.innerHTML = '<span class="location-icon">✓</span><div><strong>' + l.latitude.toFixed(6) + ', ' + l.longitude.toFixed(6) + '</strong><small>' + (l.accuracy ? 'ความแม่นยำ ±' + l.accuracy + ' ม. · ' : '') + (d != null ? 'ห่างจุด HS ' + d.toLocaleString('th-TH') + ' ม.' : '') + (l.saved ? ' · ตำแหน่งที่บันทึกไว้' : '') + '</small></div>';
+    panel.className = 'location-panel ok';
+    panel.innerHTML = '<span class="location-icon">✓</span><div><strong>' + l.latitude.toFixed(6) + ', ' + l.longitude.toFixed(6) + '</strong><small>' + (l.accuracy ? 'ความแม่นยำ ±' + l.accuracy + ' ม. · ' : '') + (d != null ? 'ห่างจุด HS ' + C.formatDistance(d) : '') + (l.saved ? ' · ตำแหน่งที่บันทึกไว้' : '') + '</small></div>';
   }
 
   async function addPhotos(e) {
@@ -488,6 +665,7 @@
         if (file.type === 'image/jpeg' && globalThis.HSEvidence) { try { meta = HSEvidence.inspectBytes(new Uint8Array(await file.slice(0, 262144).arrayBuffer())); } catch (_) {} }
         const img = await HSImage.compress(file, meta);
         state.photos.push({ clientRequestId: C.uuid(), mimeType: img.mimeType, base64: img.base64, preview: img.preview, photoLat: meta && meta.latitude != null ? meta.latitude : '', photoLng: meta && meta.longitude != null ? meta.longitude : '', takenAt: meta && meta.capturedAt ? String(meta.capturedAt) : '' });
+        $('photoMissingReason').value = '';
       } catch (err) { toast(err.message, true); }
     }
     renderPhotos();
@@ -497,7 +675,7 @@
   }
   function renderExistingPhotos() {
     const canEdit = state.record && state.record.canEdit;
-    $('existingPhotos').innerHTML = state.existingPhotos.map(p => '<div class="photo-item" data-photo="' + esc(p.photoId) + '"><button type="button" class="photo-load" data-load="' + esc(p.photoId) + '" style="position:static;width:100%;height:100%;border-radius:0;background:#e9f5ed;color:#17633e;font-size:.85rem">ดูภาพ ' + esc(C.thaiDateTime(p.uploadedAt)) + '</button>' + (canEdit ? '<button type="button" data-delete-photo="' + esc(p.photoId) + '" aria-label="ลบภาพ">×</button>' : '') + '</div>').join('');
+    $('existingPhotos').innerHTML = state.existingPhotos.map(p => '<div class="photo-item" data-photo="' + esc(p.photoId) + '"><button type="button" class="photo-load" data-load="' + esc(p.photoId) + '">ดูภาพที่บันทึกไว้<br><small>' + esc(C.thaiDateTime(p.uploadedAt)) + '</small></button>' + (canEdit ? '<button type="button" data-delete-photo="' + esc(p.photoId) + '" aria-label="ลบภาพ">×</button>' : '') + '</div>').join('');
   }
   async function existingPhotoAction(e) {
     const load = e.target.closest('[data-load]'), del = e.target.closest('[data-delete-photo]');
@@ -525,37 +703,43 @@
       inspectedAt: $('inspectedAt').value ? $('inspectedAt').value + ':00' : '',
       obsLat: l ? Number(l.latitude.toFixed(6)) : '', obsLng: l ? Number(l.longitude.toFixed(6)) : '', gpsAccuracyM: l && l.accuracy ? l.accuracy : '',
       missingGpsReason: !l && $('noGps').checked ? $('noGpsReason').value : '',
-      photoMissingReason: $('photoMissingReason').value, plannedPhotos: state.photos.length,
+      photoMissingReason: state.photos.length ? '' : $('photoMissingReason').value, plannedPhotos: state.photos.length,
       notes: $('noteInput').value, followUpAction: $('actionInput').value
     };
   }
   function validate(p) {
-    if (p.status !== 'verified') return '';
-    if (!p.result) return 'กรุณาเลือกผลการตรวจ';
-    if (p.obsLat === '' && !p.missingGpsReason) return 'กรุณากด “ใช้ตำแหน่งของฉัน” หรือเลือกบันทึกโดยไม่มี GPS พร้อมเหตุผล';
-    if (!state.photos.length && !state.existingPhotos.length && !p.photoMissingReason) return 'กรุณาแนบภาพถ่าย หรือระบุเหตุผลที่ไม่มีภาพ';
-    if (p.personCategory === 'อื่นๆ' && !p.personCategoryOther.trim()) return 'กรุณาระบุประเภทบุคคลอื่น';
-    return '';
+    if (p.status !== 'verified') return null;
+    if (p.obsLat === '' && !p.missingGpsReason) return ['locationPanel', 'ขั้นที่ 1: กด “ใช้ตำแหน่งของฉัน” หรือเลือกบันทึกโดยไม่มี GPS พร้อมเหตุผล'];
+    if (!p.result) return ['verifyFields', 'ขั้นที่ 2: กรุณาเลือกผลการตรวจ'];
+    if (!state.photos.length && !state.existingPhotos.length && !p.photoMissingReason) return ['photoMissingReason', 'ขั้นที่ 3: แนบภาพถ่าย หรือเลือกเหตุผลที่ไม่มีภาพ'];
+    if (p.personCategory === 'อื่นๆ' && !p.personCategoryOther.trim()) return ['personCategoryOther', 'กรุณาระบุประเภทบุคคลอื่น'];
+    return null;
+  }
+  function showProblem(problem) {
+    $('verifyMessage').textContent = problem[1];
+    const target = problem[0] === 'verifyFields' ? document.querySelector('.outcome-grid') : $(problem[0]);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast(problem[1], true);
   }
   function review() {
     const p = payload('verified'), problem = validate(p);
-    if (problem) { $('verifyMessage').textContent = problem; return; }
+    if (problem) return showProblem(problem);
     const r = state.selected;
-    $('confirmSummary').innerHTML = '<p><strong>' + esc(r.hsId) + '</strong> · ' + esc(areaLabel(r)) + '</p><p>ผลตรวจ: <strong>' + esc(C.RESULT_LABELS[p.result]) + '</strong></p><p>ตำแหน่ง: ' + (p.obsLat !== '' ? p.obsLat + ', ' + p.obsLng : 'ไม่มี GPS (' + esc($('noGpsReason').selectedOptions[0].textContent) + ')') + '</p><p>ภาพใหม่ ' + state.photos.length + ' ภาพ' + (state.existingPhotos.length ? ' · ภาพเดิม ' + state.existingPhotos.length + ' ภาพ' : '') + '</p>';
+    $('confirmSummary').innerHTML = '<p><strong>' + esc(r.hsId) + '</strong><br>' + esc(areaLabel(r)) + '</p><p>ผลตรวจ: <strong>' + esc(C.RESULT_LABELS[p.result]) + '</strong></p><p>ตำแหน่ง: ' + (p.obsLat !== '' ? p.obsLat + ', ' + p.obsLng : 'ไม่มี GPS (' + esc($('noGpsReason').selectedOptions[0].textContent) + ')') + '</p><p>ภาพใหม่ ' + state.photos.length + ' ภาพ' + (state.existingPhotos.length ? ' · ภาพเดิม ' + state.existingPhotos.length + ' ภาพ' : '') + '</p>';
     $('confirmDialog').showModal();
   }
 
   async function submit(status) {
     if (state.busy) return;
     const p = payload(status), problem = validate(p);
-    if (problem) { $('verifyMessage').textContent = problem; return; }
+    if (problem) return showProblem(problem);
     const job = { id: p.clientRequestId, payload: p, photos: state.photos.map(x => ({ clientRequestId: x.clientRequestId, mimeType: x.mimeType, base64: x.base64, photoLat: x.photoLat, photoLng: x.photoLng, takenAt: x.takenAt })), createdAt: new Date().toISOString(), hsId: state.selected.hsId };
-    state.busy = true; $('verifyMessage').textContent = 'กำลังส่งข้อมูล…';
+    state.busy = true; $('verifyMessage').textContent = state.photos.length ? 'กำลังส่งผลตรวจและภาพ ' + state.photos.length + ' ภาพ…' : 'กำลังส่งข้อมูล…';
     $('saveDraftButton').disabled = $('reviewSubmitButton').disabled = true;
     try {
       const saved = await HSOutbox.run(job, HSApi);
       updateRow(state.selected, saved.verification, job.photos.length);
-      toast(status === 'verified' ? 'บันทึกผลการตรวจแล้ว' : 'เก็บงานร่างแล้ว');
+      toast(status === 'verified' ? '✓ บันทึกผลการตรวจแล้ว' : 'เก็บงานร่างแล้ว');
       closeVerify();
     } catch (err) {
       if (err.network) {
@@ -587,9 +771,13 @@
     } catch (err) { $('verifyMessage').textContent = err.message; }
   }
 
-  function closeVerify() { if ($('verifyDialog').open) $('verifyDialog').close(); state.selected = null; }
+  function closeVerify(keepPending) {
+    if ($('verifyDialog').open) $('verifyDialog').close();
+    state.selected = null;
+    if (keepPending !== true) state.pendingHs = state.pendingHs || null;
+  }
 
-  /* ---------------------------------------------------------------- งานค้าง */
+  /* ================================================================ งานค้าง */
   async function refreshOutbox() {
     const jobs = await HSOutbox.all();
     $('retryButton').hidden = !jobs.length; $('retryCount').textContent = jobs.length;
@@ -602,7 +790,7 @@
     refreshOutbox();
   }
 
-  /* ---------------------------------------------------------------- เครื่องมือ */
+  /* ================================================================ เครื่องมือ */
   function toast(message, error) {
     const t = document.createElement('div');
     t.className = 'toast' + (error ? ' error' : '');

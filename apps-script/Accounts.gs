@@ -1,13 +1,22 @@
 /* ============================== คำขอใช้งาน / บัญชีผู้ใช้ ============================== */
 
+/** ผู้ลงทะเบียน (Admin ลงทะเบียนเองใช้งานได้ทันที) พร้อมสถานะบัญชีปัจจุบัน เพื่อให้ผู้ดูแลจังหวัดตรวจและระงับได้ */
 function requestsList_(user, b) {
   requireManager_(user);
-  const status = (b && b.status) || 'pending';
+  const status = (b && b.status) || 'all';
+  const days = Math.max(0, Number(b && b.days) || 0);
+  const since = days ? Utilities.formatDate(new Date(Date.now() - days * 86400000), 'Asia/Bangkok', "yyyy-MM-dd") : '';
+  const accounts = {};
+  readAll_('Accounts').forEach(a => { accounts[a.accountId] = a; accounts['p' + normalizePhone_(a.phone)] = a; });
   const rows = readAll_('Requests').filter(r => inScope_(user, r.provinceCode)
     && (isSuper_(user) || r.requestedRole !== 'minisuper')
-    && (status === 'all' || r.status === status));
+    && (status === 'all' || r.status === status)
+    && (!since || String(r.createdAt).slice(0, 10) >= since));
   rows.sort((a, c) => String(c.createdAt).localeCompare(String(a.createdAt)));
-  return { ok: true, requests: rows.map(stripRow_).map(r => Object.assign(r, { phone: normalizePhone_(r.phone), requestedRole: r.requestedRole || 'admin' })) };
+  return { ok: true, requests: rows.map(stripRow_).map(r => {
+    const acc = accounts[r.accountId] || accounts['p' + normalizePhone_(r.phone)] || null;
+    return Object.assign(r, { phone: normalizePhone_(r.phone), requestedRole: r.requestedRole || 'admin', accountId: acc ? acc.accountId : '', accountStatus: acc ? acc.status : 'deleted', accountRole: acc ? acc.role : '' });
+  }) };
 }
 
 function requestDecide_(user, b) {
