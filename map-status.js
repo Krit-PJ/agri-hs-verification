@@ -1,3 +1,0 @@
-/* Marker color follows the saved status. A draft never looks like a confirmed finding. */
-var HSMapStatus=(()=>{const colors={pending:'#e3651d',draft:'#2677ad',burned:'#cb2c29',not_burned:'#18845d',inaccessible:'#596579',not_found:'#687976',needs_review:'#7a5ab5'};const labels={pending:'รอตรวจ',draft:'งานร่าง',burned:'พบการเผา',not_burned:'ไม่พบการเผา',inaccessible:'เข้าตรวจสอบไม่ได้',not_found:'ไม่พบจุด',needs_review:'ต้องตรวจซ้ำ'};function key(item){if(item.status!=='verified')return item.status==='draft'?'draft':'pending';return labels[item.verification?.result]?item.verification.result:'pending';}return {key,color:item=>colors[key(item)],label:item=>labels[key(item)]};})();
-if(typeof module!=='undefined')module.exports=HSMapStatus;

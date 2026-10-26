@@ -1,431 +1,130 @@
-function tokenHash_(token) {
-  const pepper = PropertiesService.getScriptProperties().getProperty('TOKEN_PEPPER');
-  assert_(pepper && pepper.length >= 24, 'CONFIG_ERROR', 'ยังไม่ได้ตั้งค่า TOKEN_PEPPER');
-  return sha256_(pepper + ':' + token);
-}
+/* ============================== เข้าสู่ระบบ / สิทธิ์ ============================== */
+/*
+ * ระบบเดียวกับ TH-Agri-Risk-Maps-Burning:
+ *   - Admin และ Mini Super Admin เข้าสู่ระบบด้วยเบอร์โทรศัพท์ที่ได้รับอนุญาต
+ *   - Super Admin เข้าสู่ระบบด้วยชื่อผู้ใช้ + รหัสผ่าน (เก็บเป็นค่า Hash ใน Script Properties)
+ *   - Token ลงลายมือชื่อ HMAC อายุ 8 ชั่วโมง ตรวจสถานะบัญชีทุกคำสั่ง (ระงับสิทธิ์มีผลทันที)
+ *   - บันทึกทุกการพยายามเข้าใช้ในชีต LoginAttempts (ไม่บันทึกรหัสผ่าน)
+ */
 
-const AUTH_ACCOUNTS_PROPERTY_ = 'AUTH_ACCOUNTS_V1';
-const AUTH_PASSWORD_PEPPER_PROPERTY_ = 'AUTH_PASSWORD_PEPPER';
-const AUTH_DUMMY_SALT_PROPERTY_ = 'AUTH_DUMMY_SALT';
-const AUTH_SESSION_PREFIX_ = 'auth-session:';
-const AUTH_FAILURE_PREFIX_ = 'auth-failure:';
-const AUTH_GLOBAL_RATE_PREFIX_ = 'auth-global-rate:';
-const AUTH_GLOBAL_ATTEMPTS_PER_MINUTE_ = 60;
-
-function ensureAuthSecrets_() {
-  const properties = PropertiesService.getScriptProperties();
-  if (!properties.getProperty('TOKEN_PEPPER')) properties.setProperty('TOKEN_PEPPER', uuid_() + uuid_());
-  if (!properties.getProperty(AUTH_PASSWORD_PEPPER_PROPERTY_)) properties.setProperty(AUTH_PASSWORD_PEPPER_PROPERTY_, uuid_() + uuid_());
-  if (!properties.getProperty(AUTH_DUMMY_SALT_PROPERTY_)) properties.setProperty(AUTH_DUMMY_SALT_PROPERTY_, uuid_() + uuid_());
-}
-
-function normalizeUsername_(username) {
-  const value = cleanText_(username, 64).toLowerCase();
-  assert_(/^[a-z0-9._-]{3,64}$/.test(value), 'VALIDATION_ERROR', 'ชื่อผู้ใช้ต้องมี 3-64 ตัว และใช้ตัวอักษรอังกฤษ ตัวเลข จุด ขีดกลาง หรือขีดล่าง');
-  return value;
-}
-
-function readAuthAccounts_() {
-  const raw = PropertiesService.getScriptProperties().getProperty(AUTH_ACCOUNTS_PROPERTY_);
-  if (!raw){if(typeof HSNational!=='undefined'){const all=PropertiesService.getScriptProperties().getProperties(),result={};Object.keys(all).filter(function(k){return k.indexOf('AUTH_ACCOUNT_V2_')===0;}).forEach(function(k){result[k.slice(16)]=JSON.parse(all[k]);});return result;}return {};}
-  try {
-    const parsed = JSON.parse(raw);
-    assert_(parsed && typeof parsed === 'object' && !Array.isArray(parsed), 'CONFIG_ERROR', 'ข้อมูลบัญชีเข้าสู่ระบบเสียหาย');
-    if(typeof HSNational!=='undefined'){const all=PropertiesService.getScriptProperties().getProperties();Object.keys(all).filter(function(k){return k.indexOf('AUTH_ACCOUNT_V2_')===0;}).forEach(function(k){parsed[k.slice(16)]=JSON.parse(all[k]);});}
-    return parsed;
-  } catch (error) {
-    if (error && error.name === 'ApiError') throw error;
-    throw new ApiError('CONFIG_ERROR', 'ข้อมูลบัญชีเข้าสู่ระบบเสียหาย');
+function loginAdmin_(b) {
+  const phone = normalizePhone_(b.phone);
+  const device = clean_(b.device, 120);
+  if (!validPhone_(phone)) {
+    logAttempt_('admin', clean_(b.phone, 20), 'invalid', null, device);
+    throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง');
   }
-}
-
-function authAccountByKey_(accounts, key) {
-  return accounts && Object.prototype.hasOwnProperty.call(accounts, key) ? accounts[key] : null;
-}
-
-function passwordHash_(password, salt, iterations) {
-  const pepper = PropertiesService.getScriptProperties().getProperty(AUTH_PASSWORD_PEPPER_PROPERTY_);
-  assert_(pepper && pepper.length >= 24, 'CONFIG_ERROR', 'ยังไม่ได้ตั้งค่าระบบรหัสผ่าน');
-  let digest = sha256_(pepper + ':' + salt + ':' + password);
-  for (let i = 1; i < iterations; i += 1) digest = sha256_(pepper + ':' + salt + ':' + digest);
-  return digest;
-}
-
-function publicAccountProfile_(account) {
-  const profile = account.profile || {};
-  return {
-    username: cleanText_(account.username, 64),
-    inspectorId: cleanText_(profile.inspectorId, 64) || ('account:' + cleanText_(account.username, 64).toLowerCase()),
-    displayName: cleanText_(profile.displayName, 120) || cleanText_(account.username, 64),
-    assignedProvinceCode: cleanText_(profile.assignedProvinceCode,2),
-    agencyLevel: cleanText_(profile.agencyLevel,16),
-    phone: cleanText_(profile.phone,20),
-    authMethod: account.authMethod === 'phone_only' ? 'phone_only' : 'password',
-    role: ['inspector', 'admin', 'super_admin'].indexOf(profile.role) >= 0 ? profile.role : 'inspector',
-    district: cleanText_(profile.district, 120),
-    tambon: cleanText_(profile.tambon, 120),
-    personCategory: cleanText_(profile.personCategory, 120),
-    personCategoryOther: cleanText_(profile.personCategoryOther, 200),
-    position: cleanText_(profile.position, 120),
-    agency: cleanText_(profile.agency, 200)
-  };
-}
-
-function actorFromAccount_(account) {
-  const profile = publicAccountProfile_(account);
-  return {
-    id: profile.inspectorId,
-    username: profile.username,
-    assignedProvinceCode:profile.assignedProvinceCode,
-    agencyLevel:profile.agencyLevel,
-    phone:profile.phone,
-    displayName: profile.displayName,
-    role: profile.role,
-    district: profile.district,
-    tambon: profile.tambon,
-    personCategory: profile.personCategory,
-    personCategoryOther: profile.personCategoryOther,
-    position: profile.position,
-    agency: profile.agency
-  };
-}
-
-function sessionCache_() {
-  return CacheService.getScriptCache();
-}
-
-function authRateKey_(username) {
-  return AUTH_FAILURE_PREFIX_ + sha256_(username).slice(0, 40);
-}
-
-function readAuthFailures_(username) {
-  const raw = sessionCache_().get(authRateKey_(username));
-  if (!raw) return {count: 0, resetAt: 0};
-  try {
-    const value = JSON.parse(raw);
-    if (Number(value.resetAt) <= Date.now()) return {count: 0, resetAt: 0};
-    return {count: Number(value.count) || 0, resetAt: Number(value.resetAt) || 0};
-  } catch (ignored) {
-    return {count: 0, resetAt: 0};
+  const acc = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
+  if (!acc) {
+    const pending = findRow_('Requests', r => normalizePhone_(r.phone) === phone && r.status === 'pending');
+    logAttempt_('admin', phone, pending ? 'pending' : 'not_found', pending ? { fullName: pending.fullName, provinceCode: pending.provinceCode } : null, device);
+    throw new Error(pending ? 'คำขอของท่านอยู่ระหว่างรอการอนุมัติ' : 'ไม่พบเบอร์โทรศัพท์นี้ในระบบ กรุณายื่นคำขอใช้งาน');
   }
-}
-
-function assertLoginAllowed_(username) {
-  const failures = readAuthFailures_(username);
-  if (failures.count >= APP.AUTH_MAX_FAILURES) {
-    throw new ApiError('RATE_LIMITED', 'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่', {retryAfterSeconds: Math.max(1, Math.ceil((failures.resetAt - Date.now()) / 1000))});
+  const role = acc.role === 'minisuper' ? 'minisuper' : 'admin';
+  if (acc.status !== 'approved') {
+    logAttempt_(role, phone, 'disabled', acc, device);
+    throw new Error('บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด');
   }
+  logAttempt_(role, phone, 'success', acc, device);
+  updateRow_('Accounts', acc._row, { lastLoginAt: now_() });
+  const user = accountUser_(acc);
+  audit_(user, 'login', ROLE_LABELS[role], device);
+  return { ok: true, token: signToken_(user), user: user };
 }
 
-function recordLoginFailure_(username) {
-  const failures = readAuthFailures_(username);
-  const now = Date.now();
-  const resetAt = failures.resetAt > now ? failures.resetAt : now + APP.AUTH_FAILURE_WINDOW_SECONDS * 1000;
-  sessionCache_().put(authRateKey_(username), JSON.stringify({count: failures.count + 1, resetAt: resetAt}), Math.max(1, Math.ceil((resetAt - now) / 1000)));
-}
-
-function clearLoginFailures_(username) {
-  sessionCache_().remove(authRateKey_(username));
-}
-
-function authGlobalAdmission_() {
-  const cache = sessionCache_();
-  const key = AUTH_GLOBAL_RATE_PREFIX_ + Math.floor(Date.now() / 60000);
-  const count = Number(cache.get(key) || 0);
-  assert_(count < AUTH_GLOBAL_ATTEMPTS_PER_MINUTE_, 'RATE_LIMITED', 'มีคำขอเข้าสู่ระบบจำนวนมาก กรุณาลองใหม่ภายหลัง');
-  cache.put(key, String(count + 1), 120);
-}
-
-function sessionKey_(token) {
-  return AUTH_SESSION_PREFIX_ + tokenHash_(token);
-}
-
-function login_(payload) {
-  const lock=LockService.getScriptLock();
-  assert_(lock.tryLock(10000), 'RATE_LIMITED', 'ระบบเข้าสู่ระบบกำลังมีผู้ใช้งาน กรุณาลองอีกครั้ง');
-  try { return loginUnlocked_(payload); } finally { lock.releaseLock(); }
-}
-
-function loginUnlocked_(payload) {
-  payload = payload || {};
-  ensureAuthSecrets_();
-  authGlobalAdmission_();
-  let username;
-  try { username = normalizeUsername_(payload.username); } catch (ignored) { username = 'invalid-user'; }
-  const password = payload.password == null ? '' : String(payload.password);
-  assert_(password.length <= 256, 'UNAUTHORIZED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-  assertLoginAllowed_(username);
-
-  const accounts = readAuthAccounts_();
-  const account = authAccountByKey_(accounts, username);
-  const dummySalt = PropertiesService.getScriptProperties().getProperty(AUTH_DUMMY_SALT_PROPERTY_);
-  const salt = account && account.salt ? account.salt : dummySalt;
-  const storedIterations = account ? Number(account.iterations) : 0;
-  const iterations = storedIterations >= APP.AUTH_HASH_ITERATIONS && storedIterations <= 100000 ? storedIterations : APP.AUTH_HASH_ITERATIONS;
-  const candidate = passwordHash_(password, salt, iterations);
-  const valid = account && account.authMethod !== 'phone_only' && account.active !== false && secureEquals_(candidate, account.hash);
-  if (!valid) {
-    recordLoginFailure_(username);
-    throw new ApiError('UNAUTHORIZED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+function loginSuper_(b) {
+  const props = PropertiesService.getScriptProperties();
+  const cache = CacheService.getScriptCache();
+  const u = clean_(b.username, 60);
+  const device = clean_(b.device, 120);
+  const failKey = 'superfail';
+  const fails = Number(cache.get(failKey) || 0);
+  if (fails >= 10) {
+    logAttempt_('superadmin', u, 'wrong_credentials', null, device);
+    throw new Error('พยายามเข้าสู่ระบบผิดหลายครั้ง กรุณารอ 15 นาที');
   }
-
-  clearLoginFailures_(username);
-  return createAccountSession_(username, account);
+  const ok = !!props.getProperty('SUPER_HASH') && u.toLowerCase() === String(props.getProperty('SUPER_USER') || '').toLowerCase()
+    && superHash_(props.getProperty('SUPER_SALT'), String(b.password || '')) === props.getProperty('SUPER_HASH');
+  logAttempt_('superadmin', u, ok ? 'success' : 'wrong_credentials', ok ? { accountId: 'SUPER', fullName: 'Super Admin' } : null, device);
+  if (!ok) {
+    cache.put(failKey, String(fails + 1), 900);
+    throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  }
+  cache.remove(failKey);
+  const user = { sub: 'SUPER', name: 'Super Admin (' + props.getProperty('SUPER_USER') + ')', role: 'superadmin', prov: '*', provName: 'ทุกจังหวัด' };
+  audit_(user, 'login', 'Super Admin', device, '');
+  return { ok: true, token: signToken_(user), user: user };
 }
 
-function createAccountSession_(username, account) {
-  const token = (uuid_() + uuid_()).replace(/-/g, '');
-  const csrf=(uuid_()+uuid_()).replace(/-/g,'');
-  const expiresAtMs = Date.now() + APP.AUTH_SESSION_SECONDS * 1000;
-  sessionCache_().put(sessionKey_(token), JSON.stringify({csrf:csrf, username: username, version: account.sessionVersion, expiresAt: expiresAtMs}), APP.AUTH_SESSION_SECONDS);
-  return {csrf:csrf, token: token, profile: publicAccountProfile_(account), expiresAt: new Date(expiresAtMs).toISOString()};
-}
-
-function loginPhone_(payload) {
-  const lock=LockService.getScriptLock();
-  assert_(lock.tryLock(10000), 'RATE_LIMITED', 'ระบบเข้าสู่ระบบกำลังมีผู้ใช้งาน กรุณาลองอีกครั้ง');
-  try { return loginPhoneUnlocked_(payload); } finally { lock.releaseLock(); }
-}
-
-function loginPhoneUnlocked_(payload) {
-  payload=payload||{};
-  ensureAuthSecrets_();
-  authGlobalAdmission_();
-  const supplied=cleanText_(payload.phone,20).replace(/[ -]/g,'');
-  const phone=/^0[689][0-9]{8}$/.test(supplied)?supplied:'invalid-phone';
-  assertLoginAllowed_(phone);
-  const account=authAccountByKey_(readAuthAccounts_(),phone);
-  const profile=account&&account.profile||{};
-  const registrations=phone==='invalid-phone'?[]:rowsAsObjects_(APP.SHEETS.REGISTRATIONS).filter(function(row){
-    return canonicalStoredPhone_(row.phone)===phone;
+/** ยื่นคำขอใช้งาน (ผู้ใช้ทั่วไป) — Admin: ผู้ดูแลจังหวัดหรือ Super Admin อนุมัติ, Mini Super Admin: Super Admin อนุมัติ */
+function register_(b) {
+  const phone = normalizePhone_(b.phone);
+  const prov = provCode_(b.provinceCode);
+  const requestedRole = b.requestedRole === 'minisuper' ? 'minisuper' : 'admin';
+  if (!validPhone_(phone)) throw new Error('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง 0812345678)');
+  if (!prov) throw new Error('กรุณาเลือกจังหวัด');
+  if (!clean_(b.fullName)) throw new Error('กรุณากรอกชื่อ-นามสกุล');
+  if (!clean_(b.position)) throw new Error('กรุณากรอกตำแหน่ง');
+  if (!clean_(b.affiliation)) throw new Error('กรุณากรอกสังกัด');
+  if (b.consent !== true) throw new Error('กรุณายืนยันการรับทราบการใช้ข้อมูลส่วนบุคคล');
+  return withLock_(() => {
+    if (findRow_('Accounts', r => normalizePhone_(r.phone) === phone)) throw new Error('เบอร์โทรศัพท์นี้มีสิทธิ์ใช้งานแล้ว สามารถเข้าสู่ระบบได้ทันที');
+    if (findRow_('Requests', r => normalizePhone_(r.phone) === phone && r.status === 'pending')) throw new Error('มีคำขอของเบอร์นี้รอการอนุมัติอยู่แล้ว');
+    const id = newId_('R');
+    appendObj_('Requests', {
+      requestId: id, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
+      provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: requestedRole, note: clean_(b.note, 500), consentAt: now_(),
+      status: 'pending', createdAt: now_(), decidedAt: '', decidedBy: '', reason: ''
+    });
+    audit_({ sub: phone, name: clean_(b.fullName), role: 'public', prov: prov }, 'register', id, ROLE_LABELS[requestedRole], prov);
+    return { ok: true, requestId: id };
   });
-  const registration=registrations.length===1&&registrations[0].status==='approved'?registrations[0]:null;
-  const valid=Boolean(
-    registration&&account&&account.active===true&&account.authMethod==='phone_only'&&
-    cleanText_(account.username,64).toLowerCase()===phone&&profile.role==='inspector'&&
-    cleanText_(profile.phone,20).replace(/[ -]/g,'')===phone&&
-    cleanText_(profile.assignedProvinceCode,2)===cleanText_(registration.province_code,2)&&
-    cleanText_(profile.agencyLevel,16)===cleanText_(registration.agency_level,16)&&
-    cleanText_(profile.district,120)===cleanText_(registration.district,120)&&
-    ['district','province'].indexOf(cleanText_(profile.agencyLevel,16))>=0&&
-    (typeof HSNational==='undefined'||Boolean(HSNational.provinces[cleanText_(profile.assignedProvinceCode,2)]))
-  );
-  if(!valid){
-    recordLoginFailure_(phone);
-    throw new ApiError('UNAUTHORIZED','ไม่สามารถเข้าสู่ระบบด้วยหมายเลขโทรศัพท์นี้ได้');
+}
+
+/** แปลงบัญชีในชีตเป็นผู้ใช้ในระบบ — ทั้ง admin และ minisuper มีขอบเขตจังหวัดของตน */
+function accountUser_(acc) {
+  const role = acc.role === 'minisuper' ? 'minisuper' : 'admin';
+  const prov = String(acc.provinceCode);
+  return { sub: acc.accountId, name: acc.fullName, phone: normalizePhone_(acc.phone), role: role, prov: prov, provName: PROVINCES[prov] || '', position: acc.position || '', affiliation: acc.affiliation || '' };
+}
+
+function signToken_(user) {
+  const payload = Object.assign({}, user, { exp: Date.now() + TOKEN_HOURS * 3600 * 1000 });
+  const p = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+  return p + '.' + hmac_(p);
+}
+
+function verifyToken_(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2 || hmac_(parts[0]) !== parts[1]) throw new Error('AUTH: กรุณาเข้าสู่ระบบ');
+  const user = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
+  if (!user.exp || Date.now() > user.exp) throw new Error('AUTH: หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่');
+  if (user.role === 'admin' || user.role === 'minisuper') {
+    const acc = findRow_('Accounts', r => r.accountId === user.sub);
+    if (!acc || acc.status !== 'approved') throw new Error('AUTH: บัญชีถูกระงับหรือถูกลบ');
+    return Object.assign({ exp: user.exp }, accountUser_(acc));
   }
-  clearLoginFailures_(phone);
-  return createAccountSession_(phone,account);
+  if (user.role === 'superadmin') return user;
+  throw new Error('AUTH: กรุณาเข้าสู่ระบบ');
 }
 
-function authenticateSession_(token) {
-  token = cleanText_(token, 256);
-  if (token.length < APP.TOKEN_MIN_LENGTH) return null;
-  const raw = sessionCache_().get(sessionKey_(token));
-  if (!raw) return null;
-  let session;
-  try { session = JSON.parse(raw); } catch (ignored) { return null; }
-  if (!session || Number(session.expiresAt) <= Date.now()) {
-    sessionCache_().remove(sessionKey_(token));
-    return null;
-  }
-  const account = authAccountByKey_(readAuthAccounts_(), cleanText_(session.username, 64));
-  if (!account || account.active === false || !secureEquals_(session.version, account.sessionVersion)) {
-    sessionCache_().remove(sessionKey_(token));
-    return null;
-  }
-  return actorFromAccount_(account);
+function isSuper_(user) { return user.role === 'superadmin'; }
+function isManager_(user) { return user.role === 'superadmin' || user.role === 'minisuper'; }
+function requireSuper_(user) { if (!isSuper_(user)) throw new Error('เฉพาะ Super Admin เท่านั้น'); }
+function requireManager_(user) { if (!isManager_(user)) throw new Error('เฉพาะ Mini Super Admin / Super Admin เท่านั้น'); }
+function inScope_(user, prov) { return isSuper_(user) || String(prov) === user.prov; }
+
+/** ตรวจว่าผู้ใช้ทำงานกับจังหวัดนี้ได้ (Super Admin ทุกจังหวัด, อื่น ๆ เฉพาะจังหวัดของตน) */
+function requireProvince_(user, prov) {
+  const code = provCode_(prov);
+  if (!code) throw new Error('รหัสจังหวัดไม่ถูกต้อง');
+  if (!inScope_(user, code)) throw new Error('ไม่มีสิทธิ์จัดการข้อมูลจังหวัดนี้');
+  return code;
 }
 
-function logoutSession_(token) {
-  token = cleanText_(token, 256);
-  if (token.length >= APP.TOKEN_MIN_LENGTH) sessionCache_().remove(sessionKey_(token));
-  return {loggedOut: true};
-}
-
-function setupPasswordAccount(username, password, profile) {
-  ensureAuthSecrets_();
-  const key = normalizeUsername_(username);
-  assert_(['__proto__', 'prototype', 'constructor'].indexOf(key) < 0, 'VALIDATION_ERROR', 'ชื่อผู้ใช้นี้สงวนไว้');
-  password = password == null ? '' : String(password);
-  assert_(password.length >= 6 && password.length <= 256, 'VALIDATION_ERROR', 'รหัสผ่านต้องมี 6-256 ตัวอักษร');
-  profile = profile || {};
-  const role = cleanText_(profile.role, 32) || 'inspector';
-  assert_(['inspector', 'admin', 'super_admin'].indexOf(role) >= 0, 'VALIDATION_ERROR', 'role ไม่ถูกต้อง');
-  const accounts = readAuthAccounts_();
-  const salt = (uuid_() + uuid_()).replace(/-/g, '');
-  accounts[key] = {
-    username: cleanText_(username, 64),
-    authMethod: 'password',
-    salt: salt,
-    iterations: APP.AUTH_HASH_ITERATIONS,
-    hash: passwordHash_(password, salt, APP.AUTH_HASH_ITERATIONS),
-    sessionVersion: uuid_(),
-    active: profile.active !== false,
-    profile: {
-      inspectorId: cleanText_(profile.inspectorId, 64) || ('account:' + key),
-      displayName: cleanText_(profile.displayName, 120) || cleanText_(username, 64),
-      role: role,
-      assignedProvinceCode:cleanText_(profile.assignedProvinceCode,2),
-      agencyLevel:cleanText_(profile.agencyLevel,16),
-      phone:cleanText_(profile.phone,20),
-      district: cleanText_(profile.district, 120),
-      tambon: cleanText_(profile.tambon, 120),
-      personCategory: cleanText_(profile.personCategory, 120),
-      personCategoryOther: cleanText_(profile.personCategoryOther, 200),
-      position: cleanText_(profile.position, 120),
-      agency: cleanText_(profile.agency, 200)
-    }
-  };
-  if(typeof HSNational!=='undefined')PropertiesService.getScriptProperties().setProperty('AUTH_ACCOUNT_V2_'+key,JSON.stringify(accounts[key]));else PropertiesService.getScriptProperties().setProperty(AUTH_ACCOUNTS_PROPERTY_, JSON.stringify(accounts));
-  return {configured: true, profile: publicAccountProfile_(accounts[key])};
-}
-
-function setupPhoneOnlyInspectorAccount_(phone, profile) {
-  const key=cleanText_(phone,20).replace(/[ -]/g,'');
-  assert_(/^0[689][0-9]{8}$/.test(key),'VALIDATION_ERROR','กรุณาระบุหมายเลขโทรศัพท์มือถือไทย 10 หลัก');
-  profile=profile||{};
-  const account={
-    username:key,
-    authMethod:'phone_only',
-    sessionVersion:uuid_(),
-    active:false,
-    profile:{
-      inspectorId:cleanText_(profile.inspectorId,64)||('account:'+key),
-      displayName:cleanText_(profile.displayName,120)||key,
-      role:'inspector',
-      assignedProvinceCode:cleanText_(profile.assignedProvinceCode,2),
-      agencyLevel:cleanText_(profile.agencyLevel,16),
-      phone:key,
-      district:cleanText_(profile.district,120),
-      tambon:cleanText_(profile.tambon,120),
-      personCategory:cleanText_(profile.personCategory,120),
-      personCategoryOther:cleanText_(profile.personCategoryOther,200),
-      position:cleanText_(profile.position,120),
-      agency:cleanText_(profile.agency,200)
-    }
-  };
-  PropertiesService.getScriptProperties().setProperty('AUTH_ACCOUNT_V2_'+key,JSON.stringify(account));
-  return {configured:true,profile:publicAccountProfile_(account)};
-}
-
-function setupRequestedLoginAccounts() {
-  const properties = PropertiesService.getScriptProperties();
-  const adminPassword = properties.getProperty('BOOTSTRAP_ADMIN_PASSWORD');
-  const superAdminPassword = properties.getProperty('BOOTSTRAP_SUPER_ADMIN_PASSWORD');
-  assert_(adminPassword && superAdminPassword, 'CONFIG_ERROR', 'ตั้งค่า BOOTSTRAP_ADMIN_PASSWORD และ BOOTSTRAP_SUPER_ADMIN_PASSWORD ก่อน');
-  const admin = setupPasswordAccount('620000', adminPassword, {displayName: 'ผู้ดูแลระบบ', role: 'admin'});
-  const superAdmin = setupPasswordAccount('Krit', superAdminPassword, {displayName: 'Krit', role: 'super_admin'});
-  properties.deleteProperty('BOOTSTRAP_ADMIN_PASSWORD');
-  properties.deleteProperty('BOOTSTRAP_SUPER_ADMIN_PASSWORD');
-  return {configured: true, accounts: [admin.profile, superAdmin.profile], note: 'ลบ plaintext bootstrap passwords ออกจาก Script Properties แล้ว'};
-}
-
-function authenticate_(token) {
-  token = cleanText_(token, 256);
-  assert_(token.length >= APP.TOKEN_MIN_LENGTH, 'UNAUTHORIZED', 'โทเคนไม่ถูกต้อง');
-  const sessionActor = authenticateSession_(token);
-  if (sessionActor) return sessionActor;
-  const hash = tokenHash_(token);
-  const adminHash = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN_HASH');
-  if (adminHash && secureEquals_(hash, adminHash)) {
-    return {id: 'admin', displayName: 'ผู้ดูแลระบบ', role: 'super_admin', district: '', tambon: ''};
-  }
-  const inspectors = rowsAsObjects_(APP.SHEETS.INSPECTORS);
-  for (let i = 0; i < inspectors.length; i += 1) {
-    const row = inspectors[i];
-    if (String(row.active).toLowerCase() === 'false') continue;
-    if (secureEquals_(hash, cleanText_(row.token_hash))) {
-      try {
-        row.last_seen_at = isoNow_();
-        updateObjectRow_(APP.SHEETS.INSPECTORS, row._row, row);
-      } catch (ignored) {}
-      return {
-        id: cleanText_(row.inspector_id),
-        displayName: cleanText_(row.display_name),
-        role: cleanText_(row.role) || 'inspector',
-        district: cleanText_(row.district),
-        tambon: cleanText_(row.tambon),
-        personCategory: cleanText_(row.person_category), personCategoryOther: cleanText_(row.person_category_other),
-        position: cleanText_(row.position), agency: cleanText_(row.agency)
-      };
-    }
-  }
-  throw new ApiError('UNAUTHORIZED', 'โทเคนไม่ถูกต้องหรือถูกปิดใช้งาน');
-}
-
-function requireAdmin_(actor) {
-  assert_(actor && ['admin', 'super_admin'].indexOf(actor.role) >= 0, 'FORBIDDEN', 'ต้องใช้สิทธิ์ผู้ดูแลระบบ');
-}
-
-function requireSuperAdmin_(actor) {
-  assert_(actor && actor.role === 'super_admin', 'FORBIDDEN', 'ต้องใช้สิทธิ์ Super Admin');
-}
-
-function createInspector(profile) {
-  ensureSchema_();
-  profile = profile || {};
-  const person = validatePersonCategory_(profile.personCategory, profile.personCategoryOther);
-  const token = uuid_() + uuid_().replace(/-/g, '');
-  const inspectorId = cleanText_(profile.inspectorId, 64) || uuid_();
-  assert_(!findOne_(APP.SHEETS.INSPECTORS, 'inspector_id', inspectorId), 'CONFLICT', 'inspectorId นี้มีอยู่แล้ว');
-  const now = isoNow_();
-  appendObject_(APP.SHEETS.INSPECTORS, {
-    inspector_id: inspectorId,
-    display_name: cleanText_(profile.displayName, 120),
-    district: cleanText_(profile.district, 120),
-    tambon: cleanText_(profile.tambon, 120),
-    assignedProvinceCode: cleanText_(profile.assignedProvinceCode,2),
-    agencyLevel: cleanText_(profile.agencyLevel,16),
-    phone: cleanText_(profile.phone,20),
-    role: ['inspector', 'admin', 'super_admin'].indexOf(profile.role) >= 0 ? profile.role : 'inspector',
-    token_hash: tokenHash_(token),
-    active: true,
-    created_at: now,
-    last_seen_at: '', person_category: person.category, person_category_other: person.other,
-    position: cleanText_(profile.position,120), agency: cleanText_(profile.agency,200)
-  });
-  return {inspectorId: inspectorId, token: token};
-}
-
-function rotateInspectorToken(inspectorId) {
-  ensureSchema_();
-  const row = findOne_(APP.SHEETS.INSPECTORS, 'inspector_id', cleanText_(inspectorId, 64));
-  assert_(row, 'NOT_FOUND', 'ไม่พบเจ้าหน้าที่');
-  const token = uuid_() + uuid_().replace(/-/g, '');
-  row.token_hash = tokenHash_(token);
-  updateObjectRow_(APP.SHEETS.INSPECTORS, row._row, row);
-  return {inspectorId: cleanText_(row.inspector_id), token: token};
-}
-
-function initializeBackend() {
-  const properties = PropertiesService.getScriptProperties();
-  if (!properties.getProperty('TOKEN_PEPPER')) properties.setProperty('TOKEN_PEPPER', uuid_() + uuid_());
-  ensureAuthSecrets_();
-  ensureSchema_();
-  let adminToken = '';
-  if (!properties.getProperty('ADMIN_TOKEN_HASH')) {
-    adminToken = uuid_() + uuid_().replace(/-/g, '');
-    properties.setProperty('ADMIN_TOKEN_HASH', tokenHash_(adminToken));
-  }
-  return {initialized: true, adminToken: adminToken || null, note: adminToken ? 'บันทึก token นี้ทันที ระบบไม่เก็บค่า plaintext' : 'มี ADMIN_TOKEN_HASH อยู่แล้ว'};
-}
-
-function rotateAdminToken() {
-  const token = uuid_() + uuid_().replace(/-/g, '');
-  PropertiesService.getScriptProperties().setProperty('ADMIN_TOKEN_HASH', tokenHash_(token));
-  return {token: token, note: 'บันทึก token นี้ทันที ระบบไม่เก็บค่า plaintext'};
-}
-
-function validatePersonCategory_(category, other) {
-  category = cleanText_(category,120); other = cleanText_(other,200);
-  assert_(!category || APP.PERSON_CATEGORIES.indexOf(category)>=0, 'VALIDATION_ERROR', 'ประเภทบุคคลไม่ถูกต้อง');
-  assert_(category!=='อื่นๆ' || other, 'VALIDATION_ERROR', 'โปรดระบุประเภทบุคคลอื่นๆ');
-  return {category:category,other:category==='อื่นๆ'?other:''};
-}
-
-/* Recover only the known spreadsheet loss of a leading zero, never arbitrary identifiers. */
-function canonicalStoredPhone_(value){
- const text=cleanText_(value,20).replace(/[ -]/g,'');
- return /^[689][0-9]{8}$/.test(text)?'0'+text:text;
+/** Mini Super Admin จัดการได้เฉพาะบัญชี Admin ในจังหวัดของตน — บัญชี Mini Super Admin จัดการได้โดย Super Admin เท่านั้น */
+function requireAccountManager_(user, role, prov) {
+  requireManager_(user);
+  requireProvince_(user, prov);
+  if (role === 'minisuper' && !isSuper_(user)) throw new Error('การเพิ่ม/แก้ไข/ระงับ/ลบ Mini Super Admin ทำได้เฉพาะ Super Admin');
 }

@@ -1,123 +1,114 @@
-function doGet() {
-  return outputJson_({ok: false, requestId: '', error: {code: 'METHOD_NOT_ALLOWED', message: 'ใช้ POST พร้อม token เท่านั้น'}});
-}
+/**
+ * Router ของ Web App
+ * วิธีติดตั้งโดยสรุป (รายละเอียด docs/INSTALL_V30_TH.md)
+ *   1) เปิด Google Sheet "Thailand HS Verification - Database" > ส่วนขยาย > Apps Script
+ *   2) วางไฟล์ทั้งหมดใน apps-script/ (หรือไฟล์รวม docs/AppsScript-v30-All.gs) และสร้าง Secrets.gs จาก Secrets.example.gs
+ *   3) ทำให้ใช้งานได้ > การทำให้ใช้งานได้รายการใหม่ > เว็บแอป  (ดำเนินการในฐานะ: ฉัน · ผู้มีสิทธิ์เข้าถึง: ทุกคน)
+ *   4) นำ URL /exec ไปใส่ site-config.js ช่อง apiEndpoint
+ */
 
-function doPost(event) {
-  if(typeof beginRepositoryRequest_==='function')beginRepositoryRequest_();
-  let requestId = '', requestAction = '';
+function doGet(e) {
+  resetRequestCache_();
+  const p = (e && e.parameter) || {};
   try {
-    const raw = event && event.postData ? String(event.postData.contents || '') : '';
-    assert_(raw.length > 0 && raw.length <= APP.MAX_BODY_CHARS, 'INVALID_REQUEST', 'คำขอว่างหรือมีขนาดใหญ่เกินไป');
-    const envelope = parseJsonObject_(raw);
-    requestId = cleanText_(envelope.requestId, 64);
-    const action = cleanText_(envelope.action, 64);requestAction=action;
-    assert_(action, 'INVALID_REQUEST', 'ต้องระบุ action');
-    const payload = envelope.payload == null ? {} : envelope.payload;
-    assert_(payload && typeof payload === 'object' && !Array.isArray(payload), 'INVALID_REQUEST', 'payload ต้องเป็น object');
-    if (action === 'getCounters') return outputJson_({ok:true,requestId:requestId,data:getCounters_()});
-    if (action === 'recordVisit') return outputJson_({ok:true,requestId:requestId,data:recordVisit_(payload)});
-    if (action === 'getRegistrationPolicy') return outputJson_({ok:true,requestId:requestId,data:getRegistrationPolicy_()});
-    if (action === 'register') return outputJson_({ok:true,requestId:requestId,data:registerUser_(payload)});
-    if (action === 'registerProvincialAdmin') return outputJson_({ok:true,requestId:requestId,data:registerProvincialAdmin_(payload)});
-    if (action === 'getTeam') return outputJson_({ok:true,requestId:requestId,data:getTeam_()});
-    if (action === 'login') {
-      return outputJson_({ok: true, requestId: requestId, data: login_(payload)});
+    ensureSetup_();
+    switch (p.action) {
+      case 'ping': return json_({ ok: true, version: APP_VERSION, time: now_() });
+      case 'provinces': return json_({ ok: true, provinces: publicProvinces_() });
+      case 'hotspots': return json_(publicHotspots_(p.province));
+      case 'hit': return json_({ ok: true, counter: counter_(true) });
+      case 'counter': return json_({ ok: true, counter: counter_(false) });
+      case 'settings': return json_({ ok: true, settings: { riskUrl: setting_('risk_url'), hubUrl: setting_('hub_url') } });
+      default: return json_({ ok: false, error: 'unknown action' });
     }
-    if (action === 'loginPhone') {
-      return outputJson_({ok: true, requestId: requestId, data: loginPhone_(payload)});
-    }
-    if(action==='getDatasetInfo'&&!envelope.token)return outputJson_({ok:true,requestId:requestId,data:getDatasetInfo_(publicReadActor_(payload))});
-    if(typeof nationalPublicRead_==='function' && action==='bootstrap' && !envelope.token)return outputJson_({ok:true,requestId:requestId,data:nationalPublicRead_(payload)});
-    const actor = authenticate_(envelope.token);
-    if(typeof nationalCsrf_==='function')nationalCsrf_(envelope);
-    if (action === 'recordUsage') return outputJson_({ok:true,requestId:requestId,data:recordUsage_(actor)});
-    if (action === 'logout') {
-      return outputJson_({ok: true, requestId: requestId, data: logoutSession_(envelope.token)});
-    }
-    const data = dispatch_(actor, action, requestId, payload);
-    return outputJson_({ok: true, requestId: requestId, data: data});
-  } catch (error) {
-    console.warn(JSON.stringify({event:'api_error',action:requestAction,code:error&&error.code||'INTERNAL_ERROR',version:APP.VERSION}));
-    return outputJson_({ok: false, requestId: requestId, error: publicError_(error)});
+  } catch (err) { return json_({ ok: false, error: String(err.message || err) }); }
+}
+
+function doPost(e) {
+  resetRequestCache_();
+  let body = {};
+  try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (_) { return json_({ ok: false, error: 'invalid JSON' }); }
+  try {
+    ensureSetup_();
+    return json_(handle_(body));
+  } catch (err) {
+    return json_({ ok: false, error: String(err.message || err) });
   }
 }
 
-function dispatch_(actor, action, requestId, payload) {
-  if(typeof nationalGuard_==='function')nationalGuard_(actor,action);
-  const mutationActions = ['saveVerification', 'verifyHS', 'uploadPhoto', 'syncSource', 'importSource', 'setConfig', 'importRows'];
-  if (mutationActions.indexOf(action) >= 0) requestId = requireUuid_(requestId, 'requestId');
-  switch (action) {
-    case 'getDatasetInfo':return getDatasetInfo_(actor);
-    case 'listAdminAccounts':return listAdminAccounts_(actor);
-    case 'listProvincialAdminRequests':return listProvincialAdminRequests_(actor,payload);
-    case 'approveProvincialAdminRequest':return reviewProvincialAdminRequest_(actor,payload,true);
-    case 'rejectProvincialAdminRequest':return reviewProvincialAdminRequest_(actor,payload,false);
-    case 'createProvincialAdmin':return createProvincialAdmin_(actor,payload);
-    case 'changeOwnCredentials':return changeOwnCredentials_(actor,payload);
-    case 'getBoundaryConfig':return getBoundaryConfig_(actor);
-    case 'getMyProfile':return {profile:actor};
-    case 'listRegistrations':return listRegistrations_(actor,payload);
-    case 'approveRegistration':return reviewRegistration_(actor,payload,true);
-    case 'rejectRegistration':return reviewRegistration_(actor,payload,false);
-    case 'getHSPhotos':return getHsPhotos_(actor,payload);
-    case 'nationalPreview':return nationalPreview_(actor,payload);
-    case 'nationalReadSource':return nationalReadSource_(actor,payload);
-    case 'nationalCommit':return nationalCommit_(actor,requireUuid_(requestId,'requestId'),payload);
-    case 'nationalSetSource':return nationalSetSource_(actor,requireUuid_(requestId,'requestId'),payload);
-    case 'assignProvince':return assignProvince_(actor,requireUuid_(requestId,'requestId'),payload);
-    case 'saveTeam':
-      requireUuid_(requestId,'requestId');
-      return saveTeam_(actor,payload);
-    case 'getConfig':
-    case 'status':
-      return getConfig_(actor);
-    case 'bootstrap':
-    case 'read':
-      return {
-        config: getConfig_(actor),
-        filters: {
-          districts: locationValues_(actor, {}, 'district'),
-          tambons: payload.filters && payload.filters.district ? locationValues_(actor, {district: payload.filters.district}, 'tambon') : [],
-          villages: payload.filters && payload.filters.district && payload.filters.tambon ? locationValues_(actor, {district: payload.filters.district, tambon: payload.filters.tambon}, 'village') : []
-        },
-        summary: summaries_(actor, payload),
-        hotspots: allHs_(actor, payload)
-      };
-    case 'listHS':
-      return listHs_(actor, payload);
-    case 'getHS':
-      return getHs_(actor, payload);
-    case 'getDistricts':
-      return {items: locationValues_(actor, payload, 'district')};
-    case 'getTambons':
-      return {items: locationValues_(actor, payload, 'tambon')};
-    case 'getVillages':
-      return {items: locationValues_(actor, payload, 'village')};
-    case 'summaries':
-      return summaries_(actor, payload);
-    case 'saveVerification':
-    case 'verifyHS':
-      return saveVerification_(actor, requestId, payload);
-    case 'uploadPhoto':
-      return uploadPhoto_(actor, requestId, payload);
-    case 'getPhoto':
-      return getPhoto_(actor, payload);
-    case 'qa':
-      return qa_(actor);
-    case 'log':
-      return readLog_(actor, payload);
-    case 'export':
-      return exportCsv_(actor, payload);
-    case 'syncSource':
-    case 'importSource':
-      return syncSource_(actor, requestId);
-    case 'previewImportRows':
-      return previewImportRows_(actor, payload);
-    case 'importRows':
-      return importRows_(actor, requestId, payload);
-    case 'setConfig':
-      return setConfig_(actor, requestId, payload);
-    default:
-      throw new ApiError('UNKNOWN_ACTION', 'ไม่รู้จัก action: ' + action);
+/** แยกจาก doPost เพื่อให้ทดสอบได้ */
+function handle_(body) {
+  const a = String(body.action || '');
+  if (a === 'login_admin') return loginAdmin_(body);
+  if (a === 'login_super') return loginSuper_(body);
+  if (a === 'register') return register_(body);
+
+  const user = verifyToken_(body.token);
+  switch (a) {
+    case 'me': return { ok: true, user: user };
+    case 'logout': audit_(user, 'logout', ROLE_LABELS[user.role] || '', ''); return { ok: true };
+    // ผลตรวจ
+    case 'verification_get': return verificationGet_(user, body);
+    case 'verification_save': return verificationSave_(user, body);
+    case 'verification_delete': return verificationDelete_(user, body);
+    case 'verifications_list': return verificationsList_(user, body);
+    case 'photo_upload': return photoUpload_(user, body);
+    case 'photo_get': return photoGet_(user, body);
+    case 'photo_delete': return photoDelete_(user, body);
+    // คำขอและบัญชี
+    case 'requests_list': return requestsList_(user, body);
+    case 'request_decide': return requestDecide_(user, body);
+    case 'accounts_list': return accountsList_(user);
+    case 'account_save': return accountSave_(user, body);
+    case 'account_status': return accountStatus_(user, body);
+    case 'account_delete': return accountDelete_(user, body);
+    // บันทึกการใช้งาน
+    case 'audit_list': return auditList_(user, body);
+    case 'login_report': return loginReport_(user, body);
+    // ตั้งค่า
+    case 'cache_clear': return cacheClear_(user, body);
+    case 'settings_get': return settingsGet_(user);
+    case 'settings_save': return settingsSave_(user, body);
+    default: return { ok: false, error: 'unknown action' };
   }
+}
+
+function cacheClear_(user, b) {
+  requireManager_(user);
+  const prov = requireProvince_(user, b.province);
+  clearHsCache_(prov);
+  audit_(user, 'cache_clear', 'HS_' + prov, '', prov);
+  return { ok: true };
+}
+
+const EDITABLE_SETTINGS = ['source_sheet_id', 'photo_folder_id', 'risk_url', 'hub_url'];
+
+function settingsGet_(user) {
+  requireSuper_(user);
+  const out = {};
+  EDITABLE_SETTINGS.forEach(k => { out[k] = setting_(k); });
+  out.db_id = DB_ID;
+  out.version = APP_VERSION;
+  return { ok: true, settings: out };
+}
+
+function settingsSave_(user, b) {
+  requireSuper_(user);
+  const s = b.settings || {};
+  const changed = [];
+  withLock_(() => {
+    EDITABLE_SETTINGS.forEach(k => {
+      if (s[k] === undefined) return;
+      let v = clean_(s[k], 300);
+      if (/_id$/.test(k)) {
+        const m = v.match(/[-\w]{25,}/);
+        if (!m) throw new Error('รหัส ' + k + ' ไม่ถูกต้อง');
+        v = m[0];
+      } else if (v && !/^https:\/\//.test(v)) throw new Error('ลิงก์ต้องขึ้นต้นด้วย https://');
+      if (v !== setting_(k)) { setSetting_(k, v); changed.push(k); }
+    });
+  });
+  if (changed.indexOf('source_sheet_id') >= 0) Object.keys(PROVINCES).forEach(clearHsCache_);
+  audit_(user, 'settings_save', changed.join(', ') || '-', '', '');
+  return { ok: true, changed: changed };
 }

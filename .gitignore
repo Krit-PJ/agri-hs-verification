@@ -17,3 +17,7 @@ test-v28-focus.log
 
 # Private deployment source snapshots
 docs/AppsScript-before-*.json
+
+# Apps Script secrets (never commit)
+apps-script/Secrets.gs
+Secrets.gs
