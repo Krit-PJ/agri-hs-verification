@@ -69,16 +69,26 @@ function readAll_(name) {
 
 function cellText_(v) {
   if (v === null || v === undefined) return '';
-  if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, 'Asia/Bangkok', "yyyy-MM-dd'T'HH:mm:ss");
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    const full = Utilities.formatDate(v, 'Asia/Bangkok', "yyyy-MM-dd'T'HH:mm:ss");
+    return /T00:00:00$/.test(full) ? full.slice(0, 10) : full;
+  }
   return String(v);
 }
 
 function findRow_(name, fn) { return readAll_(name).find(fn) || null; }
 
+/** ค่าในคอลัมน์ข้อความใส่ ' นำหน้า เพื่อไม่ให้ Google Sheet แปลงเป็นตัวเลข/วันที่ (เครื่องหมายนี้ไม่แสดงในเซลล์) */
+function cellFor_(name, h, v) {
+  const text = (TEXT_COLUMNS[name] || []).indexOf(h) >= 0;
+  if (text && v !== undefined && v !== null && v !== '') return "'" + String(v);
+  return safeCell_(v);
+}
+
 function appendObj_(name, obj) {
   const sh = sheet_(name);
   const header = headerOf_(sh);
-  sh.appendRow(header.map(h => safeCell_(obj[h])));
+  sh.appendRow(header.map(h => cellFor_(name, h, obj[h])));
   delete ROWS_CACHE_[name];
 }
 
@@ -87,7 +97,7 @@ function updateRow_(name, rowNum, patch) {
   const header = headerOf_(sh);
   const range = sh.getRange(rowNum, 1, 1, header.length);
   const row = range.getValues()[0];
-  header.forEach((h, i) => { if (Object.prototype.hasOwnProperty.call(patch, h)) row[i] = safeCell_(patch[h]); });
+  header.forEach((h, i) => { row[i] = Object.prototype.hasOwnProperty.call(patch, h) ? cellFor_(name, h, patch[h]) : (typeof row[i] === 'string' && (TEXT_COLUMNS[name] || []).indexOf(h) >= 0 && row[i] !== '' ? "'" + row[i] : row[i]); });
   range.setValues([row]);
   delete ROWS_CACHE_[name];
 }

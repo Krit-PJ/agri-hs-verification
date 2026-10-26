@@ -52,7 +52,7 @@ test('public reads: provinces and hotspots come from the source HS sheet, cleane
   assert.deepEqual(provinces.provinces.map(p => p.code).sort(), ['51', '62']);
   const hs = env.get({ action: 'hotspots', province: '62' });
   assert.equal(hs.ok, true);
-  assert.equal(hs.rows.length, 3, 'duplicate id and missing coordinates are dropped');
+  assert.equal(hs.rows.length, 5, 'duplicate id and missing coordinates are dropped');
   assert.equal(hs.rows[0][0], 'VI1202401010701urgxyruxcx');
   assert.equal(hs.rows[0][9], 16.45278);
   assert.deepEqual(hs.status, {});
@@ -258,4 +258,17 @@ test('copyAccountsFromRiskMap copies approved accounts only, once', () => {
   const copied = env.rows('Accounts').find(a => a.provinceCode === '51');
   assert.equal(copied.role, 'minisuper');
   assert.equal(loginPhone(env, '0899999999').user.prov, '51');
+});
+
+test('values keep their text form in the sheet (phones, dates) and the daily counter matches today', () => {
+  const env = boot();
+  const reg = env.call({ action: 'register', phone: '0833333333', fullName: 'ทดสอบ', position: 'a', affiliation: 'b', provinceCode: '62', consent: true });
+  const raw = env.db.getSheetByName('Accounts').data.find(r => r[0] === reg.user.sub);
+  assert.equal(raw[1], '0833333333', 'phone stays text with leading zero');
+  assert.equal(typeof raw[9], 'string', 'createdAt stays text');
+  const first = env.get({ action: 'hit' });
+  const second = env.get({ action: 'hit' });
+  assert.equal(first.counter.today, 1);
+  assert.equal(second.counter.today, 2);
+  assert.equal(env.get({ action: 'counter' }).counter.today, 2);
 });

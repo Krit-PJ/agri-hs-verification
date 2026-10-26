@@ -227,7 +227,7 @@
     if (user && !C.can(user, 'chooseProvince') && code !== user.prov) code = user.prov;
     $('provinceSelect').value = code || '';
     if (!code) { state.province = ''; state.rows = []; updateBrand(); renderAll(); return; }
-    if (code !== state.province) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); }
+    if (code !== state.province) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); state.periodSet = false; }
     state.province = code;
     try { localStorage.setItem(LAST_PROVINCE, code); } catch (_) {}
     updateBrand();
@@ -243,11 +243,11 @@
         state.source = 'Google Sheet ต้นทาง แท็บ HS_' + code + ' (อ่านอย่างเดียว)';
       }
       if (state.province !== code) return;
-      const keepPeriod = force === true && $('startMonth').value;
-      const period = [$('startMonth').value, $('endMonth').value];
+      const period = force === true && state.periodSet ? [$('startMonth').value, $('endMonth').value] : null;
       buildPeriodOptions();
-      if (keepPeriod) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; }
-      if (!$('startMonth').value) setDefaultPeriod();
+      if (period) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; }
+      if (!period || !$('startMonth').value) setDefaultPeriod();
+      state.periodSet = true;
       fillLocationFilters();
       fillCropFilter();
       loadBoundaries(code);
@@ -290,7 +290,7 @@
   }
   function setDefaultPeriod() {
     const p = C.defaultPeriod(state.rows);
-    $('startMonth').value = p.start; $('endMonth').value = p.end;
+    $('startMonth').value = p.start ? pickMonth(p.start, 'start') : ''; $('endMonth').value = p.end ? pickMonth(p.end, 'end') : '';
     $('summaryYear').value = '';
   }
   function filters() {

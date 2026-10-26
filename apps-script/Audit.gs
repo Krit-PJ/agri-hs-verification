@@ -87,7 +87,7 @@ function loginReport_(user, b) {
 function counter_(increment) {
   return withLock_(() => {
     const today = today_();
-    let row = findRow_('Counter', r => r.date === today);
+    let row = findRow_('Counter', r => String(r.date).slice(0, 10) === today);
     let todayHits = row ? Number(row.hits) || 0 : 0;
     let total = Number(setting_('counter_total')) || 0;
     if (increment) {

@@ -35,8 +35,12 @@ class Sheet {
     while (this.data.length < row) this.data.push([]);
     const line = this.data[row - 1];
     while (line.length < col) line.push('');
-    // Sheets treats a leading apostrophe as a text marker that is not stored.
-    line[col - 1] = typeof v === 'string' && v.startsWith("'") ? v.slice(1) : v;
+    // Like the Sheets UI/API, unprefixed text that looks like a date or number is converted;
+    // a leading apostrophe forces text and is not stored.
+    if (typeof v === 'string' && v.startsWith("'")) v = v.slice(1);
+    else if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$/.test(v)) v = new Date(v.length === 10 ? v + 'T00:00:00+07:00' : v.replace(' ', 'T') + '+07:00');
+    else if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) v = Number(v);
+    line[col - 1] = v;
   }
   getName() { return this.name; }
   getLastRow() {
