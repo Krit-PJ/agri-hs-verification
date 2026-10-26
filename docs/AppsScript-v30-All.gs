@@ -389,6 +389,37 @@ function copyAccountsFromRiskMap(provinceCodes) {
   return added;
 }
 
+/* ---------- เมนูในชีตฐานข้อมูล (สำหรับเจ้าของระบบ) ---------- */
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('ระบบตรวจสอบ HS')
+    .addItem('ตั้งชื่อผู้ใช้ / รหัสผ่าน Super Admin', 'setSuperAdminFromMenu')
+    .addItem('คัดลอกบัญชีจากระบบ Agri-Risk Map', 'copyAccountsFromMenu')
+    .addSeparator()
+    .addItem('ติดตั้ง / ตรวจโครงสร้างชีต', 'setup')
+    .addToUi();
+}
+
+/** ให้เจ้าของระบบพิมพ์ชื่อผู้ใช้และรหัสผ่าน Super Admin ในชีต — ระบบเก็บเฉพาะค่า Hash ใน Script Properties */
+function setSuperAdminFromMenu() {
+  const ui = SpreadsheetApp.getUi();
+  const u = ui.prompt('Super Admin', 'ชื่อผู้ใช้ Super Admin', ui.ButtonSet.OK_CANCEL);
+  if (u.getSelectedButton() !== ui.Button.OK || !u.getResponseText().trim()) return;
+  const p = ui.prompt('Super Admin', 'รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร) — ปิดหน้าจอจากผู้อื่นขณะพิมพ์', ui.ButtonSet.OK_CANCEL);
+  if (p.getSelectedButton() !== ui.Button.OK) return;
+  try {
+    setSuperAdmin(u.getResponseText().trim(), p.getResponseText());
+    audit_({ sub: 'SETUP', name: 'เจ้าของระบบ', role: 'system', prov: '' }, 'settings_save', 'Super Admin credentials', '');
+    ui.alert('ตั้งค่า Super Admin เรียบร้อย เข้าสู่ระบบที่เว็บไซต์ → เข้าใช้งานระบบ → Super Admin');
+  } catch (err) { ui.alert(String(err.message || err)); }
+}
+
+function copyAccountsFromMenu() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.alert('คัดลอกบัญชีที่อนุมัติแล้วจากระบบ Agri-Risk Map Burning (ข้ามเบอร์ที่มีอยู่แล้ว)?', ui.ButtonSet.YES_NO);
+  if (r !== ui.Button.YES) return;
+  ui.alert('คัดลอกแล้ว ' + copyAccountsFromRiskMap() + ' บัญชี');
+}
+
 /* ===== Audit.gs ===== */
 /* ============================== บันทึกการใช้งาน ============================== */
 
