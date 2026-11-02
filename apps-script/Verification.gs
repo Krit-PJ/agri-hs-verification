@@ -131,17 +131,27 @@ function photoUpload_(user, b) {
   if (!base64 || base64.length > Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 8) throw new Error('ภาพต้องมีขนาดไม่เกิน 1 MB');
   const bytes = Utilities.base64Decode(base64);
   if (bytes.length > MAX_PHOTO_BYTES) throw new Error('ภาพต้องมีขนาดไม่เกิน 1 MB');
-  return withLock_(() => {
+  // ตรวจสิทธิ์และเขียนไฟล์ลง Drive นอกล็อก (ช้า) แล้วล็อกเฉพาะตอนบันทึกแถว
+  const replay0 = findRow_('Photos', p => p.clientRequestId === clientRequestId);
+  if (replay0) return { ok: true, replay: true, photo: stripRow_(replay0) };
+  const rec0 = findRow_('Verifications', r => r.verificationId === b.verificationId);
+  if (!rec0) throw new Error('ไม่พบผลตรวจ กรุณาบันทึกผลก่อนแนบภาพ');
+  if (!canEdit_(user, rec0)) throw new Error('ไม่มีสิทธิ์แนบภาพในผลตรวจนี้');
+  const count0 = photosOf_(rec0.verificationId).length;
+  if (count0 >= MAX_PHOTOS_PER_HS) throw new Error('แนบภาพได้สูงสุด ' + MAX_PHOTOS_PER_HS + ' ภาพต่อจุด');
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  const fileName = rec0.hotspotId + '_' + (count0 + 1) + '_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss') + '.' + ext;
+  const file = photoFolder_(rec0.provinceCode).createFile(Utilities.newBlob(bytes, mime, fileName));
+  let saved = false;
+  try {
+    const out = withLock_(() => {
+    resetRequestCache_();
     const replay = findRow_('Photos', p => p.clientRequestId === clientRequestId);
     if (replay) return { ok: true, replay: true, photo: stripRow_(replay) };
     const rec = findRow_('Verifications', r => r.verificationId === b.verificationId);
     if (!rec) throw new Error('ไม่พบผลตรวจ กรุณาบันทึกผลก่อนแนบภาพ');
-    if (!canEdit_(user, rec)) throw new Error('ไม่มีสิทธิ์แนบภาพในผลตรวจนี้');
     const count = photosOf_(rec.verificationId).length;
     if (count >= MAX_PHOTOS_PER_HS) throw new Error('แนบภาพได้สูงสุด ' + MAX_PHOTOS_PER_HS + ' ภาพต่อจุด');
-    const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-    const fileName = rec.hotspotId + '_' + (count + 1) + '_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss') + '.' + ext;
-    const file = photoFolder_(rec.provinceCode).createFile(Utilities.newBlob(bytes, mime, fileName));
     const photo = {
       photoId: newId_('P'), clientRequestId: clientRequestId, verificationId: rec.verificationId, hotspotId: rec.hotspotId, provinceCode: rec.provinceCode,
       driveFileId: file.getId(), fileName: fileName, mimeType: mime, sizeBytes: bytes.length, sha256: sha256Bytes_(bytes),
@@ -150,9 +160,14 @@ function photoUpload_(user, b) {
     };
     appendObj_('Photos', photo);
     updateRow_('Verifications', rec._row, { photoCount: count + 1 });
-    audit_(user, 'photo_upload', rec.hotspotId, fileName + ' ' + bytes.length + ' bytes', rec.provinceCode);
+    saved = true;
     return { ok: true, photo: photo };
-  });
+    });
+    if (saved) audit_(user, 'photo_upload', rec0.hotspotId, fileName + ' ' + bytes.length + ' bytes', rec0.provinceCode);
+    return out;
+  } finally {
+    if (!saved) trashDriveFile_(file.getId());
+  }
 }
 
 function photoGet_(user, b) {

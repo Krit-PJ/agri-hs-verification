@@ -16,7 +16,7 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.4.0';
+const APP_VERSION = '3.5.0';
 const SETUP_VERSION = '3.2';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
@@ -34,7 +34,10 @@ const REGISTER_LIMIT_PER_10_MIN = 30;
 const ALL_PROVINCES = 'ALL';
 const VISIT_LOG_MINUTES = 30;
 const MAX_PHOTO_BYTES = 1000000;
-const REPORT_BATCH = 10;   // จุด HS ต่อคำขอภาพสำหรับรายงาน (≤30 ภาพ ≈ ไม่เกิน ~10 MB)
+const REPORT_BATCH = 10;
+const LOCK_WAIT_MS = 28000;        // รอคิวบันทึกได้นานสุด (Apps Script จำกัดคำขอละ ~6 นาที แต่หน้าเว็บรอ 60 วินาที)
+const BUSY_MESSAGE = 'ขณะนี้มีผู้บันทึกข้อมูลพร้อมกันจำนวนมาก ระบบยังไม่ได้บันทึกรายการนี้ กรุณากดลองใหม่อีกครั้ง';
+const AUDIT_TAIL_ROWS = 4000;      // อ่านเฉพาะท้ายชีต AuditLog เมื่อนับเจ้าหน้าที่ที่ใช้งานวันนี้   // จุด HS ต่อคำขอภาพสำหรับรายงาน (≤30 ภาพ ≈ ไม่เกิน ~10 MB)
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const PROVINCES = {"10":"กรุงเทพมหานคร","11":"สมุทรปราการ","12":"นนทบุรี","13":"ปทุมธานี","14":"พระนครศรีอยุธยา","15":"อ่างทอง","16":"ลพบุรี","17":"สิงห์บุรี","18":"ชัยนาท","19":"สระบุรี","20":"ชลบุรี","21":"ระยอง","22":"จันทบุรี","23":"ตราด","24":"ฉะเชิงเทรา","25":"ปราจีนบุรี","26":"นครนายก","27":"สระแก้ว","30":"นครราชสีมา","31":"บุรีรัมย์","32":"สุรินทร์","33":"ศรีสะเกษ","34":"อุบลราชธานี","35":"ยโสธร","36":"ชัยภูมิ","37":"อำนาจเจริญ","38":"บึงกาฬ","39":"หนองบัวลำภู","40":"ขอนแก่น","41":"อุดรธานี","42":"เลย","43":"หนองคาย","44":"มหาสารคาม","45":"ร้อยเอ็ด","46":"กาฬสินธุ์","47":"สกลนคร","48":"นครพนม","49":"มุกดาหาร","50":"เชียงใหม่","51":"ลำพูน","52":"ลำปาง","53":"อุตรดิตถ์","54":"แพร่","55":"น่าน","56":"พะเยา","57":"เชียงราย","58":"แม่ฮ่องสอน","60":"นครสวรรค์","61":"อุทัยธานี","62":"กำแพงเพชร","63":"ตาก","64":"สุโขทัย","65":"พิษณุโลก","66":"พิจิตร","67":"เพชรบูรณ์","70":"ราชบุรี","71":"กาญจนบุรี","72":"สุพรรณบุรี","73":"นครปฐม","74":"สมุทรสาคร","75":"สมุทรสงคราม","76":"เพชรบุรี","77":"ประจวบคีรีขันธ์","80":"นครศรีธรรมราช","81":"กระบี่","82":"พังงา","83":"ภูเก็ต","84":"สุราษฎร์ธานี","85":"ระนอง","86":"ชุมพร","90":"สงขลา","91":"สตูล","92":"ตรัง","93":"พัทลุง","94":"ปัตตานี","95":"ยะลา","96":"นราธิวาส"};
@@ -157,9 +160,13 @@ function distanceM_(lat1, lng1, lat2, lng2) {
 
 function json_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-function withLock_(fn) {
+/**
+ * ล็อกสั้นที่สุดเท่าที่จำเป็น (เฉพาะช่วงเขียนชีตที่ต้องไม่ชนกัน)
+ * ไม่ได้ล็อกภายในเวลาที่กำหนด → แจ้งข้อความภาษาไทยแทน "Lock timeout"
+ */
+function withLock_(fn, waitMs) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(waitMs || LOCK_WAIT_MS)) throw new Error(BUSY_MESSAGE);
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
@@ -240,6 +247,20 @@ function cellText_(v) {
     return /T00:00:00$/.test(full) ? full.slice(0, 10) : full;
   }
   return String(v);
+}
+
+/** อ่านเฉพาะ n แถวล่าสุด (ชีตบันทึกที่เพิ่มแถวต่อท้ายเสมอ) — ไม่ใส่แคช */
+function readTail_(name, n) {
+  const sh = sheet_(name);
+  const header = headerOf_(sh);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const start = Math.max(2, last - n + 1);
+  return sh.getRange(start, 1, last - start + 1, header.length).getValues().map((v, i) => {
+    const o = { _row: start + i };
+    header.forEach((h, j) => { if (h) o[h] = cellText_(v[j]); });
+    return o;
+  });
 }
 
 function findRow_(name, fn) { return readAll_(name).find(fn) || null; }
@@ -435,7 +456,6 @@ function audit_(user, action, target, detail, prov) {
       provinceCode: prov !== undefined && prov !== null ? String(prov) : (user.prov && user.prov !== '*' ? user.prov : ''),
       action: action, target: clean_(target, 300), detail: clean_(typeof detail === 'string' ? detail : JSON.stringify(detail || ''), 2000)
     });
-    if (['admin', 'minisuper', 'superadmin'].indexOf(user.role) >= 0) CacheService.getScriptCache().remove('staff:' + today_());
   } catch (err) {
     console.error('audit failed: ' + err);
   }
@@ -581,20 +601,33 @@ function loginReport_(user, b) {
 }
 
 /* ตัวนับผู้เข้าชม (สาธารณะ) */
+/**
+ * ตัวนับผู้เข้าชม — ไม่ใช่ข้อมูลสำคัญ จึงไม่ให้แย่งคิวกับการลงทะเบียน/บันทึกผลตรวจ
+ *   อ่าน   : ไม่ล็อก
+ *   นับเพิ่ม: ล็อกได้ภายใน 1.5 วินาทีจึงนับ ไม่ได้ก็ข้าม (คลาดได้เล็กน้อยในช่วงคนใช้มาก)
+ *   จำนวนเจ้าหน้าที่วันนี้คำนวณนอกล็อก
+ */
 function counter_(increment) {
-  return withLock_(() => {
+  const read = () => {
     const today = today_();
-    let row = findRow_('Counter', r => String(r.date).slice(0, 10) === today);
-    let todayHits = row ? Number(row.hits) || 0 : 0;
-    let total = Number(setting_('counter_total')) || 0;
-    if (increment) {
-      todayHits++; total++;
-      if (row) updateRow_('Counter', row._row, { hits: todayHits });
-      else appendObj_('Counter', { date: today, hits: todayHits });
-      setSetting_('counter_total', total);
+    const row = findRow_('Counter', r => String(r.date).slice(0, 10) === today);
+    return { row: row, today: today, todayHits: row ? Number(row.hits) || 0 : 0, total: Number(setting_('counter_total')) || 0 };
+  };
+  let c = read();
+  if (increment) {
+    const lock = LockService.getScriptLock();
+    if (lock.tryLock(1500)) {
+      try {
+        resetRequestCache_();
+        c = read();
+        c.todayHits++; c.total++;
+        if (c.row) updateRow_('Counter', c.row._row, { hits: c.todayHits });
+        else appendObj_('Counter', { date: c.today, hits: c.todayHits });
+        setSetting_('counter_total', c.total);
+      } finally { lock.releaseLock(); }
     }
-    return { today: todayHits, total: total, staffToday: staffToday_() };
-  });
+  }
+  return { today: c.todayHits, total: c.total, staffToday: staffToday_() };
 }
 
 /** จำนวนเจ้าหน้าที่ (Admin / Mini Super Admin / Super Admin) ที่ใช้งานวันนี้ จากบันทึกการใช้งาน — แคช 5 นาที */
@@ -604,7 +637,7 @@ function staffToday_() {
   const hit = cache.get(key);
   if (hit !== null && hit !== undefined) return Number(hit);
   const today = today_(), seen = {};
-  readAll_('AuditLog').forEach(r => {
+  readTail_('AuditLog', AUDIT_TAIL_ROWS).forEach(r => {
     if (String(r.time).slice(0, 10) === today && ['admin', 'minisuper', 'superadmin'].indexOf(r.role) >= 0) seen[r.actorId] = true;
   });
   const n = Object.keys(seen).length;
@@ -689,29 +722,36 @@ function register_(b) {
   const cache = CacheService.getScriptCache();
   const recent = Number(cache.get('regcount') || 0);
   if (recent >= REGISTER_LIMIT_PER_10_MIN) throw new Error('มีการลงทะเบียนจำนวนมากในขณะนี้ กรุณาลองใหม่ในอีก 10 นาที');
-  return withLock_(() => {
+  const dupMessage = acc => acc.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด';
+  // ตรวจซ้ำก่อนเข้าคิว (เร็ว) แล้วตรวจอีกครั้งในล็อกกันลงทะเบียนพร้อมกัน
+  const before = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
+  if (before) throw new Error(dupMessage(before));
+  const data = withLock_(() => {
+    resetRequestCache_();
     const existing = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
-    if (existing) throw new Error(existing.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด');
-    const accountId = nextAccountId_(prov);
-    const data = {
-      accountId: accountId, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
+    if (existing) throw new Error(dupMessage(existing));
+    const row = {
+      accountId: nextAccountId_(prov), phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
       provinceCode: prov, provinceName: PROVINCES[prov], role: 'admin', status: 'approved',
       createdAt: now_(), approvedAt: now_(), approvedBy: 'ลงทะเบียนด้วยตนเอง', lastLoginAt: now_()
     };
-    appendObj_('Accounts', data);
-    const id = newId_('R');
+    appendObj_('Accounts', row);
+    return row;
+  });
+  // บันทึกประกอบอยู่นอกล็อก (เพิ่มแถวต่อท้าย ไม่ชนกัน) เพื่อไม่ให้ผู้อื่นต้องรอนาน
+  const id = newId_('R');
+  try {
     appendObj_('Requests', {
       requestId: id, phone: phone, fullName: data.fullName, position: data.position, affiliation: data.affiliation,
       provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: 'admin', note: clean_(b.note, 500), consentAt: now_(),
-      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: accountId
+      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: data.accountId
     });
-    cache.put('regcount', String(recent + 1), 600);
-    const acc = findRow_('Accounts', r => r.accountId === accountId);
-    const user = accountUser_(acc);
-    logAttempt_('admin', phone, 'success', acc, device);
-    audit_(user, 'register', accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
-    return { ok: true, requestId: id, token: signToken_(user), user: user };
-  });
+  } catch (err) { console.error('request log failed: ' + err); }
+  cache.put('regcount', String(recent + 1), 600);
+  const user = accountUser_(data);
+  logAttempt_('admin', phone, 'success', data, device);
+  audit_(user, 'register', data.accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
+  return { ok: true, requestId: id, token: signToken_(user), user: user };
 }
 
 /**
@@ -1154,17 +1194,27 @@ function photoUpload_(user, b) {
   if (!base64 || base64.length > Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 8) throw new Error('ภาพต้องมีขนาดไม่เกิน 1 MB');
   const bytes = Utilities.base64Decode(base64);
   if (bytes.length > MAX_PHOTO_BYTES) throw new Error('ภาพต้องมีขนาดไม่เกิน 1 MB');
-  return withLock_(() => {
+  // ตรวจสิทธิ์และเขียนไฟล์ลง Drive นอกล็อก (ช้า) แล้วล็อกเฉพาะตอนบันทึกแถว
+  const replay0 = findRow_('Photos', p => p.clientRequestId === clientRequestId);
+  if (replay0) return { ok: true, replay: true, photo: stripRow_(replay0) };
+  const rec0 = findRow_('Verifications', r => r.verificationId === b.verificationId);
+  if (!rec0) throw new Error('ไม่พบผลตรวจ กรุณาบันทึกผลก่อนแนบภาพ');
+  if (!canEdit_(user, rec0)) throw new Error('ไม่มีสิทธิ์แนบภาพในผลตรวจนี้');
+  const count0 = photosOf_(rec0.verificationId).length;
+  if (count0 >= MAX_PHOTOS_PER_HS) throw new Error('แนบภาพได้สูงสุด ' + MAX_PHOTOS_PER_HS + ' ภาพต่อจุด');
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  const fileName = rec0.hotspotId + '_' + (count0 + 1) + '_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss') + '.' + ext;
+  const file = photoFolder_(rec0.provinceCode).createFile(Utilities.newBlob(bytes, mime, fileName));
+  let saved = false;
+  try {
+    const out = withLock_(() => {
+    resetRequestCache_();
     const replay = findRow_('Photos', p => p.clientRequestId === clientRequestId);
     if (replay) return { ok: true, replay: true, photo: stripRow_(replay) };
     const rec = findRow_('Verifications', r => r.verificationId === b.verificationId);
     if (!rec) throw new Error('ไม่พบผลตรวจ กรุณาบันทึกผลก่อนแนบภาพ');
-    if (!canEdit_(user, rec)) throw new Error('ไม่มีสิทธิ์แนบภาพในผลตรวจนี้');
     const count = photosOf_(rec.verificationId).length;
     if (count >= MAX_PHOTOS_PER_HS) throw new Error('แนบภาพได้สูงสุด ' + MAX_PHOTOS_PER_HS + ' ภาพต่อจุด');
-    const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-    const fileName = rec.hotspotId + '_' + (count + 1) + '_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss') + '.' + ext;
-    const file = photoFolder_(rec.provinceCode).createFile(Utilities.newBlob(bytes, mime, fileName));
     const photo = {
       photoId: newId_('P'), clientRequestId: clientRequestId, verificationId: rec.verificationId, hotspotId: rec.hotspotId, provinceCode: rec.provinceCode,
       driveFileId: file.getId(), fileName: fileName, mimeType: mime, sizeBytes: bytes.length, sha256: sha256Bytes_(bytes),
@@ -1173,9 +1223,14 @@ function photoUpload_(user, b) {
     };
     appendObj_('Photos', photo);
     updateRow_('Verifications', rec._row, { photoCount: count + 1 });
-    audit_(user, 'photo_upload', rec.hotspotId, fileName + ' ' + bytes.length + ' bytes', rec.provinceCode);
+    saved = true;
     return { ok: true, photo: photo };
-  });
+    });
+    if (saved) audit_(user, 'photo_upload', rec0.hotspotId, fileName + ' ' + bytes.length + ' bytes', rec0.provinceCode);
+    return out;
+  } finally {
+    if (!saved) trashDriveFile_(file.getId());
+  }
 }
 
 function photoGet_(user, b) {

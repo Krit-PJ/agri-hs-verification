@@ -8,7 +8,6 @@ function audit_(user, action, target, detail, prov) {
       provinceCode: prov !== undefined && prov !== null ? String(prov) : (user.prov && user.prov !== '*' ? user.prov : ''),
       action: action, target: clean_(target, 300), detail: clean_(typeof detail === 'string' ? detail : JSON.stringify(detail || ''), 2000)
     });
-    if (['admin', 'minisuper', 'superadmin'].indexOf(user.role) >= 0) CacheService.getScriptCache().remove('staff:' + today_());
   } catch (err) {
     console.error('audit failed: ' + err);
   }
@@ -154,20 +153,33 @@ function loginReport_(user, b) {
 }
 
 /* ตัวนับผู้เข้าชม (สาธารณะ) */
+/**
+ * ตัวนับผู้เข้าชม — ไม่ใช่ข้อมูลสำคัญ จึงไม่ให้แย่งคิวกับการลงทะเบียน/บันทึกผลตรวจ
+ *   อ่าน   : ไม่ล็อก
+ *   นับเพิ่ม: ล็อกได้ภายใน 1.5 วินาทีจึงนับ ไม่ได้ก็ข้าม (คลาดได้เล็กน้อยในช่วงคนใช้มาก)
+ *   จำนวนเจ้าหน้าที่วันนี้คำนวณนอกล็อก
+ */
 function counter_(increment) {
-  return withLock_(() => {
+  const read = () => {
     const today = today_();
-    let row = findRow_('Counter', r => String(r.date).slice(0, 10) === today);
-    let todayHits = row ? Number(row.hits) || 0 : 0;
-    let total = Number(setting_('counter_total')) || 0;
-    if (increment) {
-      todayHits++; total++;
-      if (row) updateRow_('Counter', row._row, { hits: todayHits });
-      else appendObj_('Counter', { date: today, hits: todayHits });
-      setSetting_('counter_total', total);
+    const row = findRow_('Counter', r => String(r.date).slice(0, 10) === today);
+    return { row: row, today: today, todayHits: row ? Number(row.hits) || 0 : 0, total: Number(setting_('counter_total')) || 0 };
+  };
+  let c = read();
+  if (increment) {
+    const lock = LockService.getScriptLock();
+    if (lock.tryLock(1500)) {
+      try {
+        resetRequestCache_();
+        c = read();
+        c.todayHits++; c.total++;
+        if (c.row) updateRow_('Counter', c.row._row, { hits: c.todayHits });
+        else appendObj_('Counter', { date: c.today, hits: c.todayHits });
+        setSetting_('counter_total', c.total);
+      } finally { lock.releaseLock(); }
     }
-    return { today: todayHits, total: total, staffToday: staffToday_() };
-  });
+  }
+  return { today: c.todayHits, total: c.total, staffToday: staffToday_() };
 }
 
 /** จำนวนเจ้าหน้าที่ (Admin / Mini Super Admin / Super Admin) ที่ใช้งานวันนี้ จากบันทึกการใช้งาน — แคช 5 นาที */
@@ -177,7 +189,7 @@ function staffToday_() {
   const hit = cache.get(key);
   if (hit !== null && hit !== undefined) return Number(hit);
   const today = today_(), seen = {};
-  readAll_('AuditLog').forEach(r => {
+  readTail_('AuditLog', AUDIT_TAIL_ROWS).forEach(r => {
     if (String(r.time).slice(0, 10) === today && ['admin', 'minisuper', 'superadmin'].indexOf(r.role) >= 0) seen[r.actorId] = true;
   });
   const n = Object.keys(seen).length;

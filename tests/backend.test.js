@@ -104,6 +104,37 @@ test('Admin self-registration: usable immediately, phone-only, always role Admin
   assert.equal(env.rows('Requests')[0].status, 'auto_approved');
 });
 
+test('busy lock: page-view counter never blocks; writes fail with a clear Thai retry message, not "Lock timeout"', () => {
+  const env = boot();
+  env.lockState.busy = true;
+  const hit = env.get({ action: 'hit' });
+  assert.equal(hit.ok, true, 'counter answers even when another request holds the lock');
+  expectError(() => env.call({ action: 'register', phone: '0844444444', fullName: 'ช่วงคนใช้มาก', position: 'a', affiliation: 'b', provinceCode: '62', consent: true }), /ผู้บันทึกข้อมูลพร้อมกัน.*ลองใหม่/);
+  assert.equal(env.rows('Accounts').filter(a => a.phone === '0844444444').length, 0);
+  env.lockState.busy = false;
+  const ok = env.call({ action: 'register', phone: '0844444444', fullName: 'ช่วงคนใช้มาก', position: 'a', affiliation: 'b', provinceCode: '62', consent: true });
+  assert.ok(ok.token);
+  assert.equal(env.get({ action: 'hit' }).counter.today >= 1, true);
+});
+
+test('photo upload keeps the Drive write outside the lock and removes the file if the row cannot be saved', () => {
+  const env = boot();
+  const mini = loginPhone(env, '0811111111');
+  const v = env.call(verifiedPayload(mini.token, { plannedPhotos: 1, photoMissingReason: '' })).verification;
+  const base64 = Buffer.from('jpeg').toString('base64');
+  env.lockState.busy = true;
+  expectError(() => env.call({ action: 'photo_upload', token: mini.token, clientRequestId: uuid(), verificationId: v.verificationId, mimeType: 'image/jpeg', base64 }), /ลองใหม่/);
+  assert.equal(env.rows('Photos').length, 0);
+  assert.equal([...env.files.values()].every(f => f.trashed), true, 'orphan Drive file trashed');
+  env.lockState.busy = false;
+  const id = uuid();
+  const a = env.call({ action: 'photo_upload', token: mini.token, clientRequestId: id, verificationId: v.verificationId, mimeType: 'image/jpeg', base64 });
+  const b = env.call({ action: 'photo_upload', token: mini.token, clientRequestId: id, verificationId: v.verificationId, mimeType: 'image/jpeg', base64 });
+  assert.equal(b.replay, true);
+  assert.equal(b.photo.photoId, a.photo.photoId);
+  assert.equal(env.rows('Photos').length, 1);
+});
+
 test('Mini Super Admin sees new registrations of its province and can suspend them at once', () => {
   const env = boot();
   const mini = loginPhone(env, '0811111111');

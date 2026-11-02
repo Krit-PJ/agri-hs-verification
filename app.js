@@ -45,6 +45,10 @@
     document.querySelectorAll('.nav-item[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
     document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) switchView(g.dataset.go); });
     $('menuButton').addEventListener('click', () => toggleMenu());
+    $('linksToggle').addEventListener('click', e => { e.stopPropagation(); toggleLinks(); });
+    $('linksMenu').addEventListener('click', e => { if (e.target.closest('a')) { toggleLinks(false); toggleMenu(false); } });
+    document.addEventListener('click', e => { if (!e.target.closest('.nav-links')) toggleLinks(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('linksToggle').getAttribute('aria-expanded') === 'true') { toggleLinks(false); $('linksToggle').focus(); } });
     document.querySelectorAll('#mainNav a').forEach(a => a.addEventListener('click', () => toggleMenu(false)));
     $('accessLoginNav').addEventListener('click', () => { toggleMenu(false); HSApi.user() ? logout() : HSAdmin.openAccess('phone'); });
     $('provinceSelect').addEventListener('change', e => loadProvince(e.target.value));
@@ -104,6 +108,12 @@
     window.addEventListener('online', () => { toast('กลับมาออนไลน์แล้ว'); flushOutbox(); });
   }
 
+  function toggleLinks(force) {
+    const btn = $('linksToggle');
+    const open = typeof force === 'boolean' ? force : btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    $('linksMenu').classList.toggle('open', open);
+  }
   function toggleMenu(force) {
     const open = typeof force === 'boolean' ? force : !$('mainNav').classList.contains('open');
     $('mainNav').classList.toggle('open', open);
@@ -310,7 +320,7 @@
     $('provinceLogo').hidden = !logo;
     $('provinceLogoFallback').hidden = Boolean(logo);
     if (logo) { $('provinceLogo').src = logo.path; $('provinceLogo').alt = 'ตราประจำจังหวัด' + C.provinceName(code); }
-    $('areaSubtitle').textContent = code && code !== C.ALL ? 'พื้นที่การเกษตรในจังหวัด' + C.provinceName(code) : 'พื้นที่การเกษตรของประเทศไทย';
+    $('areaSubtitle').innerHTML = code && code !== C.ALL ? '<span class="sub-long">พื้นที่การเกษตรใน</span>จังหวัด' + esc(C.provinceName(code)) : '<span class="sub-long">พื้นที่การเกษตร</span>ของประเทศไทย';
   }
 
   function setLoading(on) {
@@ -330,10 +340,11 @@
   }
   const shortMonth = m => C.monthLabel(m).replace(/(\d{2})(\d{2})$/, '$2');
   function buildPeriodOptions() {
+    const narrow = window.matchMedia && matchMedia('(max-width: 430px)').matches;
     const groups = C.fiscalGroups(C.monthsBetween(state.rows));
     const opts = groups.map(g => '<optgroup label="ปีงบประมาณ ' + g.year + '">' + g.months.map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('') + '</optgroup>').join('');
     $('startMonth').innerHTML = opts; $('endMonth').innerHTML = opts;
-    $('periodPreset').innerHTML = groups.map(g => '<option value="fy:' + g.year + '">ปีงบ ' + g.year + ' (' + esc(shortMonth(g.months[0])) + '–' + esc(shortMonth(g.months[g.months.length - 1])) + ')</option>').join('') +
+    $('periodPreset').innerHTML = groups.map(g => '<option value="fy:' + g.year + '">ปีงบ ' + g.year + (narrow ? '' : ' (' + esc(shortMonth(g.months[0])) + '–' + esc(shortMonth(g.months[g.months.length - 1])) + ')') + '</option>').join('') +
       (groups.length > 1 ? '<option value="all">ทุกช่วงเวลา</option>' : '') + '<option value="custom">กำหนดเอง…</option>';
   }
   function applyPreset(v) {
@@ -456,10 +467,16 @@
   const areaLabel = r => [r.village, r.tambon, r.district].concat(allMode() ? ['จ.' + C.provinceName(r.provinceCode)] : []).filter(Boolean).join(' · ') || 'ไม่ระบุพื้นที่';
   function card(r, canRecord) {
     const todo = canRecord && r.status === 'pending';
-    return '<article class="hotspot-card' + (todo ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '" tabindex="0" role="button" aria-label="' + esc('จุด ' + r.hsId + ' ' + areaLabel(r) + ' ' + statusText(r)) + '">' +
-      '<div class="row"><h3>' + esc(areaLabel(r)) + '</h3><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div>' +
-      '<p>' + esc(r.plantType) + ' · ' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + (r.photoCount ? ' · ภาพ ' + r.photoCount : '') + (r.distance != null ? ' · <span class="distance">ห่าง ' + esc(C.formatDistance(r.distance)) + '</span>' : '') + '</p>' +
-      '<div class="card-actions"><span class="hotspot-id">' + esc(r.hsId) + '</span><button type="button" class="icon-text" data-show-map aria-label="แสดงจุด ' + esc(r.hsId) + ' บนแผนที่">⌖ แผนที่</button>' +
+    const place = r.village || ('ต.' + (r.tambon || '—'));
+    const area = [r.village ? 'ต.' + r.tambon : '', r.district ? 'อ.' + r.district : '', allMode() ? 'จ.' + C.provinceName(r.provinceCode) : ''].filter(x => x && x.length > 2).join(' · ');
+    const meta = ['<span>' + esc(r.plantType) + '</span>', '<span>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</span>']
+      .concat(r.photoCount ? ['<span>ภาพ ' + Number(r.photoCount) + '</span>'] : [])
+      .concat(r.distance != null ? ['<span class="distance">ห่าง ' + esc(C.formatDistance(r.distance)) + '</span>'] : []).join('');
+    return '<article class="hotspot-card st-' + esc(statusClass(r)) + (todo ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '" tabindex="0" role="button" aria-label="' + esc('จุด ' + r.hsId + ' ' + areaLabel(r) + ' ' + statusText(r)) + '">' +
+      '<div class="hc-top"><h3 class="hc-place">' + esc(place) + '</h3><span class="status-pill ' + esc(statusClass(r)) + '">' + esc(statusText(r)) + '</span></div>' +
+      (area ? '<p class="hc-area">' + esc(area) + '</p>' : '') +
+      '<p class="hc-meta">' + meta + '</p>' +
+      '<div class="card-actions"><span class="hotspot-id" title="' + esc(r.hsId) + '">' + esc(r.hsId) + '</span><button type="button" class="icon-text" data-show-map aria-label="แสดงจุด ' + esc(r.hsId) + ' บนแผนที่">⌖ แผนที่</button>' +
       (canRecord ? '<span class="card-cta' + (todo ? ' todo' : '') + '">' + (todo ? 'บันทึกผล ›' : 'ดู / แก้ไข ›') + '</span>' : '') + '</div></article>';
   }
   const markerColor = r => r.status === 'draft' ? C.COLORS.draft : r.status === 'verified' ? (C.COLORS[r.result] || C.COLORS.not_found) : C.COLORS.pending;

@@ -76,6 +76,20 @@ function cellText_(v) {
   return String(v);
 }
 
+/** อ่านเฉพาะ n แถวล่าสุด (ชีตบันทึกที่เพิ่มแถวต่อท้ายเสมอ) — ไม่ใส่แคช */
+function readTail_(name, n) {
+  const sh = sheet_(name);
+  const header = headerOf_(sh);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const start = Math.max(2, last - n + 1);
+  return sh.getRange(start, 1, last - start + 1, header.length).getValues().map((v, i) => {
+    const o = { _row: start + i };
+    header.forEach((h, j) => { if (h) o[h] = cellText_(v[j]); });
+    return o;
+  });
+}
+
 function findRow_(name, fn) { return readAll_(name).find(fn) || null; }
 
 /** ค่าในคอลัมน์ข้อความใส่ ' นำหน้า เพื่อไม่ให้ Google Sheet แปลงเป็นตัวเลข/วันที่ (เครื่องหมายนี้ไม่แสดงในเซลล์) */

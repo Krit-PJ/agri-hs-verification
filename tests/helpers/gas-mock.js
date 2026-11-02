@@ -82,6 +82,7 @@ function createContext({ sources = {}, now = () => new Date() } = {}) {
     createFolder: n => folder(n),
     createFile: blob => { const id = 'F' + (++fileSeq); files.set(id, { blob, trashed: false }); return { getId: () => id }; }
   });
+  const lockState = { busy: false };
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     Logger: { log() {} },
@@ -105,7 +106,7 @@ function createContext({ sources = {}, now = () => new Date() } = {}) {
       getAll: keys => Object.fromEntries(keys.filter(k => cache.has(k)).map(k => [k, cache.get(k)])),
       remove: k => cache.delete(k)
     }) },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    LockService: { getScriptLock: () => ({ tryLock: () => !lockState.busy, waitLock() { if (lockState.busy) throw new Error('Lock timeout'); }, releaseLock() {} }) },
     DriveApp: {
       getFolderById: id => folder(id),
       getFileById: id => {
@@ -145,7 +146,7 @@ function createContext({ sources = {}, now = () => new Date() } = {}) {
     + '\nthis.__api={handle_,doGet,doPost,setup,readAll_,resetRequestCache_,publicHotspots_,copyAccountsFromRiskMap,DB_ID,DEFAULT_SOURCE_ID};';
   vm.runInContext(code, ctx, { filename: 'apps-script.gs' });
   ctx.DB_ID_FOR_TEST = ctx.__api.DB_ID;
-  return { ctx, db, api: ctx.__api, props, files, cache };
+  return { ctx, db, api: ctx.__api, props, files, cache, lockState };
 }
 
 module.exports = { createContext, Spreadsheet, Sheet };

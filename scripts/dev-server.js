@@ -14,6 +14,12 @@ const { createContext, Spreadsheet } = require('../tests/helpers/gas-mock');
 const root = path.join(__dirname, '..');
 const port = Number(process.argv[2] || 8085);
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests', 'fixtures', 'source-db.json'), 'utf8'));
+// DEV_MANY=300 node scripts/dev-server.js → เพิ่มจุด HS สมมุติในกำแพงเพชรเพื่อทดสอบรายการยาว
+const many = Number(process.env.DEV_MANY || 0);
+for (let i = 0; i < many; i++) {
+  const d = new Date(Date.UTC(2025, 10, 1) + (i % 280) * 86400000).toISOString().slice(0, 10);
+  fixture.HS_62.push(['DEV' + String(i).padStart(5, '0') + 'urgsamplepoint', d, '13:' + String(i % 60).padStart(2, '0'), '6201', '620113', i % 3 ? 'เมืองกำแพงเพชร' : 'ขาณุวรลักษบุรี', i % 2 ? 'เทพนคร' : 'ยางสูง', 'บ้านทดสอบหมู่ที่ ' + (i % 15 + 1) + ' ชื่อหมู่บ้านค่อนข้างยาว', i % 4 ? 'นาข้าว' : 'อ้อย', String(16.2 + (i % 40) * 0.01), String(99.4 + (i % 37) * 0.012), '', '']);
+}
 const env = createContext({ sources: { '178jFMiZLLsq4f1Juq2FADERx_mYs8bAB2yzdYa5cp-A': new Spreadsheet(fixture) } });
 env.api.setup();
 

@@ -37,7 +37,7 @@ var HSAdmin = (() => {
   function showAccessTab(which) {
     document.querySelectorAll('[data-access-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.accessTab === which)));
     document.querySelectorAll('[data-access-panel]').forEach(p => { p.hidden = p.dataset.accessPanel !== which; });
-    $('accessTitle').textContent = which === 'register' ? 'ขออนุญาตใช้งาน' : 'เข้าใช้งานระบบ';
+    $('accessTitle').textContent = which === 'register' ? 'ลงทะเบียน Admin' : 'เข้าใช้งานระบบ';
   }
   async function login(e, kind) {
     e.preventDefault();
@@ -63,9 +63,9 @@ var HSAdmin = (() => {
     if (!$('regProvince').value) { msg.textContent = 'กรุณาเลือกจังหวัดที่ปฏิบัติงาน'; return; }
     if (!C.validPhone(phone)) { msg.textContent = 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง 0812345678)'; return; }
     if (!$('regConsent').checked) { msg.textContent = 'กรุณายืนยันการรับทราบการใช้ข้อมูลส่วนบุคคล'; return; }
-    btn.disabled = true; btn.textContent = 'กำลังลงทะเบียน…'; msg.textContent = '';
+    btn.disabled = true; btn.textContent = 'กำลังลงทะเบียน…'; msg.textContent = 'กำลังบันทึก อาจใช้เวลา 5–30 วินาทีในช่วงที่มีผู้ใช้มาก';
     try {
-      const user = await HSApi.register({ phone, fullName: $('regName').value, position: $('regPosition').value, affiliation: $('regAffiliation').value, provinceCode: $('regProvince').value, consent: true });
+      const user = await HSApi.register({ phone, fullName: $('regName').value, position: $('regPosition').value, affiliation: $('regAffiliation').value, provinceCode: $('regProvince').value, consent: true }, s => { msg.textContent = s; });
       e.target.reset();
       $('accessDialog').close();
       ctx.toast('ลงทะเบียนสำเร็จ ยินดีต้อนรับ ' + user.name + ' — ครั้งต่อไปเข้าสู่ระบบด้วยเบอร์ ' + phone);

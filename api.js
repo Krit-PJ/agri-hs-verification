@@ -57,9 +57,28 @@ var HSApi = (() => {
     return adopt(await post(kind === 'super' ? 'login_super' : 'login_admin', Object.assign({ device: device() }, credentials)));
   }
 
-  /** ลงทะเบียน Admin — สำเร็จแล้วเข้าสู่ระบบให้ทันที */
-  async function register(form) {
-    return adopt(await post('register', Object.assign({ device: device() }, form)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const isSlow = err => err && (err.network || /ช้าเกินไป|ผู้บันทึกข้อมูลพร้อมกัน/.test(err.message));
+
+  /**
+   * ลงทะเบียน Admin — สำเร็จแล้วเข้าสู่ระบบให้ทันที
+   * ถ้าเครือข่าย/ระบบตอบช้าจนหมดเวลา ระบบอาจบันทึกไปแล้ว: ลองเข้าสู่ระบบด้วยเบอร์เดิมให้อัตโนมัติ
+   * (Admin เข้าระบบด้วยเบอร์โทรอย่างเดียวอยู่แล้ว และ Backend ไม่สร้างบัญชีซ้ำ)
+   */
+  async function register(form, onStatus) {
+    let first;
+    try { return adopt(await post('register', Object.assign({ device: device() }, form), 60000)); }
+    catch (err) { first = err; }
+    const already = /ลงทะเบียนแล้ว/.test(first.message);
+    if (!already && !isSlow(first)) throw first;
+    for (let i = 0; i < (already ? 1 : 3); i++) {
+      if (onStatus) onStatus(already ? 'เบอร์นี้ลงทะเบียนไว้แล้ว กำลังเข้าสู่ระบบ…' : 'ระบบตอบช้า กำลังตรวจสอบว่าลงทะเบียนสำเร็จหรือยัง… (' + (i + 1) + '/3)');
+      if (!already) await wait(i ? 6000 : 2500);
+      try { return await login('admin', { phone: form.phone }); }
+      catch (err) { if (/ระงับ/.test(err.message)) throw err; }
+    }
+    if (already) throw first;
+    throw new Error('ระบบตอบช้า ยังยืนยันการลงทะเบียนไม่ได้ — กด “ลงทะเบียนและเริ่มใช้งาน” อีกครั้งได้เลย ระบบจะไม่สร้างบัญชีซ้ำ');
   }
 
   async function logout() {

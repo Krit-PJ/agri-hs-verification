@@ -72,8 +72,12 @@ function distanceM_(lat1, lng1, lat2, lng2) {
 
 function json_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-function withLock_(fn) {
+/**
+ * ล็อกสั้นที่สุดเท่าที่จำเป็น (เฉพาะช่วงเขียนชีตที่ต้องไม่ชนกัน)
+ * ไม่ได้ล็อกภายในเวลาที่กำหนด → แจ้งข้อความภาษาไทยแทน "Lock timeout"
+ */
+function withLock_(fn, waitMs) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(waitMs || LOCK_WAIT_MS)) throw new Error(BUSY_MESSAGE);
   try { return fn(); } finally { lock.releaseLock(); }
 }

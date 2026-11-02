@@ -396,3 +396,129 @@ details.table-card>summary{cursor:pointer;font-weight:800;color:var(--teal-950)}
 .summary-actions .check-option{align-self:center;height:auto;margin:0}
 #adminPanels td.row-actions{white-space:nowrap}
 #adminPanels td.row-actions .compact+.compact{margin-left:6px}
+
+/* =====================================================================
+   v3.5 — การ์ดจุด HS: ไม่ถูกบีบในรายการยาว + โครงอ่านง่าย
+   ต้นเหตุเดิม: .hotspot-list เป็น flex คอลัมน์ที่จำกัดความสูง การ์ด (min-height:0)
+   จึงถูกบีบเหลือ ~26px แล้วข้อความล้นทับการ์ดถัดไปเมื่อมีจุดจำนวนมาก
+   ===================================================================== */
+.hotspot-list>.hotspot-card{flex:0 0 auto}
+.hotspot-list{gap:8px;scrollbar-gutter:stable}
+.hotspot-card{position:relative;display:grid;gap:3px;padding:11px 12px 10px 15px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;min-height:0}
+.hotspot-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--orange-600)}
+.hotspot-card.st-pending::before{background:var(--orange-600)}
+.hotspot-card.st-draft::before{background:#2f7bc0}
+.hotspot-card.st-burned::before{background:#cb2c29}
+.hotspot-card.st-not_burned::before{background:#18845d}
+.hotspot-card.st-not_found::before,.hotspot-card.st-needs_review::before,.hotspot-card.st-inaccessible::before{background:#7a8a86}
+.hotspot-card.todo{border-left:1px solid var(--line)}
+.hotspot-card:hover{border-color:var(--color-primary);box-shadow:0 3px 12px #172d2412}
+.hotspot-card.selected{border-color:var(--color-primary);box-shadow:0 0 0 2px #1a7f3733}
+.hc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.hotspot-card .hc-place{margin:0;font-size:.95rem;line-height:1.4;font-weight:700;color:var(--ink);min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.hc-top .status-pill{flex:0 0 auto;margin-top:1px}
+.hotspot-card .hc-area{margin:0;font-size:.8rem;line-height:1.4;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hotspot-card .hc-meta{margin:2px 0 0;display:flex;flex-wrap:wrap;gap:2px 0;font-size:.8rem;line-height:1.45;color:#3f514d}
+.hc-meta span+span::before{content:'·';margin:0 6px;color:#9aa8a5}
+.hotspot-card .card-actions{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:7px;border-top:1px dashed #e1e8e6;min-width:0}
+.hotspot-card .hotspot-id{flex:1 1 auto;min-width:0;font-size:.7rem;color:#8a9894;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hotspot-card .icon-text{flex:0 0 auto;min-height:32px;padding:4px 6px;border-radius:8px}
+.hotspot-card .icon-text:hover{background:var(--teal-50)}
+.hotspot-card .card-cta{flex:0 0 auto;font-size:.82rem}
+.hotspot-card .card-cta.todo{padding:6px 11px;border-radius:8px}
+.map-layout.list-only .hotspot-list{align-items:start}
+@media (min-width:801px){
+  .map-wrap,#map,.result-panel{height:calc(100vh - 372px);min-height:440px}
+  .result-panel{padding:8px}
+  .result-panel .hotspot-list{padding:2px 4px 6px 2px}
+}
+
+/* v3.5 — ลิงก์ที่เกี่ยวข้อง (ถัดจาก งานของฉัน / ผู้ดูแลระบบ) */
+.nav-links{position:relative;display:flex}
+.nav-more svg{transition:transform .15s}
+.nav-more[aria-expanded="true"]{background:var(--teal-100);color:var(--teal-900)}
+.nav-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.links-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:1200;min-width:290px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px #0b2a1f2e;padding:6px}
+.links-menu.open{display:grid}
+.links-heading{display:none;margin:0;padding:6px 12px 4px;font-size:.75rem;font-weight:800;color:var(--muted)}
+.links-menu a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 12px;border-radius:10px;color:var(--teal-950);font-weight:650;font-size:.92rem;text-decoration:none}
+.links-menu a span{color:var(--muted);font-size:.85rem}
+.links-menu a:hover,.links-menu a:focus-visible{background:var(--teal-50)}
+.links-menu a[href="privacy.html"]{border-top:1px solid var(--line);border-radius:0 0 10px 10px;margin-top:4px;padding-top:10px;color:var(--muted)}
+
+/* =====================================================================
+   v3.5 — มือถือ: หัวเว็บกะทัดรัด, แถบผลลัพธ์ติดบนบรรทัดเดียว,
+   รายการจุดเลื่อนพร้อมหน้าเว็บ (ไม่เลื่อนซ้อน), เมนูแบ่งหมวด, ปุ่มแตะง่าย
+   ===================================================================== */
+@media screen and (max-width:700px){
+  .topbar{position:relative;height:auto;min-height:0;padding:10px 12px;align-items:center;gap:10px}
+  .brand{align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+  .agency-logos{padding-top:0;flex-wrap:nowrap;gap:4px}
+  .topbar .agency-logo,.topbar .province-mark{width:38px;height:38px}
+  .brand-copy{min-width:0}
+  .brand-copy strong{font-size:1rem;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand .brand-copy small,.brand-copy small:not(.developer-credit){display:block;font-size:.78rem;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9}
+  .header-actions{padding-top:0;flex:0 0 auto}
+  #menuButton{width:46px;height:46px;border-radius:12px}
+
+  /* เมนู ☰ : รายการหลัก + หมวดลิงก์ที่เกี่ยวข้อง */
+  .main-nav.open{padding:8px 12px 12px;gap:2px;box-shadow:0 10px 24px #0b2a1f1f}
+  .main-nav .nav-item{min-height:48px;font-size:.98rem;border-radius:10px}
+  .nav-links{display:block;border-top:1px solid var(--line);margin:6px 0 4px;padding-top:4px}
+  .nav-more{display:none!important}
+  .links-menu,.links-menu.open{display:grid;position:static;min-width:0;border:0;box-shadow:none;padding:0}
+  .links-heading{display:block;padding:8px 12px 2px}
+  .links-menu a{min-height:46px;font-weight:600;color:#3f514d}
+  .links-menu a[href="privacy.html"]{border-top:0;margin-top:0;padding-top:8px;border-radius:10px}
+  #accessLoginNav{margin-top:6px;justify-content:center}
+
+  /* แถบผลลัพธ์: จำนวน + สลับ แผนที่/รายการ บรรทัดเดียว ติดด้านบนเมื่อเลื่อน */
+  .result-toolbar{position:sticky!important;top:0;z-index:850;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 10px;margin:0 -16px 10px;padding:8px 16px!important;background:rgba(244,247,245,.96);backdrop-filter:blur(6px);border-bottom:1px solid #e3ebe8}
+  .result-summary{gap:4px 8px;font-size:.85rem}
+  .result-summary strong{font-size:1.2rem}
+  .result-summary #selectedCount{gap:4px}
+  .tally{font-size:.72rem;padding:2px 8px}
+  .result-actions{display:contents}
+  .result-actions .segmented{grid-column:2;grid-row:1;padding:2px}
+  .result-actions .segmented button{min-height:38px;padding:4px 12px;font-size:.88rem}
+  .field-actions{grid-column:1/-1;grid-row:2}
+  .field-actions:empty{display:none}
+  .field-actions .compact{width:100%;min-height:44px}
+
+  /* แผนที่และรายการ */
+  .map-wrap,#map{height:58vh;min-height:320px;max-height:520px}
+  .result-panel{background:transparent;border:0;box-shadow:none;padding:0!important;margin-top:12px;height:auto!important;max-height:none!important}
+  .result-panel .hotspot-list{overflow:visible!important;max-height:none!important;padding:0;gap:10px}
+  .hotspot-card{padding:12px 12px 10px 16px}
+  .hotspot-card .hc-place{font-size:1rem}
+  .hotspot-card .icon-text{min-height:40px;padding:6px 8px}
+  .hotspot-card .card-cta.todo{min-height:40px;display:inline-flex;align-items:center}
+  #loadMore{min-height:48px}
+  .leaflet-touch .leaflet-control-layers-toggle{width:44px;height:44px}
+  .map-legend{left:8px;right:8px;bottom:22px;gap:4px 10px;font-size:.72rem;padding:6px 10px}
+
+  /* ส่วนท้าย */
+  .site-footer{padding:20px 16px 28px}
+}
+@media screen and (max-width:380px){
+  .topbar .agency-logo,.topbar .province-mark{width:34px;height:34px}
+  .result-summary #selectedCount .tally.ok{display:none}
+}
+@media screen and (max-width:700px){
+  .topbar{position:sticky!important;top:0}
+  .brand-copy .sub-long{display:none}
+  .result-toolbar{top:var(--topbar-h,64px)}
+}
+@media screen and (max-width:700px){
+  .topbar .agency-logo,.topbar .province-mark{width:34px;height:34px}
+}
+@media screen and (max-width:380px){
+  .topbar .agency-logo,.topbar .province-mark{width:30px;height:30px}
+  .brand-copy small:not(.developer-credit){font-size:.72rem}
+}
+/* ชื่อระบบบรรทัดเดียวบนมือถือ (ทับค่า !important ของรุ่นก่อน) */
+@media screen and (max-width:700px){ .topbar .brand-copy strong{font-size:.87rem!important;line-height:1.35!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} }
+@media screen and (max-width:380px){ .topbar .brand-copy strong{font-size:.78rem!important} .topbar{padding:8px 10px;gap:6px} }
+@media screen and (max-width:700px){
+  .access-tabs button{white-space:nowrap;font-size:.88rem;padding-left:6px;padding-right:6px}
+}

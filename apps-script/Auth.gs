@@ -74,29 +74,36 @@ function register_(b) {
   const cache = CacheService.getScriptCache();
   const recent = Number(cache.get('regcount') || 0);
   if (recent >= REGISTER_LIMIT_PER_10_MIN) throw new Error('มีการลงทะเบียนจำนวนมากในขณะนี้ กรุณาลองใหม่ในอีก 10 นาที');
-  return withLock_(() => {
+  const dupMessage = acc => acc.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด';
+  // ตรวจซ้ำก่อนเข้าคิว (เร็ว) แล้วตรวจอีกครั้งในล็อกกันลงทะเบียนพร้อมกัน
+  const before = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
+  if (before) throw new Error(dupMessage(before));
+  const data = withLock_(() => {
+    resetRequestCache_();
     const existing = findRow_('Accounts', r => normalizePhone_(r.phone) === phone);
-    if (existing) throw new Error(existing.status === 'approved' ? 'เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยเบอร์นี้' : 'เบอร์โทรศัพท์นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบจังหวัด');
-    const accountId = nextAccountId_(prov);
-    const data = {
-      accountId: accountId, phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
+    if (existing) throw new Error(dupMessage(existing));
+    const row = {
+      accountId: nextAccountId_(prov), phone: phone, fullName: clean_(b.fullName), position: clean_(b.position), affiliation: clean_(b.affiliation),
       provinceCode: prov, provinceName: PROVINCES[prov], role: 'admin', status: 'approved',
       createdAt: now_(), approvedAt: now_(), approvedBy: 'ลงทะเบียนด้วยตนเอง', lastLoginAt: now_()
     };
-    appendObj_('Accounts', data);
-    const id = newId_('R');
+    appendObj_('Accounts', row);
+    return row;
+  });
+  // บันทึกประกอบอยู่นอกล็อก (เพิ่มแถวต่อท้าย ไม่ชนกัน) เพื่อไม่ให้ผู้อื่นต้องรอนาน
+  const id = newId_('R');
+  try {
     appendObj_('Requests', {
       requestId: id, phone: phone, fullName: data.fullName, position: data.position, affiliation: data.affiliation,
       provinceCode: prov, provinceName: PROVINCES[prov], requestedRole: 'admin', note: clean_(b.note, 500), consentAt: now_(),
-      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: accountId
+      status: 'auto_approved', createdAt: now_(), decidedAt: now_(), decidedBy: 'อัตโนมัติ', reason: '', accountId: data.accountId
     });
-    cache.put('regcount', String(recent + 1), 600);
-    const acc = findRow_('Accounts', r => r.accountId === accountId);
-    const user = accountUser_(acc);
-    logAttempt_('admin', phone, 'success', acc, device);
-    audit_(user, 'register', accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
-    return { ok: true, requestId: id, token: signToken_(user), user: user };
-  });
+  } catch (err) { console.error('request log failed: ' + err); }
+  cache.put('regcount', String(recent + 1), 600);
+  const user = accountUser_(data);
+  logAttempt_('admin', phone, 'success', data, device);
+  audit_(user, 'register', data.accountId + ' ' + data.fullName, 'ลงทะเบียน Admin ด้วยตนเอง · ' + data.position + ' · ' + data.affiliation, prov);
+  return { ok: true, requestId: id, token: signToken_(user), user: user };
 }
 
 /**
