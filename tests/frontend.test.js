@@ -143,30 +143,71 @@ test('land type + month range helpers (v3.6)', () => {
   assert.equal(C.applyFilters(rows, { landTypes: [] }).length, 4, 'empty list = every land type');
 });
 
-test('Agri-Risk Map API reader: one request per land type, mapped by column name, merged without duplicates', async () => {
+test('HS reader: snapshot first, live API on Update or when a land type has no snapshot, month range filtered locally', async () => {
   const HSRiskApi = require('../riskmap-api.js');
-  const columns = ['date', 'time', 'districtCode', 'district', 'subdistrictCode', 'subdistrict', 'village', 'plantType', 'landType', 'lat', 'lng', 'id', 'importedAt'];
+  HSRiskApi.clear();
+  const columns = ['date', 'time', 'districtCode', 'district', 'subdistrictCode', 'subdistrict', 'village', 'plantType', 'landType', 'lat', 'lng', 'id'];
+  const row = (id, date, land, lat = 16.2) => [date, '13:44', '6210', 'บึงสามัคคี', '621004', 'เทพนิมิต', 'บ้าน', 'นาข้าว', land, lat, 99.9, id];
   const calls = [];
   const fetcher = async url => {
-    const q = new URL(url).searchParams; calls.push(Object.fromEntries(q));
-    const land = q.get('land');
-    const rows = land === 'พื้นที่เกษตร'
-      ? [['2026-01-03', '13:44', '6210', 'บึงสามัคคี', '621004', 'เทพนิมิต', 'บ้านทุ่งผึ้ง', 'นาข้าว', land, 16.21909, 99.94696, 'VI2A', 'x'], ['2026-02-01', '', '6201', 'เมือง', '620101', 'ในเมือง', '', '', land, 16.4, 99.5, 'VI2B', 'x']]
-      : [['2026-03-05', '13:40', '6204', 'ขาณุ', '620403', 'ยางสูง', '', 'อ้อย', land, 16.1, 99.8, 'VI2C', 'x'], ['2026-03-05', '13:40', '6204', 'ขาณุ', '620403', 'ยางสูง', '', 'อ้อย', land, 'bad', 99.8, 'VI2D', 'x']];
-    return { ok: true, json: async () => ({ ok: true, land, columns, rows }) };
+    calls.push(url);
+    if (url.startsWith('snap/index.json')) return { ok: true, json: async () => ({ provinces: { 62: { lands: { 'พื้นที่เกษตร': { file: '62/0.json', at: '2026-11-16T02:00:00Z', count: 3 } } } } }) };
+    if (url.startsWith('snap/62/0.json')) return { ok: true, json: async () => ({ columns, rows: [row('A', '2025-12-30', 'พื้นที่เกษตร'), row('B', '2026-01-03', 'พื้นที่เกษตร'), row('C', '2026-02-01', 'พื้นที่เกษตร', 'bad')] }) };
+    const q = new URL(url).searchParams;
+    return { ok: true, json: async () => ({ ok: true, land: q.get('land'), columns, rows: [row(q.get('land') === 'เขต สปก.' ? 'S1' : 'L1', '2026-01-20', q.get('land'))] }) };
   };
-  const rows = await HSRiskApi.load('https://example.test/exec', '62', ['พื้นที่เกษตร', 'เขต สปก.'], '2026-01', '2026-02', { fetcher });
-  assert.deepEqual(rows.map(r => r.hsId), ['VI2A', 'VI2B', 'VI2C'], 'bad coordinates dropped');
-  assert.equal(rows[0].tambon, 'เทพนิมิต');
-  assert.equal(rows[0].landType, 'พื้นที่เกษตร');
-  assert.equal(rows[1].plantType, 'ไม่ระบุ');
-  assert.equal(rows[2].provinceCode, '62');
-  assert.deepEqual(calls.map(c => [c.action, c.fn, c.province, c.land, c.from, c.to]), [
-    ['api', 'hotspots', '62', 'พื้นที่เกษตร', '2026-01-01', '2026-02-28'],
-    ['api', 'hotspots', '62', 'เขต สปก.', '2026-01-01', '2026-02-28']]);
-  await HSRiskApi.load('https://example.test/exec', '62', ['พื้นที่เกษตร'], '2026-01', '2026-02', { fetcher });
-  assert.equal(calls.length, 2, 'second identical request served from memory');
-  const bad = async () => ({ ok: true, json: async () => ({ ok: true, land: 'พื้นที่เกษตร', columns, rows: [] }) });
-  await assert.rejects(HSRiskApi.load('https://example.test/exec', '62', ['เขต สปก.'], '2026-01', '2026-01', { fetcher: bad, force: true }), /ไม่รองรับประเภทพื้นที่/);
+  const o = { snapshotBase: 'snap/', fetcher };
+  const a = await HSRiskApi.load('https://api.test/exec', '62', ['พื้นที่เกษตร'], '2026-01', '2026-11', o);
+  assert.deepEqual(a.rows.map(r => r.hsId), ['B'], 'outside the month range and bad coordinates dropped');
+  assert.equal(a.via, 'snapshot');
+  assert.equal(a.at, '2026-11-16T02:00:00Z');
+  assert.ok(!calls.some(u => u.startsWith('https://api.test')), 'snapshot means no API call');
+  const b = await HSRiskApi.load('https://api.test/exec', '62', ['พื้นที่เกษตร', 'เขต สปก.'], '2026-01', '2026-11', o);
+  assert.deepEqual(b.rows.map(r => r.hsId).sort(), ['B', 'S1']);
+  assert.equal(b.via, 'mixed');
+  const live = calls.filter(u => u.startsWith('https://api.test')).map(u => Object.fromEntries(new URL(u).searchParams));
+  assert.deepEqual(live.map(c => [c.action, c.fn, c.province, c.land, c.from]), [['api', 'hotspots', '62', 'เขต สปก.', '2020-01-01']]);
+  const c = await HSRiskApi.load('https://api.test/exec', '62', ['พื้นที่เกษตร'], '2026-01', '2026-11', Object.assign({ force: true }, o));
+  assert.deepEqual(c.rows.map(r => r.hsId), ['L1'], 'Update reads the live API');
+  assert.equal(c.via, 'live');
+  const bad = async url => url.startsWith('snap/') ? { ok: false, status: 404, json: async () => ({}) } : { ok: true, json: async () => ({ ok: true, land: 'พื้นที่เกษตร', columns, rows: [] }) };
+  HSRiskApi.clear();
+  await assert.rejects(HSRiskApi.load('https://api.test/exec', '62', ['ป่าอนุรักษ์'], '2026-01', '2026-01', { snapshotBase: 'snap/', fetcher: bad }), /ไม่รองรับประเภทพื้นที่/);
   assert.equal(HSRiskApi.lastDay('2024-02'), '2024-02-29');
+});
+
+test('snapshot builder: one file per province × land type, reuses unchanged provinces, keeps old file on failure', async () => {
+  const os = require('node:os');
+  const { build } = require('../scripts/build-hs-snapshot.js');
+  const columns = ['date', 'time', 'districtCode', 'district', 'subdistrictCode', 'subdistrict', 'village', 'plantType', 'landType', 'lat', 'lng', 'id', 'importedAt'];
+  const published = {};
+  const calls = [];
+  const make = (updatedAt, failLand) => async url => {
+    const u = new URL(url);
+    if (u.origin === 'https://site.test') {
+      const key = u.pathname.replace('/data/hs/', '');
+      if (!published[key]) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, json: async () => JSON.parse(published[key]) };
+    }
+    const q = u.searchParams; calls.push(q.get('fn') + ':' + (q.get('land') || ''));
+    if (q.get('fn') === 'provinces') return { ok: true, json: async () => ({ ok: true, rows: [{ code: '62', name: 'กำแพงเพชร', first: '2024-01-01', last: '2026-11-13', updatedAt }] }) };
+    const land = q.get('land');
+    if (land === failLand) return { ok: false, status: 500, json: async () => ({}) };
+    return { ok: true, json: async () => ({ ok: true, land, columns, rows: land === 'พื้นที่เกษตร' ? [['2026-01-03', '13:44', '6210', 'บึงสามัคคี', '621004', 'เทพนิมิต', 'บ้าน', 'นาข้าว', land, 16.2, 99.9, 'VI2A', 'x']] : [] }) };
+  };
+  const quiet = () => {};
+  const dir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'hs1-'));
+  const idx1 = await build(dir1, { fetcher: make('T1'), api: 'https://api.test/exec', site: 'https://site.test/', log: quiet });
+  assert.equal(Object.keys(idx1.provinces['62'].lands).length, 6);
+  const agri = JSON.parse(fs.readFileSync(path.join(dir1, '62/0.json'), 'utf8'));
+  assert.deepEqual(agri.columns.includes('importedAt'), false);
+  assert.equal(agri.rows[0][agri.columns.indexOf('id')], 'VI2A');
+  assert.equal(calls.filter(c => c.startsWith('hotspots')).length, 6);
+  // เผยแพร่ชุดแรก แล้วสร้างใหม่โดยต้นทางไม่เปลี่ยน → ไม่เรียก API hotspots
+  for (const f of ['index.json', ...Array.from({ length: 6 }, (_, i) => '62/' + i + '.json')]) published[f] = fs.readFileSync(path.join(dir1, f), 'utf8');
+  calls.length = 0;
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'hs2-'));
+  const idx2 = await build(dir2, { fetcher: make('T1'), api: 'https://api.test/exec', site: 'https://site.test/', log: quiet });
+  assert.equal(calls.filter(c => c.startsWith('hotspots')).length, 0);
+  assert.equal(idx2.stats.reused, 6);
 });

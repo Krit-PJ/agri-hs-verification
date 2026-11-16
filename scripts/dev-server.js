@@ -43,7 +43,9 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/__risk') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify(url.searchParams.get('fn') === 'hotspots' ? riskHotspots(url.searchParams) : { ok: false, error: 'unknown action' }));
+    const fn = url.searchParams.get('fn');
+    const provinces = () => ({ ok: true, rows: fixture.ProvinceSummary.slice(1).map(r => ({ code: r[0], name: r[1], first: r[3], last: r[4], updatedAt: r[5] })) });
+    res.end(JSON.stringify(fn === 'hotspots' ? riskHotspots(url.searchParams) : fn === 'provinces' ? provinces() : { ok: false, error: 'unknown action' }));
     return;
   }
   if (url.pathname === '/__api') {

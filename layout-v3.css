@@ -572,3 +572,18 @@ details.table-card>summary{cursor:pointer;font-weight:800;color:var(--teal-950)}
   .land-panel{z-index:2200}
 }
 .land-panel .land-option input[type=checkbox]{width:20px;height:20px;min-height:0;min-width:0;margin:0;padding:0;box-shadow:none}
+
+/* v3.7 — ปุ่มอัปเดตข้อมูล + เวลาข้อมูล */
+.wb-update{min-height:44px;display:inline-flex;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--color-primary);background:var(--teal-50);color:var(--teal-950);border-radius:var(--radius-control);font:700 .92rem var(--font-body);cursor:pointer;white-space:nowrap}
+.wb-update:hover{background:var(--teal-100)}
+.wb-update:disabled{opacity:.7;cursor:progress}
+.wb-update-icon{font-size:1.2rem;line-height:1;display:inline-block}
+.wb-update.spin .wb-update-icon{animation:wbspin 1s linear infinite}
+.data-stamp{flex-basis:100%;font-size:.76rem;color:var(--muted);font-weight:600}
+.data-stamp:empty{display:none}
+@media (prefers-reduced-motion:reduce){.wb-update.spin .wb-update-icon{animation:none}}
+@media screen and (max-width:700px){
+  .wb-update{padding:0;width:46px;justify-content:center;grid-column:4;grid-row:2}
+  .wb-update .wb-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .data-stamp{font-size:.7rem}
+}

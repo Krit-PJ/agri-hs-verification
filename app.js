@@ -283,13 +283,28 @@
   async function fetchProvince(code, force) {
     const q = state.query;
     if (riskApi()) {
-      const [rows, status] = await Promise.all([HSRiskApi.load(riskApi(), code, q.lands, q.start, q.end, { force }), statusFor(code)]);
-      return withStatus(rows, status);
+      const p = state.provinces.find(x => x.code === code);
+      const [hs, status] = await Promise.all([HSRiskApi.load(riskApi(), code, q.lands, q.start, q.end, { force, from: p && p.firstDate }), statusFor(code)]);
+      noteDataAt(hs.at, hs.via);
+      return withStatus(hs.rows, status);
     }
     // ไม่ได้ตั้ง API ของ Risk Map: ใช้แหล่งเดิม แล้วกรองประเภทพื้นที่/ช่วงเดือนที่หน้าเว็บ
     const rows = HSApi.configured() ? C.fromApi(await HSApi.get('hotspots', { province: code }))
       : C.fromSheetSource((await HSSheetSource.load(cfg.sourceSheetUrl, code, C.PROVINCES)).rows);
     return C.applyFilters(rows, { landTypes: q.lands, start: q.start, end: q.end });
+  }
+
+  /** เวลาข้อมูลจุดความร้อนที่แสดงอยู่ (ใช้ค่าที่เก่าที่สุดเมื่อรวมหลายชุด) */
+  function noteDataAt(at, via) {
+    if (at && (!state.dataAt || at < state.dataAt)) state.dataAt = at;
+    if (via) state.dataVia = state.dataVia && state.dataVia !== via ? 'mixed' : via;
+  }
+  function renderDataStamp() {
+    const at = state.dataAt;
+    const when = at ? new Date(at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' น.' : '';
+    $('dataStamp').textContent = when ? 'ข้อมูล ณ ' + when : '';
+    $('dataStamp').title = state.dataVia === 'snapshot' ? 'สำเนาที่ระบบอัปเดตอัตโนมัติทุกวัน 09:00 และ 12:00 น. — กด “อัปเดตข้อมูล” เพื่ออ่านล่าสุดจาก API ระบบ Agri-Risk Map'
+      : 'อ่านจาก API ระบบ Agri-Risk Map โดยตรง';
   }
 
   /** โหลด HS ทุกจังหวัดพร้อมกันครั้งละ 4 จังหวัด */
@@ -381,6 +396,7 @@
     updateBrand();
     preparePeriod(code, false);
     const seq = ++state.loadSeq;
+    state.dataAt = ''; state.dataVia = '';
     setLoading(true);
     $('liveError').hidden = true;
     try {
@@ -401,6 +417,8 @@
       if (code === C.ALL && changed) $('summaryLevel').value = 'province';
       if (code !== C.ALL && $('summaryLevel').value === 'province') $('summaryLevel').value = 'amphoe';
       $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source + ' · ' + C.monthLabel(state.query.start) + ' – ' + C.monthLabel(state.query.end);
+      renderDataStamp();
+      if (force === true) toast('อัปเดตข้อมูลจาก API ระบบ Agri-Risk Map แล้ว' + ($('dataStamp').textContent ? ' · ' + $('dataStamp').textContent : ''));
     } catch (err) {
       if (seq !== state.loadSeq) return;
       state.rows = [];

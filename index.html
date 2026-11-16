@@ -8,11 +8,11 @@
   <title>ระบบตรวจสอบจุดความร้อนในพื้นที่การเกษตรของประเทศไทย</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="design-tokens.css?v=3.6">
-  <link rel="stylesheet" href="styles.css?v=3.6">
-  <link rel="stylesheet" href="registration.css?v=3.6">
-  <link rel="stylesheet" href="boundaries.css?v=3.6">
-  <link rel="stylesheet" href="layout-v3.css?v=3.6">
+  <link rel="stylesheet" href="design-tokens.css?v=3.7">
+  <link rel="stylesheet" href="styles.css?v=3.7">
+  <link rel="stylesheet" href="registration.css?v=3.7">
+  <link rel="stylesheet" href="boundaries.css?v=3.7">
+  <link rel="stylesheet" href="layout-v3.css?v=3.7">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600;700&amp;display=swap">
 </head>
 <body>
@@ -64,7 +64,7 @@
       <label class="wb-field wb-month wb-from"><span>ตั้งแต่</span><select id="startMonth"></select></label>
       <label class="wb-field wb-month wb-to"><span>ถึง</span><select id="endMonth"></select></label>
       <button id="filterToggle" class="wb-filter" type="button" aria-expanded="false" aria-controls="filterPanel"><span class="wb-label">ตัวกรอง</span><span id="filterCount" class="wb-count" hidden>0</span></button>
-      <button id="refreshDataButton" type="button" class="wb-icon" title="อ่านข้อมูลล่าสุด" aria-label="อ่านข้อมูลล่าสุด">↻</button>
+      <button id="refreshDataButton" type="button" class="wb-update" title="อ่านจุดความร้อนล่าสุดจาก API ระบบ Agri-Risk Map" aria-label="อัปเดตข้อมูลจุดความร้อนล่าสุด"><span class="wb-update-icon" aria-hidden="true">↻</span><span class="wb-label">อัปเดตข้อมูล</span></button>
     </div>
     <div id="filterChips" class="filter-chips" aria-live="polite"></div>
     <div id="filterPanel" class="filter-drawer" hidden>
@@ -92,7 +92,7 @@
       <button id="retryButton" class="notice-button" type="button" hidden>มีงานที่ยังส่งไม่สำเร็จ <span id="retryCount">0</span> รายการ — แตะเพื่อส่งอีกครั้ง</button>
 
       <div class="result-toolbar">
-        <p class="result-summary"><strong id="resultCount">0</strong> จุด <span id="selectedCount" class="muted"></span></p>
+        <p class="result-summary"><strong id="resultCount">0</strong> จุด <span id="selectedCount" class="muted"></span><span id="dataStamp" class="data-stamp"></span></p>
         <div class="result-actions">
           <div id="fieldBar" class="field-actions"></div>
           <div class="segmented" role="group" aria-label="รูปแบบการแสดงผล">
@@ -244,16 +244,16 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="site-config.js?v=3.6"></script>
-  <script src="core.js?v=3.6"></script>
-  <script src="api.js?v=3.6"></script>
-  <script src="riskmap-api.js?v=3.6"></script>
-  <script src="sheet-source.js?v=3.6"></script>
-  <script src="province-logos.js?v=3.6"></script>
-  <script src="evidence.js?v=3.6"></script>
-  <script src="image-compression.js?v=3.6"></script>
-  <script src="outbox.js?v=3.6"></script>
-  <script src="admin.js?v=3.6"></script>
-  <script src="app.js?v=3.6" defer></script>
+  <script src="site-config.js?v=3.7"></script>
+  <script src="core.js?v=3.7"></script>
+  <script src="api.js?v=3.7"></script>
+  <script src="riskmap-api.js?v=3.7"></script>
+  <script src="sheet-source.js?v=3.7"></script>
+  <script src="province-logos.js?v=3.7"></script>
+  <script src="evidence.js?v=3.7"></script>
+  <script src="image-compression.js?v=3.7"></script>
+  <script src="outbox.js?v=3.7"></script>
+  <script src="admin.js?v=3.7"></script>
+  <script src="app.js?v=3.7" defer></script>
 </body>
 </html>

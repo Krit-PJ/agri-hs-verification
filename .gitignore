@@ -21,3 +21,4 @@ docs/AppsScript-before-*.json
 # Apps Script secrets (never commit)
 apps-script/Secrets.gs
 Secrets.gs
+data/hs/

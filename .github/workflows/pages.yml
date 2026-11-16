@@ -2,6 +2,9 @@ name: Publish static site
 on:
   push:
     branches: [main]
+  schedule:
+    # อัปเดตสำเนาจุดความร้อนจาก API ระบบ Agri-Risk Map ทุกวัน 09:00 และ 12:00 น. (เวลาไทย = UTC+7)
+    - cron: '0 2,5 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +31,9 @@ jobs:
           mkdir _site
           cp *.html *.css *.js .nojekyll _site/
           cp -R assets data risk _site/
+      - name: Snapshot HS points from Agri-Risk Map API
+        run: node scripts/build-hs-snapshot.js _site/data/hs
+        timeout-minutes: 30
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
