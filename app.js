@@ -83,7 +83,7 @@
     $('applyFiltersMobile').addEventListener('click', () => { toggleFilters(false); if (mobile()) document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth' }); });
     $('filterToggle').addEventListener('click', () => toggleFilters());
     $('filterChips').addEventListener('click', e => { const c = e.target.closest('[data-clear]'); if (c) clearFilter(c.dataset.clear); });
-    $('refreshDataButton').addEventListener('click', () => loadProvince(state.province, true));
+    $('refreshDataButton').addEventListener('click', () => { state.announceUpdate = true; loadProvince(state.province, true); });
     $('loadMore').addEventListener('click', () => { state.visible += PAGE; renderList(); });
     $('hotspotList').addEventListener('click', e => {
       const card = e.target.closest('[data-hs-id]');
@@ -264,17 +264,41 @@
     const lasts = list.map(p => String(p.lastDate || '').slice(0, 7)).filter(Boolean).sort();
     return { firstMonth: firsts[0] || '', lastMonth: lasts[lasts.length - 1] || '' };
   };
-  async function statusFor(code) {
-    if (!HSApi.configured()) return {};
-    try { return (await HSApi.get('hs_status', { province: code })).status || {}; }
+  /** สถานะผลตรวจของจังหวัด — จำไว้ในหน้า: เปลี่ยนประเภทพื้นที่/ช่วงเดือนแสดงทันที แล้วอ่านสถานะล่าสุดตามหลัง */
+  const statusCache = {};
+  async function fetchStatus(code) {
+    let status;
+    try { status = (await HSApi.get('hs_status', { province: code })).status || {}; }
     catch (err) {
       // Backend รุ่นก่อน 3.6 ยังไม่มี hs_status → ใช้สถานะจาก hotspots เดิม
-      try { return (await HSApi.get('hotspots', { province: code })).status || {}; } catch (_) { return {}; }
+      try { status = (await HSApi.get('hotspots', { province: code })).status || {}; } catch (_) { status = null; }
     }
+    if (status) statusCache[code] = status;
+    return status || statusCache[code] || {};
   }
-  function withStatus(rows, status) {
+  async function statusFor(code, force) {
+    if (!HSApi.configured()) return {};
+    if (force || !statusCache[code]) return fetchStatus(code);
+    fetchStatus(code).then(status => {
+      let changed = false;
+      state.rows.forEach(r => {
+        if (r.provinceCode !== code) return;
+        const s = status[r.hsId] || ['pending', '', '', 0];
+        if (r.status !== (s[0] || 'pending') || r.result !== (s[1] || '') || r.photoCount !== (Number(s[3]) || 0)) changed = true;
+      });
+      if (changed) { withStatus(state.rows.filter(r => r.provinceCode === code), status, true); applyFilters(); }
+    }).catch(() => {});
+    return statusCache[code];
+  }
+  function rememberStatus(r) {
+    const c = r && statusCache[r.provinceCode];
+    if (!c) return;
+    if (r.status === 'pending') delete c[r.hsId];
+    else c[r.hsId] = [r.status, r.result, r.inspectedDate, r.photoCount];
+  }
+  function withStatus(rows, status, reset) {
     rows.forEach(r => {
-      const s = status[r.hsId];
+      const s = status[r.hsId] || (reset ? ['pending', '', '', 0] : null);
       if (s) { r.status = s[0] || 'pending'; r.result = s[1] || ''; r.inspectedDate = s[2] || ''; r.photoCount = Number(s[3]) || 0; }
     });
     return rows;
@@ -284,7 +308,7 @@
     const q = state.query;
     if (riskApi()) {
       const p = state.provinces.find(x => x.code === code);
-      const [hs, status] = await Promise.all([HSRiskApi.load(riskApi(), code, q.lands, q.start, q.end, { force, from: p && p.firstDate }), statusFor(code)]);
+      const [hs, status] = await Promise.all([HSRiskApi.load(riskApi(), code, q.lands, q.start, q.end, { force, from: p && p.firstDate }), statusFor(code, force === true)]);
       noteDataAt(hs.at, hs.via);
       return withStatus(hs.rows, status);
     }
@@ -418,14 +442,14 @@
       if (code !== C.ALL && $('summaryLevel').value === 'province') $('summaryLevel').value = 'amphoe';
       $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source + ' · ' + C.monthLabel(state.query.start) + ' – ' + C.monthLabel(state.query.end);
       renderDataStamp();
-      if (force === true) toast('อัปเดตข้อมูลจาก API ระบบ Agri-Risk Map แล้ว' + ($('dataStamp').textContent ? ' · ' + $('dataStamp').textContent : ''));
+      if (force === true && state.announceUpdate) toast('อัปเดตข้อมูลจาก API ระบบ Agri-Risk Map แล้ว' + ($('dataStamp').textContent ? ' · ' + $('dataStamp').textContent : ''));
     } catch (err) {
       if (seq !== state.loadSeq) return;
       state.rows = [];
       showError('อ่านจุดความร้อน' + (code === C.ALL ? 'ทุกจังหวัด' : 'ของจังหวัด' + C.provinceName(code)) + ' ไม่สำเร็จ: ' + err.message);
       renderLandTypes();
       applyFilters();
-    } finally { if (seq === state.loadSeq) { setLoading(false); renderFieldBar(); } }
+    } finally { if (seq === state.loadSeq) { setLoading(false); renderFieldBar(); state.announceUpdate = false; } }
   }
 
   function updateBrand() {
@@ -1046,6 +1070,7 @@
     if (!r || !v) return;
     r.status = v.status; r.result = v.result || ''; r.inspectedDate = String(v.inspectedAt || '').slice(0, 10);
     r.photoCount = (state.existingPhotos.length || 0) + (addedPhotos || 0);
+    rememberStatus(r);
     applyFilters();
   }
 
@@ -1056,7 +1081,7 @@
     if (reason === null) return;
     try {
       await HSApi.post('verification_delete', { verificationId: rec.verificationId, reason });
-      const r = state.selected; r.status = 'pending'; r.result = ''; r.photoCount = 0;
+      const r = state.selected; r.status = 'pending'; r.result = ''; r.photoCount = 0; rememberStatus(r);
       toast('ลบผลตรวจแล้ว'); closeVerify(); applyFilters();
     } catch (err) { $('verifyMessage').textContent = err.message; }
   }
