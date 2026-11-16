@@ -16,7 +16,9 @@
   const state = {
     provinces: [], province: '', rows: [], filtered: [], visible: PAGE, source: '',
     map: null, markers: null, boundaryLayer: null, meLayer: null, boundary: {}, fitPending: false,
-    near: null, selected: null, record: null, existingPhotos: [], photos: [], location: null, busy: false, pendingHs: null
+    near: null, selected: null, record: null, existingPhotos: [], photos: [], location: null, busy: false, pendingHs: null,
+    // ประเภทพื้นที่ (เลือกได้หลายประเภท) + ช่วงเดือน — ใช้ขอข้อมูลจาก API ระบบ Agri-Risk Map
+    query: { lands: C.DEFAULT_LAND_TYPES.slice(), start: '', end: '', endAuto: true }, months: [], loadSeq: 0
   };
 
   document.addEventListener('DOMContentLoaded', init);
@@ -53,22 +55,34 @@
     $('accessLoginNav').addEventListener('click', () => { toggleMenu(false); HSApi.user() ? logout() : HSAdmin.openAccess('phone'); });
     $('provinceSelect').addEventListener('change', e => loadProvince(e.target.value));
     document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
-    ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'startMonth', 'endMonth'].forEach(id => $(id).addEventListener('change', () => {
+    ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter'].forEach(id => $(id).addEventListener('change', () => {
       if (id === 'provinceFilter') { $('districtFilter').value = ''; $('tambonFilter').value = ''; $('villageFilter').value = ''; loadBoundaries($('provinceFilter').value); }
       if (id === 'districtFilter') { $('tambonFilter').value = ''; $('villageFilter').value = ''; }
       if (id === 'tambonFilter') $('villageFilter').value = '';
-      if (['provinceFilter', 'districtFilter', 'tambonFilter', 'startMonth', 'endMonth'].includes(id)) fillLocationFilters();
+      if (['provinceFilter', 'districtFilter', 'tambonFilter'].includes(id)) fillLocationFilters();
       state.fitPending = ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter'].includes(id);
       applyFilters();
       if (id === 'districtFilter' || id === 'tambonFilter') drawBoundaries();
-      if (id === 'startMonth' || id === 'endMonth') $('periodPreset').value = 'custom';
     }));
+    ['startMonth', 'endMonth'].forEach(id => $(id).addEventListener('change', () => {
+      let a = $('startMonth').value, b = $('endMonth').value;
+      if (a > b) { [a, b] = [b, a]; $('startMonth').value = a; $('endMonth').value = b; }
+      state.query.start = a; state.query.end = b;
+      state.query.endAuto = b === state.months[state.months.length - 1];
+      reloadQuery();
+    }));
+    $('landTypeButton').addEventListener('click', e => { e.stopPropagation(); toggleLandPanel(); });
+    $('landTypePanel').addEventListener('click', e => e.stopPropagation());
+    $('landTypeAll').addEventListener('click', () => $('landTypeList').querySelectorAll('input').forEach(i => { i.checked = true; }));
+    $('landTypeDefault').addEventListener('click', () => $('landTypeList').querySelectorAll('input').forEach(i => { i.checked = C.DEFAULT_LAND_TYPES.includes(i.value); }));
+    $('landTypeApply').addEventListener('click', () => toggleLandPanel(false, true));
+    document.addEventListener('click', () => { if (!$('landTypePanel').hidden) toggleLandPanel(false, true); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('landTypePanel').hidden) { toggleLandPanel(false, false); $('landTypeButton').focus(); } });
     let t; $('searchFilter').addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 180); });
     $('resetFilters').addEventListener('click', resetFilters);
     $('applyFiltersMobile').addEventListener('click', () => { toggleFilters(false); if (mobile()) document.querySelector('.result-toolbar').scrollIntoView({ behavior: 'smooth' }); });
     $('filterToggle').addEventListener('click', () => toggleFilters());
     $('filterChips').addEventListener('click', e => { const c = e.target.closest('[data-clear]'); if (c) clearFilter(c.dataset.clear); });
-    $('periodPreset').addEventListener('change', () => { applyPreset($('periodPreset').value); fillLocationFilters(); applyFilters(); });
     $('refreshDataButton').addEventListener('click', () => loadProvince(state.province, true));
     $('loadMore').addEventListener('click', () => { state.visible += PAGE; renderList(); });
     $('hotspotList').addEventListener('click', e => {
@@ -242,76 +256,158 @@
     $('provinceFilter').innerHTML = '<option value="">ทุกจังหวัด</option>' + state.provinces.map(p => '<option value="' + esc(p.code) + '">' + esc(p.name) + '</option>').join('');
   }
 
-  /** โหลด HS ทุกจังหวัดพร้อมกันครั้งละ 4 จังหวัด (ใช้แคชฝั่งเซิร์ฟเวอร์ของแต่ละจังหวัด) */
-  async function loadAllProvinces() {
+  /* ---------- จุด HS: API ระบบ Agri-Risk Map (ประเภทพื้นที่ + ช่วงเดือน) + สถานะผลตรวจจาก Backend ของระบบนี้ ---------- */
+  const riskApi = () => cfg.riskMapApi || '';
+  const provinceMeta = code => {
+    const list = code === C.ALL ? state.provinces : state.provinces.filter(p => p.code === code);
+    const firsts = list.map(p => String(p.firstDate || '').slice(0, 7)).filter(Boolean).sort();
+    const lasts = list.map(p => String(p.lastDate || '').slice(0, 7)).filter(Boolean).sort();
+    return { firstMonth: firsts[0] || '', lastMonth: lasts[lasts.length - 1] || '' };
+  };
+  async function statusFor(code) {
+    if (!HSApi.configured()) return {};
+    try { return (await HSApi.get('hs_status', { province: code })).status || {}; }
+    catch (err) {
+      // Backend รุ่นก่อน 3.6 ยังไม่มี hs_status → ใช้สถานะจาก hotspots เดิม
+      try { return (await HSApi.get('hotspots', { province: code })).status || {}; } catch (_) { return {}; }
+    }
+  }
+  function withStatus(rows, status) {
+    rows.forEach(r => {
+      const s = status[r.hsId];
+      if (s) { r.status = s[0] || 'pending'; r.result = s[1] || ''; r.inspectedDate = s[2] || ''; r.photoCount = Number(s[3]) || 0; }
+    });
+    return rows;
+  }
+  /** จุด HS ของ 1 จังหวัดตาม state.query */
+  async function fetchProvince(code, force) {
+    const q = state.query;
+    if (riskApi()) {
+      const [rows, status] = await Promise.all([HSRiskApi.load(riskApi(), code, q.lands, q.start, q.end, { force }), statusFor(code)]);
+      return withStatus(rows, status);
+    }
+    // ไม่ได้ตั้ง API ของ Risk Map: ใช้แหล่งเดิม แล้วกรองประเภทพื้นที่/ช่วงเดือนที่หน้าเว็บ
+    const rows = HSApi.configured() ? C.fromApi(await HSApi.get('hotspots', { province: code }))
+      : C.fromSheetSource((await HSSheetSource.load(cfg.sourceSheetUrl, code, C.PROVINCES)).rows);
+    return C.applyFilters(rows, { landTypes: q.lands, start: q.start, end: q.end });
+  }
+
+  /** โหลด HS ทุกจังหวัดพร้อมกันครั้งละ 4 จังหวัด */
+  async function loadAllProvinces(force) {
     const codes = state.provinces.map(p => p.code), out = new Array(codes.length);
     let next = 0, done = 0;
     const failed = [];
     const worker = async () => {
       while (next < codes.length) {
         const i = next++;
-        try {
-          out[i] = HSApi.configured() ? C.fromApi(await HSApi.get('hotspots', { province: codes[i] }))
-            : C.fromSheetSource((await HSSheetSource.load(cfg.sourceSheetUrl, codes[i], C.PROVINCES)).rows);
-        } catch (err) { failed.push(C.provinceName(codes[i])); out[i] = []; }
+        try { out[i] = await fetchProvince(codes[i], force); }
+        catch (err) { failed.push(C.provinceName(codes[i])); out[i] = []; }
         done++;
         $('dataSourceLabel').textContent = 'กำลังอ่านจุดความร้อน ' + done + '/' + codes.length + ' จังหวัด…';
       }
     };
     await Promise.all(Array.from({ length: Math.min(4, codes.length) }, worker));
-    if (failed.length) showError('อ่านข้อมูลไม่สำเร็จบางจังหวัด: ' + failed.join(', ') + ' — กด “อัปเดตข้อมูล” เพื่อลองใหม่');
+    if (failed.length) showError('อ่านข้อมูลไม่สำเร็จบางจังหวัด: ' + failed.join(', ') + ' — กดปุ่ม ↻ เพื่อลองใหม่');
     return out.flat();
   }
 
+  /** ช่วงเดือนที่เลือกได้ + ค่าเริ่มต้น ม.ค. 2569 ถึงเดือนของข้อมูลล่าสุด */
+  function preparePeriod(code, reset) {
+    const meta = provinceMeta(code);
+    const def = C.defaultQueryPeriod(meta);
+    const last = meta.lastMonth || def.end || C.DEFAULT_START;
+    const first = meta.firstMonth && meta.firstMonth < def.start ? meta.firstMonth : def.start;
+    state.months = C.monthRange(first, last);
+    const q = state.query;
+    if (reset || !q.start) { q.start = def.start; q.end = def.end || last; q.endAuto = true; }
+    if (q.endAuto) q.end = last;
+    if (!state.months.includes(q.start)) q.start = state.months.find(m => m >= q.start) || state.months[0];
+    if (!state.months.includes(q.end)) q.end = state.months[state.months.length - 1];
+    if (q.start > q.end) q.start = q.end;
+    buildMonthOptions();
+  }
+  function buildMonthOptions() {
+    const years = new Map();
+    state.months.slice().reverse().forEach(m => { const y = Number(m.slice(0, 4)) + 543; if (!years.has(y)) years.set(y, []); years.get(y).push(m); });
+    const opts = Array.from(years, ([y, list]) => '<optgroup label="พ.ศ. ' + y + '">' + list.slice().reverse().map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('') + '</optgroup>').join('');
+    $('startMonth').innerHTML = opts; $('endMonth').innerHTML = opts;
+    $('startMonth').value = state.query.start; $('endMonth').value = state.query.end;
+  }
+
+  /* ---------- ประเภทพื้นที่: เลือกได้ 1 ประเภทหรือมากกว่า ---------- */
+  function landCounts() {
+    const m = {};
+    state.rows.forEach(r => { m[r.landType] = (m[r.landType] || 0) + 1; });
+    return m;
+  }
+  function renderLandTypes() {
+    const sel = state.query.lands, counts = landCounts();
+    $('landTypeValue').textContent = C.landTypeLabel(sel.length === C.LAND_TYPES.length ? [] : sel);
+    $('landTypeButton').classList.toggle('changed', sel.join('|') !== C.DEFAULT_LAND_TYPES.join('|'));
+    $('landTypeList').innerHTML = C.LAND_TYPES.map(t => '<label class="land-option"><input type="checkbox" value="' + esc(t) + '"' + (sel.includes(t) ? ' checked' : '') + '><span>' + esc(t) + '</span>' +
+      (sel.includes(t) && state.province ? '<small>' + (counts[t] || 0).toLocaleString('th-TH') + '</small>' : '') + '</label>').join('');
+  }
+  function toggleLandPanel(force, apply) {
+    const open = typeof force === 'boolean' ? force : $('landTypePanel').hidden;
+    if (open) renderLandTypes();
+    $('landTypePanel').hidden = !open;
+    $('landTypeButton').setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('land-open', open);
+    if (open) { const first = $('landTypeList').querySelector('input'); if (first) first.focus(); return; }
+    if (!apply) return renderLandTypes();
+    const picked = [...$('landTypeList').querySelectorAll('input:checked')].map(i => i.value);
+    const lands = picked.length ? C.LAND_TYPES.filter(t => picked.includes(t)) : C.DEFAULT_LAND_TYPES.slice();
+    if (!picked.length) toast('ต้องเลือกอย่างน้อย 1 ประเภท — ใช้ค่าเริ่มต้น “พื้นที่เกษตร”');
+    if (lands.join('|') === state.query.lands.join('|')) return renderLandTypes();
+    state.query.lands = lands;
+    renderLandTypes();
+    reloadQuery();
+  }
+  function reloadQuery() { if (state.province) loadProvince(state.province, 'query'); else renderLandTypes(); }
+
+  /**
+   * force: true = ปุ่ม ↻ (อ่านใหม่จากต้นทาง) · 'query' = เปลี่ยนประเภทพื้นที่/ช่วงเดือน (คงตัวกรองอื่น)
+   */
   async function loadProvince(code, force) {
     const user = HSApi.user();
     if (user && !C.can(user, 'chooseProvince') && code !== user.prov) code = user.prov;
     if (code === C.ALL && !C.can(user, 'allProvinces')) code = '';
     $('provinceSelect').value = code || '';
-    if (!code) { state.province = ''; state.rows = []; updateBrand(); renderAll(); return; }
-    if (code !== state.province) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); state.periodSet = false; }
+    if (!code) { state.province = ''; state.rows = []; updateBrand(); renderLandTypes(); renderAll(); return; }
+    const changed = code !== state.province;
+    if (changed) { resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); }
     state.province = code;
     try { localStorage.setItem(LAST_PROVINCE, code); } catch (_) {}
     updateBrand();
+    preparePeriod(code, false);
+    const seq = ++state.loadSeq;
     setLoading(true);
     $('liveError').hidden = true;
     try {
-      if (code === C.ALL) {
-        state.rows = await loadAllProvinces();
-        state.source = 'ฐานข้อมูลผลตรวจ + จุด HS ทุกจังหวัด (' + state.provinces.length + ' จังหวัด) จากระบบ Agri-Risk Map';
-      } else if (HSApi.configured()) {
-        state.rows = C.fromApi(await HSApi.get('hotspots', { province: code }));
-        state.source = 'ฐานข้อมูลผลตรวจ + จุด HS_' + code + ' จากระบบ Agri-Risk Map';
-      } else {
-        const res = await HSSheetSource.load(cfg.sourceSheetUrl, code, C.PROVINCES);
-        state.rows = C.fromSheetSource(res.rows);
-        state.source = 'Google Sheet ต้นทาง แท็บ HS_' + code + ' (อ่านอย่างเดียว)';
-      }
-      if (state.province !== code) return;
-      const period = force === true && state.periodSet ? [$('startMonth').value, $('endMonth').value] : null;
-      const preset = force === true && state.periodSet ? $('periodPreset').value : '';
-      buildPeriodOptions();
-      if (period) { $('startMonth').value = period[0]; $('endMonth').value = period[1]; $('periodPreset').value = [...$('periodPreset').options].some(o => o.value === preset) ? preset : 'custom'; }
-      if (!period || !$('startMonth').value) setDefaultPeriod();
-      state.periodSet = true;
+      const rows = code === C.ALL ? await loadAllProvinces(force === true) : await fetchProvince(code, force === true);
+      if (seq !== state.loadSeq) return;
+      state.rows = rows;
+      state.source = riskApi() ? 'API ระบบ Agri-Risk Map Burning (จุด HS) + ฐานข้อมูลผลตรวจของระบบนี้'
+        : HSApi.configured() ? 'ฐานข้อมูลผลตรวจ + จุด HS จากระบบ Agri-Risk Map' : 'Google Sheet ต้นทาง (อ่านอย่างเดียว)';
       fillLocationFilters();
       fillCropFilter();
-      loadBoundaries(code === C.ALL ? $('provinceFilter').value : code);
+      if (changed || force === true) loadBoundaries(code === C.ALL ? $('provinceFilter').value : code);
+      renderLandTypes();
       applyFilters();
-      const p = state.provinces.find(x => x.code === code);
-      $('provinceCoverage').textContent = state.rows.length.toLocaleString('th-TH') + ' จุด' + (code === C.ALL ? ' จาก ' + state.provinces.length + ' จังหวัด' : '') + (p && p.firstDate ? ' · ข้อมูล ' + C.thaiDate(p.firstDate) + ' – ' + C.thaiDate(p.lastDate) : '');
+      $('provinceCoverage').textContent = state.rows.length.toLocaleString('th-TH') + ' จุด · ' + C.landTypeLabel(state.query.lands) + (code === C.ALL ? ' · ' + state.provinces.length + ' จังหวัด' : '');
       $('provinceFilterWrap').hidden = code !== C.ALL;
       const levelOpt = $('summaryLevel').querySelector('option[value=province]');
       levelOpt.hidden = code !== C.ALL;
-      if (code === C.ALL && force !== true) $('summaryLevel').value = 'province';
-      $('periodPreset').disabled = !state.rows.length;
+      if (code === C.ALL && changed) $('summaryLevel').value = 'province';
       if (code !== C.ALL && $('summaryLevel').value === 'province') $('summaryLevel').value = 'amphoe';
-      $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source + ' · ' + ($('provinceCoverage').textContent || '');
+      $('dataSourceLabel').textContent = 'แหล่งข้อมูล: ' + state.source + ' · ' + C.monthLabel(state.query.start) + ' – ' + C.monthLabel(state.query.end);
     } catch (err) {
+      if (seq !== state.loadSeq) return;
       state.rows = [];
       showError('อ่านจุดความร้อน' + (code === C.ALL ? 'ทุกจังหวัด' : 'ของจังหวัด' + C.provinceName(code)) + ' ไม่สำเร็จ: ' + err.message);
-      renderAll();
-    } finally { setLoading(false); renderFieldBar(); }
+      renderLandTypes();
+      applyFilters();
+    } finally { if (seq === state.loadSeq) { setLoading(false); renderFieldBar(); } }
   }
 
   function updateBrand() {
@@ -338,23 +434,6 @@
     if (u.role !== 'superadmin') parts.push(C.scopeLabel(u));
     return parts.join(' · ');
   }
-  const shortMonth = m => C.monthLabel(m).replace(/(\d{2})(\d{2})$/, '$2');
-  function buildPeriodOptions() {
-    const narrow = window.matchMedia && matchMedia('(max-width: 430px)').matches;
-    const groups = C.fiscalGroups(C.monthsBetween(state.rows));
-    const opts = groups.map(g => '<optgroup label="ปีงบประมาณ ' + g.year + '">' + g.months.map(m => '<option value="' + m + '">' + esc(C.monthLabel(m)) + '</option>').join('') + '</optgroup>').join('');
-    $('startMonth').innerHTML = opts; $('endMonth').innerHTML = opts;
-    $('periodPreset').innerHTML = groups.map(g => '<option value="fy:' + g.year + '">ปีงบ ' + g.year + (narrow ? '' : ' (' + esc(shortMonth(g.months[0])) + '–' + esc(shortMonth(g.months[g.months.length - 1])) + ')') + '</option>').join('') +
-      (groups.length > 1 ? '<option value="all">ทุกช่วงเวลา</option>' : '') + '<option value="custom">กำหนดเอง…</option>';
-  }
-  function applyPreset(v) {
-    const months = C.monthsBetween(state.rows);
-    $('customPeriod').hidden = v !== 'custom';
-    if (v === 'custom') { toggleFilters(true); return; }
-    if (v === 'all') { $('startMonth').value = months[0] || ''; $('endMonth').value = months[months.length - 1] || ''; return; }
-    const y = Number(String(v).slice(3)), ce = y - 543;
-    $('startMonth').value = pickMonth((ce - 1) + '-10', 'start'); $('endMonth').value = pickMonth(ce + '-09', 'end');
-  }
   function toggleFilters(force) {
     const open = typeof force === 'boolean' ? force : $('filterPanel').hidden;
     $('filterPanel').hidden = !open;
@@ -373,22 +452,9 @@
     if (key === 'all') return resetFilters();
     fillLocationFilters(); state.fitPending = true; applyFilters(); drawBoundaries();
   }
-  function pickMonth(target, edge) {
-    const months = C.monthsBetween(state.rows);
-    if (!months.length) return '';
-    if (edge === 'start') return months.find(m => m >= target) || months[months.length - 1];
-    return months.slice().reverse().find(m => m <= target) || months[0];
-  }
-  function setDefaultPeriod() {
-    const p = C.defaultPeriod(state.rows);
-    $('startMonth').value = p.start ? pickMonth(p.start, 'start') : ''; $('endMonth').value = p.end ? pickMonth(p.end, 'end') : '';
-    const first = $('periodPreset').options[0];
-    if (first) { $('periodPreset').value = first.value; applyPreset(first.value); }
-  }
   function filters() {
-    let start = $('startMonth').value, end = $('endMonth').value;
-    if (start && end && start > end) [start, end] = [end, start];
-    return { start, end, province: allMode() ? $('provinceFilter').value : '', district: $('districtFilter').value, tambon: $('tambonFilter').value, village: $('villageFilter').value, crop: $('cropFilter').value, status: $('statusFilter').value, result: $('resultFilter').value, search: $('searchFilter').value };
+    const q = state.query;
+    return { start: q.start, end: q.end, landTypes: q.lands, province: allMode() ? $('provinceFilter').value : '', district: $('districtFilter').value, tambon: $('tambonFilter').value, village: $('villageFilter').value, crop: $('cropFilter').value, status: $('statusFilter').value, result: $('resultFilter').value, search: $('searchFilter').value };
   }
   function fillSelect(id, values, allLabel) {
     const sel = $(id), current = sel.value;
@@ -411,8 +477,14 @@
   function resetFilterControls() {
     ['provinceFilter', 'districtFilter', 'tambonFilter', 'villageFilter', 'cropFilter', 'statusFilter', 'resultFilter', 'searchFilter'].forEach(id => { $(id).value = ''; });
   }
+  /** ล้างตัวกรองทั้งหมด: ตัวกรองในลิ้นชัก + ประเภทพื้นที่ / ช่วงเวลา กลับเป็นค่าเริ่มต้น */
   function resetFilters() {
-    resetFilterControls(); setDefaultPeriod(); fillLocationFilters(); state.fitPending = true; state.near = null; clearMe(); applyFilters(); drawBoundaries(); renderFieldBar();
+    resetFilterControls(); state.fitPending = true; state.near = null; clearMe(); renderFieldBar();
+    const q = state.query, before = q.lands.join('|') + q.start + q.end;
+    q.lands = C.DEFAULT_LAND_TYPES.slice();
+    if (state.province) preparePeriod(state.province, true);
+    if (state.province && before !== q.lands.join('|') + q.start + q.end) return reloadQuery();
+    renderLandTypes(); fillLocationFilters(); applyFilters(); drawBoundaries();
   }
   function applyFilters() {
     let rows = C.applyFilters(state.rows, filters());
@@ -420,7 +492,7 @@
     state.filtered = rows;
     state.visible = PAGE;
     const f = filters();
-    $('periodHint').textContent = f.start ? 'แสดงจุดตั้งแต่ ' + C.monthLabel(f.start) + ' ถึง ' + C.monthLabel(f.end) + ' · ปีงบประมาณเริ่มเดือนตุลาคม' : '';
+    $('periodHint').textContent = f.start ? 'แสดงจุด' + C.landTypeLabel(f.landTypes) + ' ตั้งแต่ ' + C.monthLabel(f.start) + ' ถึง ' + C.monthLabel(f.end) : '';
     $('sortHint').hidden = !state.near;
     if (state.near) $('sortHint').textContent = 'เรียงจากจุดที่ใกล้ตำแหน่งของท่านที่สุด (ระยะเส้นตรง)';
     renderChips();
@@ -470,6 +542,7 @@
     const place = r.village || ('ต.' + (r.tambon || '—'));
     const area = [r.village ? 'ต.' + r.tambon : '', r.district ? 'อ.' + r.district : '', allMode() ? 'จ.' + C.provinceName(r.provinceCode) : ''].filter(x => x && x.length > 2).join(' · ');
     const meta = ['<span>' + esc(r.plantType) + '</span>', '<span>' + esc(C.thaiDate(r.date)) + (r.time ? ' ' + esc(r.time) + ' น.' : '') + '</span>']
+      .concat(state.query.lands.length > 1 && r.landType ? ['<span class="land-tag">' + esc(r.landType) + '</span>'] : [])
       .concat(r.photoCount ? ['<span>ภาพ ' + Number(r.photoCount) + '</span>'] : [])
       .concat(r.distance != null ? ['<span class="distance">ห่าง ' + esc(C.formatDistance(r.distance)) + '</span>'] : []).join('');
     return '<article class="hotspot-card st-' + esc(statusClass(r)) + (todo ? ' todo' : '') + '" data-hs-id="' + esc(r.hsId) + '" tabindex="0" role="button" aria-label="' + esc('จุด ' + r.hsId + ' ' + areaLabel(r) + ' ' + statusText(r)) + '">' +
@@ -516,7 +589,7 @@
     const rows = summaryRows(), t = C.tally(rows), f = filters();
     const stat = (v, label, color) => '<article class="stat-card" style="--accent:' + color + '"><strong>' + Number(v).toLocaleString('th-TH') + '</strong><span>' + label + '</span></article>';
     $('summaryStats').innerHTML = stat(t.total, 'จุดความร้อนทั้งหมด', '#174f38') + stat(t.verified, 'ตรวจแล้ว (' + t.progress + '%)', '#18845d') + stat(t.burned, 'พบการเผา', C.COLORS.burned) + stat(t.not_burned, 'ไม่พบการเผา', C.COLORS.not_burned) + stat(t.followup, 'ต้องติดตาม / ตรวจซ้ำ', C.COLORS.needs_review) + stat(t.pending + t.draft, 'รอตรวจ / งานร่าง', C.COLORS.pending);
-    $('summaryScopeHint').textContent = scopeName() + (f.province ? ' › จังหวัด' + C.provinceName(f.province) : '') + (f.district ? ' › อำเภอ' + f.district : '') + (f.tambon ? ' › ตำบล' + f.tambon : '') + (f.start ? ' · ' + C.monthLabel(f.start) + ' – ' + C.monthLabel(f.end) : '');
+    $('summaryScopeHint').textContent = scopeName() + (f.province ? ' › จังหวัด' + C.provinceName(f.province) : '') + (f.district ? ' › อำเภอ' + f.district : '') + (f.tambon ? ' › ตำบล' + f.tambon : '') + ' · ' + C.landTypeLabel(f.landTypes) + (f.start ? ' · ' + C.monthLabel(f.start) + ' – ' + C.monthLabel(f.end) : '');
     const groups = C.groupSummary(rows, $('summaryLevel').value);
     $('summaryBody').innerHTML = groups.length ? groups.map(g => '<tr><td data-label="พื้นที่">' + esc(g.area) + '</td><td data-label="ทั้งหมด">' + g.total + '</td><td data-label="ตรวจแล้ว">' + g.verified + '</td><td data-label="พบการเผา">' + g.burned + '</td><td data-label="ไม่พบการเผา">' + g.not_burned + '</td><td data-label="งานร่าง">' + g.draft + '</td><td data-label="ความคืบหน้า"><div class="progress" role="img" aria-label="' + g.progress + '%"><i style="width:' + g.progress + '%"></i></div><small>' + g.progress + '%</small></td></tr>').join('') : '<tr><td colspan="7" class="muted">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
   }

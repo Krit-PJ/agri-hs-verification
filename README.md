@@ -1,4 +1,4 @@
-# ระบบตรวจสอบจุดความร้อน (Agri Hot Spot Verification) v3.5
+# ระบบตรวจสอบจุดความร้อน (Agri Hot Spot Verification) v3.6
 
 ระบบบันทึกผลการลงพื้นที่ตรวจสอบจุดความร้อน (HS) ในพื้นที่การเกษตรของประเทศไทย
 ใช้ข้อมูล HS ชุดเดียวกับระบบ [Agri-Risk Map Burning](https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/)
@@ -8,7 +8,7 @@
 
 © copyright By Dr. Kitti PhoJuang กรมส่งเสริมการเกษตร
 
-> รุ่น 3.x แทนที่ระบบรุ่น 2.x ทั้งหมด — [v3.5 ลงทะเบียนไม่หมดเวลา · การ์ด · มือถือ](docs/RELEASE_V35_TH.md) · [v3.4 รายงานพร้อมภาพหลักฐาน](docs/RELEASE_V34_TH.md) · [v3.3 หน้าจอกระชับ แผนที่อยู่ในจอแรก](docs/RELEASE_V33_TH.md) · [v3.2 ดูทุกจังหวัด · Mini Super Admin ระดับประเทศ · ประวัติการเข้าใช้งาน](docs/RELEASE_V32_TH.md) · [v3.1 ลงทะเบียนใช้งานทันที งานภาคสนาม และมือถือ](docs/RELEASE_V31_TH.md) · [v3.0](docs/RELEASE_V30_TH.md) · เอกสารรุ่นเก่าอยู่ใน `docs/archive-v2/`
+> รุ่น 3.x แทนที่ระบบรุ่น 2.x ทั้งหมด — [v3.6 ประเภทพื้นที่ · ช่วงเดือน · API Risk Map](docs/RELEASE_V36_TH.md) · [v3.5 ลงทะเบียนไม่หมดเวลา · การ์ด · มือถือ](docs/RELEASE_V35_TH.md) · [v3.4 รายงานพร้อมภาพหลักฐาน](docs/RELEASE_V34_TH.md) · [v3.3 หน้าจอกระชับ แผนที่อยู่ในจอแรก](docs/RELEASE_V33_TH.md) · [v3.2 ดูทุกจังหวัด · Mini Super Admin ระดับประเทศ · ประวัติการเข้าใช้งาน](docs/RELEASE_V32_TH.md) · [v3.1 ลงทะเบียนใช้งานทันที งานภาคสนาม และมือถือ](docs/RELEASE_V31_TH.md) · [v3.0](docs/RELEASE_V30_TH.md) · เอกสารรุ่นเก่าอยู่ใน `docs/archive-v2/`
 
 ---
 
@@ -17,6 +17,7 @@
 | ส่วน | ที่เก็บ | การใช้งาน |
 |---|---|---|
 | ข้อมูล HS ต้นทาง | Google Sheet **TH Agri-Risk Map Burning V3 - Database** แท็บ `HS_<รหัสจังหวัด>` (เช่น `HS_62`) | อ่านอย่างเดียว ไม่แก้ไขต้นทาง |
+| จุด HS ที่หน้าเว็บแสดง | **API ระบบ Agri-Risk Map Burning** (`riskMapApi` ใน `site-config.js`, `fn=hotspots`) ข้อมูลชุดเดียวกับเว็บ Risk Map | กรองประเภทพื้นที่ (landType) และช่วงเดือน |
 | ฐานข้อมูลระบบนี้ | Google Sheet **[Thailand HS Verification - Database](https://docs.google.com/spreadsheets/d/1LOuhCmG8nSS5Si-wHUtgyUtbWYkTw-XKaVjrYBHPxlQ/edit)** ในโฟลเดอร์ Drive **5. Thailand HS Verification** | บัญชี คำขอ ผลตรวจ ภาพ บันทึกการใช้งาน |
 | ภาพหลักฐาน | โฟลเดอร์ Drive **HS Verification Photos** (แยกโฟลเดอร์ย่อยรายจังหวัด) | ไฟล์ส่วนตัว อ่านผ่าน API ที่ตรวจสิทธิ์เท่านั้น |
 
@@ -54,6 +55,7 @@ layout-v3.css         การจัดวางรุ่น 3 (แถบเค
 site-config.js        URL ของ Apps Script (apiEndpoint) — ตั้งครั้งเดียว
 core.js               ฟังก์ชันข้อมูล (ตัวกรอง ปีงบประมาณ สรุปผล CSV สิทธิ์)
 api.js                ติดต่อ Backend + Session
+riskmap-api.js        อ่านจุด HS จาก API ระบบ Agri-Risk Map (ประเภทพื้นที่ + ช่วงเดือน)
 app.js                แผนที่ รายการ ฟอร์มบันทึกผล สรุปผล รายงานพิมพ์
 admin.js              เข้าสู่ระบบ ขออนุญาต และแผงผู้ดูแล
 outbox.js             เก็บงานค้างเมื่อไม่มีสัญญาณแล้วส่งซ้ำ

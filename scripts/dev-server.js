@@ -25,8 +25,27 @@ env.api.setup();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.geojson': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf' };
 
+// จำลอง API ระบบ Agri-Risk Map (action=api&fn=hotspots) จากข้อมูลตัวอย่าง — ประเภทพื้นที่สมมุติตามลำดับแถว
+const DEV_LANDS = ['พื้นที่เกษตร', 'พื้นที่เกษตร', 'เขต สปก.', 'ป่าอนุรักษ์', 'พื้นที่เกษตร', 'ป่าสงวนแห่งชาติ', 'ชุมชนและอื่น ๆ'];
+function riskHotspots(q) {
+  const tab = fixture['HS_' + q.get('province')] || [];
+  const h = tab[0] || [], at = k => h.indexOf(k);
+  const land = q.get('land') || 'พื้นที่เกษตร', from = q.get('from') || '0000', to = q.get('to') || '9999';
+  const rows = tab.slice(1).map((r, i) => {
+    const lt = at('landType') >= 0 && r[at('landType')] ? r[at('landType')] : String(r[0]).startsWith('DEV') ? DEV_LANDS[i % DEV_LANDS.length] : 'พื้นที่เกษตร';
+    return [r[at('date')], r[at('time')], r[at('districtCode')], r[at('districtName')], r[at('subdistrictCode')], r[at('subdistrictName')], r[at('village')], r[at('plantType')], lt, Number(r[at('lat')]), Number(r[at('lng')]), r[at('hotspotId')], ''];
+  }).filter(r => (land === 'all' || r[8] === land) && r[0] >= from && r[0] <= to && r[9] && r[10]);
+  return { ok: true, api: 'TH Agri-Risk Map Burning (dev)', land: land === 'all' ? 'ALL' : land, from, to, count: rows.length,
+    columns: ['date', 'time', 'districtCode', 'district', 'subdistrictCode', 'subdistrict', 'village', 'plantType', 'landType', 'lat', 'lng', 'id', 'importedAt'], rows };
+}
+
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname === '/__risk') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(url.searchParams.get('fn') === 'hotspots' ? riskHotspots(url.searchParams) : { ok: false, error: 'unknown action' }));
+    return;
+  }
   if (url.pathname === '/__api') {
     let body = '';
     req.on('data', c => { body += c; });
@@ -40,7 +59,7 @@ http.createServer((req, res) => {
   }
   if (url.pathname === '/site-config.js') {
     res.writeHead(200, { 'Content-Type': types['.js'] });
-    res.end("window.HS_SITE_CONFIG=Object.freeze({apiEndpoint:'http://127.0.0.1:" + port + "/__api',sourceSheetUrl:'',riskMapUrl:'https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/',greenGainHubUrl:'https://krit-pj.github.io/Green_Gain_Hub-KPP/'});");
+    res.end("window.HS_SITE_CONFIG=Object.freeze({apiEndpoint:'http://127.0.0.1:" + port + "/__api',riskMapApi:'http://127.0.0.1:" + port + "/__risk',sourceSheetUrl:'',riskMapUrl:'https://krit-pj.github.io/TH-Agri-Risk-Maps-Burning/',greenGainHubUrl:'https://krit-pj.github.io/Green_Gain_Hub-KPP/'});");
     return;
   }
   const file = path.normalize(path.join(root, decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)));

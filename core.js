@@ -45,6 +45,7 @@
         districtCode: String(r[idx('districtCode')] || ''), subdistrictCode: String(r[idx('subdistrictCode')] || ''),
         district: clean(r[idx('districtName')]), tambon: clean(r[idx('subdistrictName')]), village: clean(r[idx('village')]),
         plantType: clean(r[idx('plantType')]) || 'ไม่ระบุ', lat: Number(r[idx('lat')]), lng: Number(r[idx('lng')]),
+        landType: idx('landType') >= 0 ? clean(r[idx('landType')]) : '',
         status: s[0] || 'pending', result: s[1] || '', inspectedDate: s[2] || '', photoCount: Number(s[3]) || 0
       };
     });
@@ -56,6 +57,7 @@
       hsId: String(r.hsId), provinceCode: String(r.provinceCode || ''), date: String(r.acquiredAt || '').slice(0, 10), time: clean(r.time),
       districtCode: '', subdistrictCode: '', district: clean(r.district), tambon: clean(r.tambon), village: clean(r.village),
       plantType: clean(r.plantType) || 'ไม่ระบุ', lat: Number(r.latitude), lng: Number(r.longitude),
+      landType: clean(r.landType),
       status: 'pending', result: '', inspectedDate: '', photoCount: 0
     }));
   }
@@ -92,6 +94,35 @@
     return { start: start < months[0] ? months[0] : start, end };
   }
 
+  /* ---------- ประเภทพื้นที่ (คอลัมน์ landType ของต้นทาง) และช่วงเดือน ---------- */
+  const LAND_TYPES = ['พื้นที่เกษตร', 'เขต สปก.', 'ป่าสงวนแห่งชาติ', 'ป่าอนุรักษ์', 'ชุมชนและอื่น ๆ', 'พื้นที่ริมทางหลวง'];
+  const DEFAULT_LAND_TYPES = ['พื้นที่เกษตร'];
+  const DEFAULT_START = '2026-01';   // ม.ค. 2569
+  function monthRange(first, last) {
+    const out = [];
+    if (!/^\d{4}-\d{2}$/.test(first) || !/^\d{4}-\d{2}$/.test(last) || first > last) return out;
+    let [y, m] = first.split('-').map(Number);
+    for (let key = first; key <= last && out.length < 600; ) {
+      out.push(key); m++; if (m > 12) { m = 1; y++; }
+      key = y + '-' + String(m).padStart(2, '0');
+    }
+    return out;
+  }
+  /** ค่าเริ่มต้น: ม.ค. 2569 ถึงเดือนของข้อมูลล่าสุด (ข้อมูลเก่ากว่านั้น → ม.ค. ของปีล่าสุด) */
+  function defaultQueryPeriod(meta) {
+    const first = (meta && meta.firstMonth) || '', end = (meta && meta.lastMonth) || '';
+    if (!end) return { start: DEFAULT_START, end: '' };
+    let start = end >= DEFAULT_START ? DEFAULT_START : end.slice(0, 4) + '-01';
+    if (first && start < first) start = first;
+    return { start, end };
+  }
+  function landTypeLabel(list) {
+    list = list || [];
+    if (!list.length) return 'ทุกประเภทพื้นที่';
+    if (list.length <= 2) return list.join(' + ');
+    return list.length + ' ประเภทพื้นที่';
+  }
+
   function monthsBetween(rows) {
     return Array.from(new Set(rows.map(r => monthKey(r.date)).filter(Boolean))).sort();
   }
@@ -99,7 +130,9 @@
   function applyFilters(rows, f) {
     f = f || {};
     const q = clean(f.search).toLowerCase();
+    const lands = f.landTypes && f.landTypes.length ? f.landTypes : null;
     return rows.filter(r => (!f.start || monthKey(r.date) >= f.start)
+      && (!lands || lands.indexOf(r.landType) >= 0)
       && (!f.end || monthKey(r.date) <= f.end)
       && (!f.province || r.provinceCode === f.province)
       && (!f.district || r.district === f.district)
@@ -217,6 +250,6 @@
   return {
     PROVINCES, MONTHS, MONTHS_SHORT, RESULT_LABELS, STATUS_LABELS, ROLE_LABELS, ROLE_DESCRIPTIONS, COLORS, PERSON_CATEGORIES,
     normalizePhone, validPhone, fromApi, fromSheetSource, fiscalYear, monthKey, monthLabel, thaiDate, thaiDateTime,
-    defaultPeriod, monthsBetween, byDistance, formatDistance, fiscalGroups, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid, ALL, isNational, provinceName, scopeLabel
+    defaultPeriod, monthsBetween, LAND_TYPES, DEFAULT_LAND_TYPES, DEFAULT_START, monthRange, defaultQueryPeriod, landTypeLabel, byDistance, formatDistance, fiscalGroups, applyFilters, distinct, tally, groupSummary, toCsv, csvCell, escapeHtml, distanceM, can, uuid, ALL, isNational, provinceName, scopeLabel
   };
 });

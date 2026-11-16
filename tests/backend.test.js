@@ -58,6 +58,20 @@ test('public reads: provinces and hotspots come from the source HS sheet, cleane
   assert.deepEqual(hs.status, {});
 });
 
+test('hs_status: verification status of one province only (HS points now come from the Agri-Risk Map API)', () => {
+  const env = boot();
+  const mini = loginPhone(env, '0811111111');
+  env.call(verifiedPayload(mini.token, {}));
+  const st = env.get({ action: 'hs_status', province: '62' });
+  assert.equal(st.ok, true);
+  assert.deepEqual(Object.keys(st.status), ['VI1202401010701urgxyruxcx']);
+  assert.equal(st.status['VI1202401010701urgxyruxcx'][0], 'verified');
+  assert.deepEqual(st.statusFields, ['status', 'result', 'inspectedDate', 'photoCount']);
+  assert.ok(!JSON.stringify(st).includes(mini.user.name));
+  assert.equal(env.get({ action: 'hs_status', province: '51' }).status && Object.keys(env.get({ action: 'hs_status', province: '51' }).status).length, 0);
+  assert.equal(env.get({ action: 'hs_status', province: 'xx' }).ok, false);
+});
+
 test('Admin / Mini Super Admin log in by phone; unknown numbers are recorded', () => {
   const env = boot();
   const mini = loginPhone(env, '081-111-1111');

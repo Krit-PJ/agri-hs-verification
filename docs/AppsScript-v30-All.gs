@@ -16,7 +16,7 @@
  *   admin      : ผู้บันทึกข้อมูลผลตรวจจุดความร้อน (HS) ในจังหวัดของตน
  */
 
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.6.0';
 const SETUP_VERSION = '3.2';
 
 /** ฐานข้อมูลของระบบตรวจสอบ (สร้างไว้แล้วในโฟลเดอร์ 5. Thailand HS Verification) */
@@ -1050,6 +1050,20 @@ function publicProvinces_() {
 }
 
 /** ข้อมูลสาธารณะ: จุด HS + สถานะ/ผลตรวจ (ไม่เปิดเผยชื่อผู้บันทึก พิกัดหน้างาน หรือภาพ) */
+/**
+ * v3.6: จุด HS ของหน้าเว็บมาจาก API ระบบ Agri-Risk Map Burning (fn=hotspots) โดยตรง
+ * Backend นี้ส่งเฉพาะสถานะ/ผลตรวจของจังหวัด (ข้อมูลสาธารณะชุดเดียวกับใน hotspots — ไม่มีชื่อผู้บันทึก พิกัดหน้างาน หรือภาพ)
+ */
+function hsStatus_(prov) {
+  const code = provCode_(prov);
+  if (!code) throw new Error('รหัสจังหวัดไม่ถูกต้อง');
+  const status = {};
+  readAll_('Verifications').forEach(r => {
+    if (r.provinceCode === code) status[r.hotspotId] = [r.status, r.result, String(r.inspectedAt || r.updatedAt || '').slice(0, 10), Number(r.photoCount) || 0];
+  });
+  return { ok: true, province: code, status: status, statusFields: ['status', 'result', 'inspectedDate', 'photoCount'], generatedAt: now_() };
+}
+
 function publicHotspots_(prov) {
   const code = provCode_(prov);
   if (!code) throw new Error('รหัสจังหวัดไม่ถูกต้อง');
@@ -1315,6 +1329,7 @@ function doGet(e) {
       case 'ping': return json_({ ok: true, version: APP_VERSION, time: now_() });
       case 'provinces': return json_({ ok: true, provinces: publicProvinces_() });
       case 'hotspots': return json_(publicHotspots_(p.province));
+      case 'hs_status': return json_(hsStatus_(p.province));
       case 'hit': return json_({ ok: true, counter: counter_(true) });
       case 'counter': return json_({ ok: true, counter: counter_(false) });
       case 'settings': return json_({ ok: true, settings: { riskUrl: setting_('risk_url'), hubUrl: setting_('hub_url') } });

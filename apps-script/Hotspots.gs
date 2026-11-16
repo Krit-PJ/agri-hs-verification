@@ -118,6 +118,20 @@ function publicProvinces_() {
 }
 
 /** ข้อมูลสาธารณะ: จุด HS + สถานะ/ผลตรวจ (ไม่เปิดเผยชื่อผู้บันทึก พิกัดหน้างาน หรือภาพ) */
+/**
+ * v3.6: จุด HS ของหน้าเว็บมาจาก API ระบบ Agri-Risk Map Burning (fn=hotspots) โดยตรง
+ * Backend นี้ส่งเฉพาะสถานะ/ผลตรวจของจังหวัด (ข้อมูลสาธารณะชุดเดียวกับใน hotspots — ไม่มีชื่อผู้บันทึก พิกัดหน้างาน หรือภาพ)
+ */
+function hsStatus_(prov) {
+  const code = provCode_(prov);
+  if (!code) throw new Error('รหัสจังหวัดไม่ถูกต้อง');
+  const status = {};
+  readAll_('Verifications').forEach(r => {
+    if (r.provinceCode === code) status[r.hotspotId] = [r.status, r.result, String(r.inspectedAt || r.updatedAt || '').slice(0, 10), Number(r.photoCount) || 0];
+  });
+  return { ok: true, province: code, status: status, statusFields: ['status', 'result', 'inspectedDate', 'photoCount'], generatedAt: now_() };
+}
+
 function publicHotspots_(prov) {
   const code = provCode_(prov);
   if (!code) throw new Error('รหัสจังหวัดไม่ถูกต้อง');

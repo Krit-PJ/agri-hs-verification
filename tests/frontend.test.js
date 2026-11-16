@@ -125,3 +125,48 @@ test('national scope: Super Admin and national Mini Super Admin see all province
   assert.equal(C.applyFilters(rows, { province: '51' }).length, 4);
   assert.equal(C.groupSummary(rows, 'province').length, 2);
 });
+
+test('land type + month range helpers (v3.6)', () => {
+  assert.deepEqual(C.DEFAULT_LAND_TYPES, ['พื้นที่เกษตร']);
+  assert.equal(C.DEFAULT_START, '2026-01');
+  assert.deepEqual(C.monthRange('2025-11', '2026-02'), ['2025-11', '2025-12', '2026-01', '2026-02']);
+  assert.deepEqual(C.defaultQueryPeriod({ firstMonth: '2024-01', lastMonth: '2026-11' }), { start: '2026-01', end: '2026-11' });
+  assert.deepEqual(C.defaultQueryPeriod({ firstMonth: '2024-01', lastMonth: '2025-08' }), { start: '2025-01', end: '2025-08' }, 'older data: start at January of the latest year');
+  assert.deepEqual(C.defaultQueryPeriod({ firstMonth: '2026-03', lastMonth: '2026-05' }), { start: '2026-03', end: '2026-05' });
+  assert.equal(C.landTypeLabel(['พื้นที่เกษตร']), 'พื้นที่เกษตร');
+  assert.equal(C.landTypeLabel(['พื้นที่เกษตร', 'เขต สปก.']), 'พื้นที่เกษตร + เขต สปก.');
+  assert.equal(C.landTypeLabel(['พื้นที่เกษตร', 'เขต สปก.', 'ป่าอนุรักษ์']), '3 ประเภทพื้นที่');
+  assert.equal(C.landTypeLabel([]), 'ทุกประเภทพื้นที่');
+  const rows = C.fromApi(Object.assign({}, apiPayload, { fields: apiPayload.fields.concat('landType'), rows: apiPayload.rows.map((r, i) => r.concat(i % 2 ? 'เขต สปก.' : 'พื้นที่เกษตร')) }));
+  assert.equal(rows[1].landType, 'เขต สปก.');
+  assert.deepEqual(C.applyFilters(rows, { landTypes: ['เขต สปก.'] }).map(r => r.hsId), ['B', 'D']);
+  assert.equal(C.applyFilters(rows, { landTypes: [] }).length, 4, 'empty list = every land type');
+});
+
+test('Agri-Risk Map API reader: one request per land type, mapped by column name, merged without duplicates', async () => {
+  const HSRiskApi = require('../riskmap-api.js');
+  const columns = ['date', 'time', 'districtCode', 'district', 'subdistrictCode', 'subdistrict', 'village', 'plantType', 'landType', 'lat', 'lng', 'id', 'importedAt'];
+  const calls = [];
+  const fetcher = async url => {
+    const q = new URL(url).searchParams; calls.push(Object.fromEntries(q));
+    const land = q.get('land');
+    const rows = land === 'พื้นที่เกษตร'
+      ? [['2026-01-03', '13:44', '6210', 'บึงสามัคคี', '621004', 'เทพนิมิต', 'บ้านทุ่งผึ้ง', 'นาข้าว', land, 16.21909, 99.94696, 'VI2A', 'x'], ['2026-02-01', '', '6201', 'เมือง', '620101', 'ในเมือง', '', '', land, 16.4, 99.5, 'VI2B', 'x']]
+      : [['2026-03-05', '13:40', '6204', 'ขาณุ', '620403', 'ยางสูง', '', 'อ้อย', land, 16.1, 99.8, 'VI2C', 'x'], ['2026-03-05', '13:40', '6204', 'ขาณุ', '620403', 'ยางสูง', '', 'อ้อย', land, 'bad', 99.8, 'VI2D', 'x']];
+    return { ok: true, json: async () => ({ ok: true, land, columns, rows }) };
+  };
+  const rows = await HSRiskApi.load('https://example.test/exec', '62', ['พื้นที่เกษตร', 'เขต สปก.'], '2026-01', '2026-02', { fetcher });
+  assert.deepEqual(rows.map(r => r.hsId), ['VI2A', 'VI2B', 'VI2C'], 'bad coordinates dropped');
+  assert.equal(rows[0].tambon, 'เทพนิมิต');
+  assert.equal(rows[0].landType, 'พื้นที่เกษตร');
+  assert.equal(rows[1].plantType, 'ไม่ระบุ');
+  assert.equal(rows[2].provinceCode, '62');
+  assert.deepEqual(calls.map(c => [c.action, c.fn, c.province, c.land, c.from, c.to]), [
+    ['api', 'hotspots', '62', 'พื้นที่เกษตร', '2026-01-01', '2026-02-28'],
+    ['api', 'hotspots', '62', 'เขต สปก.', '2026-01-01', '2026-02-28']]);
+  await HSRiskApi.load('https://example.test/exec', '62', ['พื้นที่เกษตร'], '2026-01', '2026-02', { fetcher });
+  assert.equal(calls.length, 2, 'second identical request served from memory');
+  const bad = async () => ({ ok: true, json: async () => ({ ok: true, land: 'พื้นที่เกษตร', columns, rows: [] }) });
+  await assert.rejects(HSRiskApi.load('https://example.test/exec', '62', ['เขต สปก.'], '2026-01', '2026-01', { fetcher: bad, force: true }), /ไม่รองรับประเภทพื้นที่/);
+  assert.equal(HSRiskApi.lastDay('2024-02'), '2024-02-29');
+});

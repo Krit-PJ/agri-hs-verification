@@ -16,6 +16,7 @@ function doGet(e) {
       case 'ping': return json_({ ok: true, version: APP_VERSION, time: now_() });
       case 'provinces': return json_({ ok: true, provinces: publicProvinces_() });
       case 'hotspots': return json_(publicHotspots_(p.province));
+      case 'hs_status': return json_(hsStatus_(p.province));
       case 'hit': return json_({ ok: true, counter: counter_(true) });
       case 'counter': return json_({ ok: true, counter: counter_(false) });
       case 'settings': return json_({ ok: true, settings: { riskUrl: setting_('risk_url'), hubUrl: setting_('hub_url') } });

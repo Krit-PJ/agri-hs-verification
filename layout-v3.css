@@ -522,3 +522,53 @@ details.table-card>summary{cursor:pointer;font-weight:800;color:var(--teal-950)}
 @media screen and (max-width:700px){
   .access-tabs button{white-space:nowrap;font-size:.88rem;padding-left:6px;padding-right:6px}
 }
+
+/* =====================================================================
+   v3.6 — ประเภทพื้นที่ (เลือกได้หลายประเภท) + ช่วงเดือน ตั้งแต่/ถึง
+   ===================================================================== */
+.wb-land{position:relative}
+.wb-select{min-height:44px;min-width:230px;max-width:300px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--color-control-border);border-radius:var(--radius-control);background:#fff;padding:6px 12px;font:600 .95rem var(--font-body);color:var(--ink);cursor:pointer;text-align:left}
+.wb-select::after{content:'';flex:0 0 auto;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);opacity:.7}
+.wb-select[aria-expanded="true"]{border-color:var(--color-primary);box-shadow:0 0 0 3px #1a7f3722}
+.wb-select.changed{background:var(--teal-50);border-color:#8cc7a0}
+#landTypeValue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.land-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:1100;width:330px;max-width:calc(100vw - 24px);background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px #0b2a1f2e;padding:12px}
+.land-panel[hidden]{display:none}
+.land-hint{margin:0 0 8px;font-size:.78rem;font-weight:500;color:var(--muted);line-height:1.5}
+.land-list{display:grid;gap:2px}
+.land-option{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:10px;cursor:pointer;font-size:.93rem;font-weight:600;color:var(--ink)}
+.land-option:hover{background:var(--teal-50)}
+.land-option input{width:20px;height:20px;accent-color:var(--color-primary);flex:0 0 auto}
+.land-option span{flex:1 1 auto}
+.land-option small{font-size:.78rem;font-weight:700;color:var(--teal-900);background:var(--teal-50);border-radius:999px;padding:1px 9px}
+.land-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.land-actions .text-button{font-size:.82rem;padding:6px 2px;min-height:36px}
+.land-actions .primary-button{margin-left:auto;min-height:40px;padding:0 20px}
+.wb-month select{min-width:140px}
+.land-tag{font-weight:700;color:#7a4b05}
+@media screen and (max-width:800px){
+  .wb-land{flex:1 1 100%}
+  .wb-select{min-width:0;max-width:none;width:100%}
+  .wb-month{flex:1 1 calc(50% - 6px)}
+  .wb-month select{min-width:0;width:100%}
+}
+@media screen and (max-width:700px){
+  .workbar-row{grid-template-columns:1fr 1fr auto auto}
+  .wb-province{grid-column:1/-1}
+  .wb-land{grid-column:1/3;grid-row:2}
+  #filterToggle{grid-column:3;grid-row:2}
+  #refreshDataButton{grid-column:4;grid-row:2}
+  .wb-from{grid-column:1/3;grid-row:3}
+  .wb-to{grid-column:3/5;grid-row:3}
+  .wb-field.wb-month>span{display:block;font-size:.72rem;margin-bottom:-1px}
+  .land-panel{position:fixed;left:12px;right:12px;top:auto;bottom:12px;width:auto;max-height:80vh;overflow:auto;padding:14px;box-shadow:0 -10px 40px #0b2a1f40}
+  .land-actions .primary-button{flex:1 1 100%;margin-left:0;min-height:46px}
+}
+.land-panel .land-option{display:flex;grid-template-columns:none;min-height:44px;height:auto;margin:0;padding:6px 8px;line-height:1.4}
+.land-panel .land-hint{white-space:normal}
+@media screen and (max-width:700px){
+  body.land-open .workbar{z-index:2100}
+  body.land-open::after{content:'';position:fixed;inset:0;background:#0b2a1f66;z-index:2000}
+  .land-panel{z-index:2200}
+}
+.land-panel .land-option input[type=checkbox]{width:20px;height:20px;min-height:0;min-width:0;margin:0;padding:0;box-shadow:none}
